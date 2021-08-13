@@ -25,7 +25,7 @@ const { resolve } = require('./utils')
  * @param  {String}   		             backupRetentionPeriod				Unit days. Default is 1 day.
  * @param  {String}   		             auth.masterUsername				Alphanumeric character and underscore.
  * @param  {String}   		             auth.masterPassword				Max length is 41 characters.
- * @param  {Output<String>}              auth.secretArn						ARN of the secret in AWS secrets manager that contains the masterUsername and masterPassword
+ * @param  {Output<String>}              auth.secretId						ARN of the secret in AWS secrets manager that contains the masterUsername and masterPassword
  * @param  {Number}   		             instanceNbr						Default 1.
  * @param  {String}   		             instanceSize						Default 'db.t2.small'.
  * @param  {String}  		             vpcId								Default null (i.e., default VPC).
@@ -89,36 +89,41 @@ const createAurora = async ({
 		throw new Error('Missing required \'availabilityZones\' argument.')
 	if (!auth)
 		throw new Error('Missing required \'auth\' argument.')
-	if (!auth.secretArn && !auth.masterUsername)
-		throw new Error('Missing required \'auth.masterUsername\' argument. Argument required when \'auth.secretArn\' is not specified.')
-	if (!auth.secretArn && !auth.masterPassword)
-		throw new Error('Missing required \'auth.masterPassword\' argument. Argument required when \'auth.secretArn\' is not specified.')
-	if (proxy && !auth.secretArn)
-		throw new Error('Missing required \'auth.secretArn\' argument. Argument required when the RDS proxy is on.')
+	if (!auth.secretId && !auth.masterUsername)
+		throw new Error('Missing required \'auth.masterUsername\' argument. Argument required when \'auth.secretId\' is not specified.')
+	if (!auth.secretId && !auth.masterPassword)
+		throw new Error('Missing required \'auth.masterPassword\' argument. Argument required when \'auth.secretId\' is not specified.')
+	if (proxy && !auth.secretId)
+		throw new Error('Missing required \'auth.secretId\' argument. Argument required when the RDS proxy is on.')
 
 	let { masterUsername, masterPassword } = auth
-	const secretArn = auth.secretArn ? await resolve(auth.secretArn) : null
+	const secretId = auth.secretId ? await resolve(auth.secretId) : null
 
 	// Extract username and password from AWS secret manager
-	if (secretArn) {
-		const secretVersion = await aws.secretsmanager.getSecretVersion({
-			secretId: secretArn
+	let secretArn
+	if (secretId) {
+		const secretVersion = await aws.secretsmanager.getSecretVersion({ secretId }).catch(err => {
+			throw new Error(`Fail to retrieve secret ID '${secretId}'. Details: ${err.message}`)
 		})
-		const { secretString } = secretVersion || {}
+		if (!secretVersion)
+			throw new Error(`Secret ID ${secretId} not found.`)
+
+		secretArn = secretVersion.arn
+		const secretString = secretVersion.secretString
 		if (!secretString)
-			throw new Error(`Secret value not found in secret '${secretArn}'.`)
+			throw new Error(`Secret value not found in secret ID '${secretId}'.`)
 		
 		let secretObj = {}
 		try {
 			secretObj = JSON.parse(secretString)
 		} catch(err) {
-			throw new Error(`Faile to parse to JSON the secret string stored in secret '${secretArn}'. Corrupted secret string: ${secretString}`)
+			throw new Error(`Faile to parse to JSON the secret string stored in secret ID '${secretId}'. Corrupted secret string: ${secretString}`)
 		}
 
 		if (!secretObj.username)
-			throw new Error(`Missing required property 'username' in secret '${secretArn}'.`)
+			throw new Error(`Missing required property 'username' in secret ID '${secretId}'.`)
 		if (!secretObj.password)
-			throw new Error(`Missing required property 'password' in secret '${secretArn}'.`)
+			throw new Error(`Missing required property 'password' in secret ID '${secretId}'.`)
 
 		masterUsername = secretObj.username
 		masterPassword = secretObj.password
