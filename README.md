@@ -1,6 +1,7 @@
 # PULUMI RECIPES
 
-> Managing AWS resources almost always involves managing IAM roles and policies. For a quick recap on that topic, please refer to this document: https://gist.github.com/nicolasdao/830fc1d1b6ce86e0d8bebbdedb2f2626.
+> __Pulumi guide__: To learn more about Pulumi, please refer to https://gist.github.com/nicolasdao/830fc1d1b6ce86e0d8bebbdedb2f2626.
+> __IAM roles & policies__: Managing AWS resources almost always involves managing IAM roles and policies. For a quick recap on that topic, please refer to this document: https://gist.github.com/nicolasdao/830fc1d1b6ce86e0d8bebbdedb2f2626#iam-recap.
 
 # Table of contents
 
