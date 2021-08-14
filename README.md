@@ -20,6 +20,7 @@
 >	- [Aurora](#aurora)
 >		- [Basic usage](#aurora---basic-usage)
 >		- [Grant access to EC2 instance](#grant-access-to-ec2-instance)
+>		- [Add RDS proxy](#add-rds-proxy)
 >		- [Using AWS Secrets Manager to manage Aurora's credentials](#using-aws-secrets-manager-to-manage-auroras-credentials)
 >	- [EC2](#ec2)
 >	- [EFS](#efs)
@@ -243,7 +244,7 @@ const auroraOutput = aurora({
 	instanceSize: 'db.t2.small', 
 	vpcId: 'vpc-1234',
 	subnetIds: ['subnet-1234', 'subnet-4567'],
-	ingressRules:[
+	ingress:[
 		{ protocol: 'tcp', fromPort: 3306, toPort: 3306, cidrBlocks: ['10.0.1.204/32'], description:`Bastion host access` }
 	],
 	protect:false, 
@@ -257,10 +258,10 @@ const auroraOutput = aurora({
 
 ### Grant access to EC2 instance
 
-Use the `ec2` function described in the [EC2 with SSM](#ec2-with-ssm) section and the `aurora` function described in the [RDS Aurora](#rds-aurora) section. The important bit in the next sample is the aurora `ingressRules`, which allows the bastion to access Aurora:
+Use the `ec2` function described in the [EC2 with SSM](#ec2-with-ssm) section and the `aurora` function described in the [RDS Aurora](#rds-aurora) section. The important bit in the next sample is the aurora `ingress`, which allows the bastion to access Aurora:
 
 ```js
-ingressRules:[
+ingress:[
 	{ protocol: 'tcp', fromPort: 3306, toPort: 3306, cidrBlocks: [pulumi.interpolate`${bastionOutput.privateIp}/32`], description:`Bastion host ${ec2Name} access` }
 ]
 ```
@@ -297,7 +298,7 @@ const auroraOutput = aurora({
 	instanceSize, 
 	vpcId:vpc.id,
 	subnetIds: vpc.isolatedSubnetIds,
-	ingressRules:[
+	ingress:[
 		{ protocol: 'tcp', fromPort: 3306, toPort: 3306, cidrBlocks: [pulumi.interpolate`${bastionOutput.privateIp}/32`], description:`Bastion host ${ec2Name} access` }
 	],
 	protect:false, 
@@ -305,6 +306,66 @@ const auroraOutput = aurora({
 	tags
 })
 ```
+
+### Add RDS proxy
+
+Use the `proxy` property. When this feature is enabled, an additional security group is created for RDS proxy.
+
+```js
+const auroraOutput = aurora({
+	name: 'my-db', 
+	engine: 'mysql',
+	availabilityZones: ['ap-southeast-2a', 'ap-southeast-2b', 'ap-southeast-2c'], 
+	backupRetentionPeriod: 30, // 30 days
+	auth: {
+		masterUsername: process.env.DB_USERNAME, 
+		masterPassword: process.env.DB_PASSWORD, 
+	}, 
+	instanceNbr: 1, 
+	instanceSize: 'db.t2.small', 
+	vpcId: 'vpc-1234',
+	subnetIds: ['subnet-1234', 'subnet-4567'],
+	ingress:[
+		{ protocol: 'tcp', fromPort: 3306, toPort: 3306, cidrBlocks: ['10.0.1.204/32'], description:`Bastion host access` }
+	],
+	proxy: true
+})
+```
+
+To configure it in greater details, use an object instead:
+
+```js
+{
+	proxy: {
+		enabled: true, // Default true.
+		subnetIds: null, // Default is the RDS's subnetIds.
+		logSQLqueries: false, // Default false
+		idleClientTimeout: 1800, // Default 1800 seconds
+		requireTls: true, // Default true.
+		iam: false // Default false. If true, the RDS credentials are disabled and the only way to connect is via IAM.
+	}
+}
+```
+
+By default, all the `ingress` rules apply to identically both RDS and RDS proxy. This first example is equivalent to this:
+
+```js
+{
+	ingress:[
+		{ 
+			protocol: 'tcp', 
+			fromPort: 3306, 
+			toPort: 3306, 
+			cidrBlocks: ['10.0.1.204/32'], 
+			description:`Bastion host access`,
+			rds: true,
+			proxy: true
+		}
+	],
+}
+```
+
+To create ingress rules that are specific to RDS or RDS proxy, use the `rds` or `proxy` flag on each rule.
 
 ### Using AWS Secrets Manager to manage Aurora's credentials
 

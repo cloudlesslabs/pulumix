@@ -26,7 +26,7 @@ const aws = require('@pulumi/aws')
  * @return {Output<secretVersion>} 	output.secretVersion
  * @return {Output<SecretRotation>} output.rotation			
  */
-const createSecret = ({ name, value, rotation, tags:_tags }) => {
+const createSecret = async ({ name, value, rotation, tags:_tags }) => {
 	if (!name)
 		throw new Error('Missing required \'name\' argument.')
 

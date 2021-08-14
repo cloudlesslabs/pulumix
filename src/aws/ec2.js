@@ -40,7 +40,7 @@ const aws = require('@pulumi/aws')
  * @return {Output<[String]>} ec2.keyPair.name
  * @return {Output<[String]>} ec2.keyPair.keyPairId
  */
-const createEC2 = ({ name, ami, instanceType, availabilityZone, subnetId, vpcSecurityGroupIds, userData, userDataBase64, publicKey, toggleSSM, ssmVpcId, ssmVpcSecurityGroupId, tags }) => {
+const createEC2 = async ({ name, ami, instanceType, availabilityZone, subnetId, vpcSecurityGroupIds, userData, userDataBase64, publicKey, toggleSSM, ssmVpcId, ssmVpcSecurityGroupId, tags }) => {
 	tags = tags || {}
 
 	// IAM role. Doc: https://www.pulumi.com/docs/reference/pkg/aws/iam/role/

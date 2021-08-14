@@ -8,43 +8,47 @@ const { resolve } = require('./utils')
 /**
  * Create an AWS Aurora cluster. Doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/cluster/
  * Resources:
- * 	1. Security Group based on the 'ingressRules' content, the 'publicAccess' and 'proxy' flag.
- * 	2. Subnet Group based on the 'subnetIds'.
- * 	3. DB Cluster & at least one DB Cluster instance (Number of instances depends on 'instanceNbr').
- * 	4. (Optional) IAM role for RDS proxy.
- * 	5. (Optional) IAM policy for RDS proxy.
- * 	6. (Optional) RDS proxy.
- * 	7. (Optional) RDS proxy target group.
- * 	8. (Optional) RDS proxy target.
+ * 	1. RDS Security Group based on the 'ingress' content and the 'publicAccess' flag
+ * 	2. RDS proxy Security Group based on the 'ingress' content and the 'publicAccess' flag
+ * 	3. Subnet Group based on the 'subnetIds'.
+ * 	4. DB Cluster & at least one DB Cluster instance (Number of instances depends on 'instanceNbr').
+ * 	5. (Optional) IAM role for RDS proxy.
+ * 	6. (Optional) IAM policy for RDS proxy.
+ * 	7. (Optional) RDS proxy.
+ * 	8. (Optional) RDS proxy target group.
+ * 	9. (Optional) RDS proxy target.
  * 	
  * 
- * @param  {String}   		             name								DB name must begin with a letter and contain only alphanumeric characters						
- * @param  {String}   		             engine								Valid values: 'postgresql' or 'mysql'
- * @param  {String}   		             engineVersion						Optional. Default depends on the 'engine'
- * @param  {[String]} 		             availabilityZones					e.g., ['ap-southeast-2a', 'ap-southeast-2b', 'ap-southeast-2c']
- * @param  {String}   		             backupRetentionPeriod				Unit days. Default is 1 day.
- * @param  {String}   		             auth.masterUsername				Alphanumeric character and underscore.
- * @param  {String}   		             auth.masterPassword				Max length is 41 characters.
- * @param  {Output<String>}              auth.secretId						ARN of the secret in AWS secrets manager that contains the masterUsername and masterPassword
- * @param  {Number}   		             instanceNbr						Default 1.
- * @param  {String}   		             instanceSize						Default 'db.t2.small'.
- * @param  {String}  		             vpcId								Default null (i.e., default VPC).
- * @param  {[String]}  		             subnetIds							Default null. If exists, it is used to create a subnet group for the cluster.
- * @param  {String}  		             ingressRules[].protocol			e.g., 'tcp'
- * @param  {Number}  		             ingressRules[].fromPort			e.g., 3306
- * @param  {Number}  		             ingressRules[].toPort				e.g., 3306
- * @param  {[String]}  		             ingressRules[].cidrBlocks			e.g., ['0.0.0.0/0']
- * @param  {[String]}  		             ingressRules[].ipv6CidrBlocks		e.g., ['::/0']
- * @param  {[String]}  		             ingressRules[].securityGroups		e.g., ['sg-123455', 'sg-7654211']
- * @param  {Boolean}  		             protect							Default false.
- * @param  {Boolean}  		             publicAccess						Default false.
- * @param  {Boolean}  		             cloudWatch							Default false.
- * @param  {Object|Boolean}  	         proxy								Default false. If true, the proxy uses the default settings.
- * @param  {Boolean}  		             proxy.enabled						Default true. 
- * @param  {Boolean}  		             proxy.subnetIds					Default 'subnetIds'.
- * @param  {Boolean}  		             proxy.logSQLqueries				Default false. Only turn this to true temporarily to debug as logging SQL queries could create security holes.
- * @param  {Number}  		             proxy.idleClientTimeout			Unit seconds. Default 1800 (30 min.)
- * @param  {Boolean}  		             proxy.requireTls					Default true.
+ * @param  {String}   		             name							DB name must begin with a letter and contain only alphanumeric characters						
+ * @param  {String}   		             engine							Valid values: 'postgresql' or 'mysql'
+ * @param  {String}   		             engineVersion					Optional. Default depends on the 'engine'
+ * @param  {[String]} 		             availabilityZones				e.g., ['ap-southeast-2a', 'ap-southeast-2b', 'ap-southeast-2c']
+ * @param  {String}   		             backupRetentionPeriod			Unit days. Default is 1 day.
+ * @param  {String}   		             auth.masterUsername			Alphanumeric character and underscore.
+ * @param  {String}   		             auth.masterPassword			Max length is 41 characters.
+ * @param  {Output<String>}              auth.secretId					ARN of the secret in AWS secrets manager that contains the masterUsername and masterPassword
+ * @param  {Number}   		             instanceNbr					Default 1.
+ * @param  {String}   		             instanceSize					Default 'db.t2.small'.
+ * @param  {String}  		             vpcId							Default null (i.e., default VPC).
+ * @param  {[String]}  		             subnetIds						Default null. If exists, it is used to create a subnet group for the cluster.
+ * @param  {String}  		             ingress[].protocol				e.g., 'tcp'
+ * @param  {Number}  		             ingress[].fromPort				e.g., 3306
+ * @param  {Number}  		             ingress[].toPort				e.g., 3306
+ * @param  {[String]}  		             ingress[].cidrBlocks			e.g., ['0.0.0.0/0']
+ * @param  {[String]}  		             ingress[].ipv6CidrBlocks		e.g., ['::/0']
+ * @param  {[String]}  		             ingress[].securityGroups		e.g., ['sg-123455', 'sg-7654211']
+ * @param  {[String]}  		             ingress[].rds					Default true. Determines whether this rule affects the RDS security group
+ * @param  {[String]}  		             ingress[].proxy				Default true. Determines whether this rule affects the RDS security group
+ * @param  {Boolean}  		             protect						Default false.
+ * @param  {Boolean}  		             publicAccess					Default false.
+ * @param  {Boolean}  		             cloudWatch						Default false.
+ * @param  {Object|Boolean}  	         proxy							Default false. If true, the proxy uses the default settings.
+ * @param  {Boolean}  		             proxy.enabled					Default true. 
+ * @param  {Boolean}  		             proxy.subnetIds				Default 'subnetIds'.
+ * @param  {Boolean}  		             proxy.logSQLqueries			Default false. Only turn this to true temporarily to debug as logging SQL queries could create security holes.
+ * @param  {Number}  		             proxy.idleClientTimeout		Unit seconds. Default 1800 (30 min.)
+ * @param  {Boolean}  		             proxy.requireTls				Default true.
+ * @param  {Boolean}  		             proxy.iam						Default false. If true, the only way to connect to the proxy is via IAM (Creds are disabled)
  * @param  {Object}  		             tags
  * 
  * @return {Output<String>}              output.endpoint			
@@ -70,7 +74,7 @@ const createAurora = async ({
 	instanceSize='db.t2.small', 
 	vpcId,
 	subnetIds,
-	ingressRules,
+	ingress,
 	protect=false, 
 	publicAccess=false,
 	cloudWatch,
@@ -82,7 +86,10 @@ const createAurora = async ({
 		throw new Error('Missing required \'name\' argument.')
 	if (!engine)
 		throw new Error('Missing required \'engine\' argument.')
+	
 	engine = engine.toLowerCase().trim()
+	const proxyEnabled = proxy && proxy.enabled !== false
+	
 	if (engine != 'mysql' && engine != 'postgresql')
 		throw new Error(`Wrong argument exception. 'engine' valid values are 'mysql' and 'postgresql'. Found '${engine}' instead.`)
 	if (!availabilityZones || !availabilityZones.length)
@@ -93,13 +100,13 @@ const createAurora = async ({
 		throw new Error('Missing required \'auth.masterUsername\' argument. Argument required when \'auth.secretId\' is not specified.')
 	if (!auth.secretId && !auth.masterPassword)
 		throw new Error('Missing required \'auth.masterPassword\' argument. Argument required when \'auth.secretId\' is not specified.')
-	if (proxy && !auth.secretId)
+	if (proxyEnabled && !auth.secretId)
 		throw new Error('Missing required \'auth.secretId\' argument. Argument required when the RDS proxy is on.')
 
 	let { masterUsername, masterPassword } = auth
 	const secretId = auth.secretId ? await resolve(auth.secretId) : null
 
-	// Extract username and password from AWS secret manager
+	// Extract username and password from AWS secret manager and get the secret's ARN for the RDS proxy
 	let secretArn
 	if (secretId) {
 		const secretVersion = await aws.secretsmanager.getSecretVersion({ secretId }).catch(err => {
@@ -134,36 +141,15 @@ const createAurora = async ({
 	const dbPort = isMySql ? 3306 : 5432
 	const logs = isMySql ? ['error', 'general', 'slowquery'] : ['postgresql'] 
 	engineVersion = engineVersion || (isMySql ? '5.7.mysql_aurora.2.10.0' : '12.6')
-	ingressRules = ingressRules || []
-
+	ingress = ingress || []
 	tags = tags || {}
 
 	// Sanitize the DB and cluster names.
 	const dbName = name.toLowerCase().replace(/-/g,'_').replace(/[^a-z0-9_]/g,'') // removing invalid characters
 	const clusterName = `${name}-cluster`.toLowerCase().replace(/[^a-z0-9-]/g,'') // removing invalid characters
 
-	if (publicAccess) // Allows the public internet to access the RDS cluster
-		ingressRules.push({ protocol: 'tcp', fromPort: dbPort, toPort: dbPort, cidrBlocks: ['0.0.0.0/0'], description: 'Public access' })
-	if (proxy) // Allows the proxy to access the RDS cluster and vice-versa
-		ingressRules.push({ protocol: 'tcp', fromPort: dbPort, toPort: dbPort, self:true, description: 'Allow RDS proxy access to Aurora' })
-	
-	// Security group doc: https://www.pulumi.com/docs/reference/pkg/aws/ec2/securitygroup/
-	const securityGroupOutput = await securityGroup({ 
-		name: `${clusterName}-sg`, 
-		description: `Controls the ${clusterName} Aurora/MySQL access`, 
-		vpcId, 
-		ingress: ingressRules, 
-		egress: [{ 
-			protocol: 'tcp', 
-			fromPort: dbPort, 
-			toPort: dbPort, 
-			cidrBlocks: ['0.0.0.0/0'], 
-			ipv6CidrBlocks: ['::/0'], 
-			description:'Allows RDS systems to respond.' 
-		}], 
-		tags
-	})
-	const sgId = securityGroupOutput.securityGroup.id
+	// Creates the RDS SG and optional the RDS Proxy SG
+	const [rdsSecurityGroup, proxySecurityGroup] = await createSecurityGroups(clusterName, dbPort, vpcId, ingress, { publicAccess, proxyEnabled, tags })
 
 	// Creates a subnet group (optional). Doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/subnetgroup/
 	const subnetGroupName = `${clusterName}-subnet-group`
@@ -191,7 +177,7 @@ const createAurora = async ({
 		enabledCloudwatchLogsExports: cloudWatch ? logs : undefined,
 		preferredBackupWindow: '15:00-17:00', // time is UTC
 		applyImmediately: true,
-		vpcSecurityGroupIds: [sgId], // Must be set to allow traffic based on the security group
+		vpcSecurityGroupIds: [rdsSecurityGroup.securityGroup.id], // Must be set to allow traffic based on the security group
 		dbSubnetGroupName: subnetGroup ? subnetGroup.name : undefined,
 		tags: {
 			...tags,
@@ -235,7 +221,7 @@ const createAurora = async ({
 	// 	- Proxy target group doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/proxydefaulttargetgroup/
 	// 	- Proxy target doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/proxytarget/
 	// 	- Proxy endpoint doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/proxyendpoint/
-	const proxyOutput = !proxy || proxy.enabled === false ? null : await (async () => {
+	const proxyOutput = !proxyEnabled ? null : await (async () => {
 		// IAM role. Doc: https://www.pulumi.com/docs/reference/pkg/aws/iam/role/
 		const proxyRoleName = `${name}-rds-proxy`
 		const proxyRole = new aws.iam.Role(proxyRoleName, {
@@ -294,13 +280,13 @@ const createAurora = async ({
 			auths: [{
 				authScheme: 'SECRETS',
 				description: `Authentication method used to connect the RDS proxy ${name} to the Aurora cluster ${clusterName}`,
-				iamAuth: 'DISABLED',
+				iamAuth: proxy.iam ? 'REQUIRED' : 'DISABLED',
 				secretArn
 			}],
 			debugLogging: proxy.logSQLqueries,
 			idleClientTimeout: proxy.idleClientTimeout || 1800,
 			requireTls: proxy.requireTls === false ? false : true,
-			vpcSecurityGroupIds: [sgId], // Must be set to allow traffic based on the security group
+			vpcSecurityGroupIds: [proxySecurityGroup.securityGroup.id], // Must be set to allow traffic based on the security group
 			tags: {
 				...tags,
 				Name: name
@@ -346,11 +332,91 @@ const createAurora = async ({
 		instanceEndpoints: clusterInstanceEndpoints,
 		dbCluster,
 		subnetGroup,
-		...securityGroupOutput,
+		securityGroups: {
+			rds: rdsSecurityGroup,
+			proxy: proxySecurityGroup
+		},
 		proxy: proxyOutput
 	}
 }
 
+/**
+ * Creates an RDS security group and optionally an RDS Proxy security group (if 'options.proxy' is true).
+ * 
+ * @param  {String}							clusterName
+ * @param  {Number}							dbPort									e.g., 3306 for MySQL.
+ * @param  {String}							vpcId
+ * @param  {[Object]						ingress			
+ * @param  {Boolean}						options.publicAccess					
+ * @param  {Boolean}						options.proxyEnabled	
+ * @param  {Object}							options.tags		
+ * 
+ * @return {Output<SecurityGroup>}			securityGroups[0].securityGroup			RDS security group		
+ * @return {[Output<SecurityGroupRule>]}	securityGroups[0].securityGroupRules	RDS security group rules	
+ * @return {Output<SecurityGroup>}			securityGroups[1].securityGroup			RDS proxy security group
+ * @return {[Output<SecurityGroupRule>]}	securityGroups[1].securityGroupRules	RDS proxy security group rules		
+ */
+const createSecurityGroups = async (clusterName, dbPort, vpcId, ingress, options) => {
+	const rdsIngress = (ingress||[]).filter(i => i.rds !== false )
+	const proxyIngress = (ingress||[]).filter(i => i.proxy !== false )
+	const { publicAccess, proxyEnabled, tags } = options
+	const fromPort = dbPort
+	const toPort = dbPort
+
+	// Allow the to respond to any allowed request
+	const egress = [{ 
+		protocol: 'tcp', 
+		fromPort,
+		toPort,
+		cidrBlocks: ['0.0.0.0/0'], 
+		ipv6CidrBlocks: ['::/0'], 
+		description:'Allows RDS systems to respond.' 
+	}]
+
+	// Allows the public internet to access the RDS cluster
+	if (publicAccess) { 
+		const allowPublic = { protocol: 'tcp', fromPort, toPort, cidrBlocks: ['0.0.0.0/0'], description: 'Allow public access' }
+		rdsIngress.push(allowPublic)
+		proxyIngress.push(allowPublic)
+	}
+
+	// Security group doc: https://www.pulumi.com/docs/reference/pkg/aws/ec2/securitygroup/
+	const proxySecurityGroup = !proxyEnabled ? null : await securityGroup({
+		name: `${clusterName}-rdsproxy-sg`, 
+		description: `Controls the RDS proxy access for the Aurora cluster ${clusterName}.`, 
+		vpcId, 
+		ingress: proxyIngress, 
+		egress, 
+		tags
+	})
+
+	if (proxyEnabled) // Allows the proxy to access the RDS cluster and vice-versa
+		rdsIngress.push({ protocol: 'tcp', fromPort, toPort, securityGroups:[proxySecurityGroup.securityGroup.id], description: 'Allow RDS proxy access to Aurora cluster' })
+	
+	// Security group doc: https://www.pulumi.com/docs/reference/pkg/aws/ec2/securitygroup/
+	const rdsSecurityGroup = await securityGroup({ 
+		name: `${clusterName}-rds-sg`,
+		description: `Controls the Aurora cluster ${clusterName} access.`, 
+		vpcId, 
+		ingress: rdsIngress, 
+		egress, 
+		tags
+	})
+
+	return [
+		rdsSecurityGroup,
+		proxySecurityGroup
+	]
+}
+
 
 module.exports = createAurora
+
+
+
+
+
+
+
+
 

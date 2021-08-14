@@ -45,7 +45,7 @@ const { resolve } = require('./utils')
  * (2) 'numberOfNatGateways' is only configurable if there is at least one public subnet. In that case, the default value is 
  * equal to 'numberOfAvailabilityZones'.  
  */
-const createVPC = ({ name, cidrBlock, subnets, numberOfAvailabilityZones, numberOfNatGateways, protect, tags }) => {
+const createVPC = async ({ name, cidrBlock, subnets, numberOfAvailabilityZones, numberOfNatGateways, protect, tags }) => {
 	tags = tags || {}
 
 	const vpc = new awsx.ec2.Vpc(name, { 

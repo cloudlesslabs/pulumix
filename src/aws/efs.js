@@ -26,7 +26,7 @@ const aws = require('@pulumi/aws')
  * @return {String}   efs.accessPoint.rootDirectory.creationInfo.permissions	e.g., '755'		
  * @return {String}   efs.accessPoint.rootDirectory.path						Access point's directory in EFS.		
  */
-const createEFS = ({ name, subnetIds, securityGroups, accessPointDir, protect, tags }) => {
+const createEFS = async ({ name, subnetIds, securityGroups, accessPointDir, protect, tags }) => {
 	if (!name)
 		throw new Error('Missing required argument \'name\'.')
 	if (!subnetIds)
