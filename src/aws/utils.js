@@ -1,3 +1,5 @@
+// Version: 0.0.1
+
 const pulumi = require('@pulumi/pulumi')
 
 /**

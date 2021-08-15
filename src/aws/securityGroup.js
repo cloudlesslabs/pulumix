@@ -1,3 +1,5 @@
+// Version: 0.0.1
+
 require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
 const crypto = require('crypto')

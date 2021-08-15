@@ -1,3 +1,4 @@
+// Version: 0.0.1
 // Full Pulumi AWS RDS API doc at https://www.pulumi.com/docs/reference/pkg/aws/rds/
 
 require('@pulumi/pulumi')
@@ -17,7 +18,15 @@ const { resolve } = require('./utils')
  * 	7. (Optional) RDS proxy.
  * 	8. (Optional) RDS proxy target group.
  * 	9. (Optional) RDS proxy target.
- * 	
+ *
+ * WARNING: If both an Aurora cluster and an RDS proxy are provisioned at the same time, the initial `pulumi up` will probably fail
+ * with the following error: 
+ * 		"registering RDS DB Proxy (xxxxxx/default) Target: InvalidDBInstanceState: DB Instance 
+ * 		xxxxxxxxxx is in an unsupported state - CONFIGURING_LOG_EXPORTS, needs to be in [AVAILABLE, MODIFYING, BACKING_UP]"
+ *
+ * This is because the RDS target can only be created with DB instances that are running. Because the initial setup takes time,
+ * the DB instance won't be running by the time the RDS target creation process starts. There is no other option to wait and run
+ * `pulumi up` again later.
  * 
  * @param  {String}   		             name							DB name must begin with a letter and contain only alphanumeric characters						
  * @param  {String}   		             engine							Valid values: 'postgresql' or 'mysql'
@@ -100,8 +109,12 @@ const createAurora = async ({
 		throw new Error('Missing required \'auth.masterUsername\' argument. Argument required when \'auth.secretId\' is not specified.')
 	if (!auth.secretId && !auth.masterPassword)
 		throw new Error('Missing required \'auth.masterPassword\' argument. Argument required when \'auth.secretId\' is not specified.')
-	if (proxyEnabled && !auth.secretId)
-		throw new Error('Missing required \'auth.secretId\' argument. Argument required when the RDS proxy is on.')
+	if (proxyEnabled) {
+		if (!auth.secretId)
+			throw new Error('Missing required \'auth.secretId\' argument. Argument required when the RDS proxy is on.')
+		if (proxy.iam && proxy.requireTls === false)
+			throw new Error('Invalid configuration. When IAM authentication is enabled on RDS proxy, the \'requireTls\' cannot be false.')
+	}
 
 	let { masterUsername, masterPassword } = auth
 	const secretId = auth.secretId ? await resolve(auth.secretId) : null
@@ -146,7 +159,7 @@ const createAurora = async ({
 
 	// Sanitize the DB and cluster names.
 	const dbName = name.toLowerCase().replace(/-/g,'_').replace(/[^a-z0-9_]/g,'') // removing invalid characters
-	const clusterName = `${name}-cluster`.toLowerCase().replace(/[^a-z0-9-]/g,'') // removing invalid characters
+	const clusterName = name.toLowerCase().replace(/[^a-z0-9-]/g,'') // removing invalid characters
 
 	// Creates the RDS SG and optional the RDS Proxy SG
 	const [rdsSecurityGroup, proxySecurityGroup] = await createSecurityGroups(clusterName, dbPort, vpcId, ingress, { publicAccess, proxyEnabled, tags })
@@ -274,6 +287,7 @@ const createAurora = async ({
 
 		// RDS Proxy doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/proxy/
 		const rdsProxy = new aws.rds.Proxy(name, {
+			name,
 			roleArn: proxyRole.arn,
 			engineFamily: isMySql ? 'MYSQL' : 'POSTGRESQL',
 			vpcSubnetIds: proxySubnetIds,

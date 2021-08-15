@@ -79,6 +79,12 @@ The `yourStack` object is similar to this:
 }
 ```
 
+Outputs cannot be accessed explicitly. Instead, you must use the __`getOutput`__ method:
+
+```js
+const endpoint = yourStack.getOutput('aurora-endpoint')
+```
+
 # Helper methods
 ## Resolving `Output<T>`
 
@@ -226,6 +232,17 @@ ARG DB_PASSWORD
 
 # AWS
 ## Aurora
+
+> __WARNING__: If both an Aurora cluster and an RDS proxy are provisioned at the same time, the initial `pulumi up` will probably fail
+> with the following error: 
+>	```
+> 	registering RDS DB Proxy (xxxxxx/default) Target: InvalidDBInstanceState: DB Instance 
+> 	xxxxxxxxxx is in an unsupported state - CONFIGURING_LOG_EXPORTS, needs to be in [AVAILABLE, MODIFYING, BACKING_UP]
+>	```
+> This is because the RDS target can only be created with DB instances that are running. Because the initial setup takes time,
+> the DB instance won't be running by the time the RDS target creation process starts. There is no other option to wait and run
+> `pulumi up` again later.
+
 ### Aurora - Basic usage
 
 > WARNING: Once the `masterUsername` is set, it cannot be changed. Attempting to change it will create a delete and replace operation, which is obvioulsy not what you may want. 
@@ -308,6 +325,16 @@ const auroraOutput = aurora({
 ```
 
 ### Add RDS proxy
+
+> __WARNING__: If both an Aurora cluster and an RDS proxy are provisioned at the same time, the initial `pulumi up` will probably fail
+> with the following error: 
+>	```
+> 	registering RDS DB Proxy (xxxxxx/default) Target: InvalidDBInstanceState: DB Instance 
+> 	xxxxxxxxxx is in an unsupported state - CONFIGURING_LOG_EXPORTS, needs to be in [AVAILABLE, MODIFYING, BACKING_UP]
+>	```
+> This is because the RDS target can only be created with DB instances that are running. Because the initial setup takes time,
+> the DB instance won't be running by the time the RDS target creation process starts. There is no other option to wait and run
+> `pulumi up` again later.
 
 Use the `proxy` property. When this feature is enabled, an additional security group is created for RDS proxy.
 

@@ -1,3 +1,4 @@
+// Version: 0.0.1
 // Doc: https://www.pulumi.com/docs/reference/pkg/aws/ec2/instance/
 
 const aws = require('@pulumi/aws')

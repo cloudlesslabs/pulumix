@@ -1,3 +1,5 @@
+// Version: 0.0.1
+
 /*
  * To create a secret with AWS secrets manager, you need to:
  * 		1. Create a new secret: https://www.pulumi.com/docs/reference/pkg/aws/secretsmanager/secret/

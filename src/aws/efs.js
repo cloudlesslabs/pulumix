@@ -1,3 +1,5 @@
+// Version: 0.0.1
+
 const aws = require('@pulumi/aws')
 
 /**
