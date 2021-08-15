@@ -642,6 +642,7 @@ const lambdaOutput = lambda({
 	CMD [ "index.handler" ]
 	```
 	> To see how to deal with `npm install`, please refer to https://gist.github.com/nicolasdao/f440e76b8fd748d84ad3b9ca7cf5fd12#the-instructions-order-in-your-dockerfile-matters-for-performance.
+	>
 	> More about this AWS image below (1).
 	3. Paste the following in the `index.js`:
 	```js
