@@ -21,6 +21,11 @@
 >		- [Basic usage](#aurora---basic-usage)
 >		- [Grant access to EC2 instance](#grant-access-to-ec2-instance)
 >		- [Add RDS proxy](#add-rds-proxy)
+>			- [RDS proxy setup](#rds-proxy-setup)
+>			- [Enabling RDS proxy](#enabling-rds-proxy)
+>			- [Setting up a Lambda to be able to access the RDS proxy when IAM is turned on](#setting-up-a-lambda-to-be-able-to-access-the-rds-proxy-when-iam-is-turned-on)
+>				- [Using AWS Signer to create a DB password](#using-aws-signer-to-create-a-db-password)
+>				- [Configure a `rds-db:connect` action on the IAM role](#configure-a-rds-dbconnect-action-on-the-iam-role)
 >		- [Using AWS Secrets Manager to manage Aurora's credentials](#using-aws-secrets-manager-to-manage-auroras-credentials)
 >	- [EC2](#ec2)
 >	- [EFS](#efs)
@@ -33,6 +38,7 @@
 >			- [Setting up environment variables and passing arguments](#setting-up-environment-variables-and-passing-arguments)	
 >		- [Example - Lambda with EFS](#example---lambda-with-efs)
 >	- [Secret](#secret)
+>		- [Getting stored secrets](#getting-stored-secrets)
 >	- [Security Group](#security-group)
 >	- [Step-function](#step-function)
 >	- [VPC](#vpc)
@@ -48,6 +54,8 @@
 >		- [Congiguring service-to-service communication](#congiguring-service-to-service-communication)
 >	- [Identity Platform](#identity-platform)
 >	- [Service Accounts](#service-accounts)
+> * [Annexes](#annexes)
+> * [References](#references)
 
 # Pulumi
 ## Cross referencing stacks
@@ -273,6 +281,8 @@ const auroraOutput = aurora({
 })
 ```
 
+> Notice that we're adding an `ingress` rule that gives access to an EC2 instance. In practice, create a dedicated security group to can access the RDS cluster, then add this SG to any system that needs access. 
+
 ### Grant access to EC2 instance
 
 Use the `ec2` function described in the [EC2 with SSM](#ec2-with-ssm) section and the `aurora` function described in the [RDS Aurora](#rds-aurora) section. The important bit in the next sample is the aurora `ingress`, which allows the bastion to access Aurora:
@@ -325,6 +335,15 @@ const auroraOutput = aurora({
 ```
 
 ### Add RDS proxy
+#### RDS proxy setup
+
+The basic setup consists of:
+1. Addind an RDS proxy on an existing and already running cluster or instance.
+2. Adding a list of resource that can access it via the `ingress` rules. You may want to create a dedicated security group that can access the RDS proxy. This way you can simply add this SG to any resource you wish to have access to the proxy rather than having to add those resource to the ingress list.
+3. Optional, but recommended, turn on IAM authentication on the proxy. This will prevent any client to use explicit DB credentials and force them to be configured properly via their IAM role. To learn more about this, please refer to the [Setting up a Lambda to be able to access the RDS proxy when IAM is turned on](#setting-up-a-lambda-to-be-able-to-access-the-rds-proxy-when-iam-is-turned-on) section.
+4. In your client, replace the RDS endpoint that you would have used in the hostname with the RDS proxy endpoint. Nothing else changes.
+
+#### Enabling RDS proxy
 
 > __WARNING__: If both an Aurora cluster and an RDS proxy are provisioned at the same time, the initial `pulumi up` will probably fail
 > with the following error: 
@@ -393,6 +412,80 @@ By default, all the `ingress` rules apply to identically both RDS and RDS proxy.
 ```
 
 To create ingress rules that are specific to RDS or RDS proxy, use the `rds` or `proxy` flag on each rule.
+
+#### Setting up a Lambda to be able to access the RDS proxy when IAM is turned on
+
+When the `iam` flag is not turned on, you must add the additional steps in your client configuration:
+1. Generate a password on-the-fly based the client's IAM role. This is done in your code via AWS Signer in the AWS SDK.
+2. Add an extra `rds-db:connect` policy to your resource's IAM role.
+
+##### Using AWS Signer to create a DB password
+
+```js
+const AWS = require('aws-sdk')
+
+const config = {
+	region: 'ap-southeast-2', 
+	hostname: 'my-project.proxy-12345.ap-southeast-2.rds.amazonaws.com',
+	port: 3306,
+	username: 'admin'
+}
+const signer = new AWS.RDS.Signer(config)
+
+signer.getAuthToken({ username:config.username }, (err, password) => {
+	if (err)
+		console.log(`Something went wrong: ${err.stack}`)
+	else
+		console.log(`Great! the password is: ${password}`)
+})
+```
+
+To integrate this signer with the `mysql2` package:
+
+```js
+const mysql = require('mysql2/promise')
+
+const db = mysql.createPool({
+	host: 'my-project.proxy-12345.ap-southeast-2.rds.amazonaws.com', // can also be an IP
+	user: 'admin',
+	ssl: { rejectUnauthorized: false},
+	database: 'my-db-name',
+	multipleStatements: true,
+	waitForConnections: true,
+	connectionLimit: 2, // connection pool size
+	queueLimit: 0,
+	timezone: '+00:00', // UTC
+	authPlugins: {
+		mysql_clear_password: () => () => {
+			return signer.getAuthToken({ username:'admin' })
+		}
+	}
+})
+```
+
+##### Configure a `rds-db:connect` action on the IAM role
+
+```js
+const lambda = require('./src/aws/lambda')
+const { createRdsConnectPolicy } = require('./src/aws/utils')
+
+const rdsAccessPolicy = createRdsConnectPolicy({ name:`my-project-access-rds`, rdsArn:proxy.arn })
+
+const lambdaOutput = await lambda({
+	//...
+	policies:[rdsAccessPolicy],
+	//...
+})
+```
+
+`createRdsConnectPolicy` accepts the following input:
+- `rdsArn`: It is required. Examples: `arn:aws:rds:ap-southeast-2:1234:db-proxy:prx-123`, `arn:aws:rds:ap-southeast-2:1234:cluster:blabla` or `arn:aws:rds:ap-southeast-2:1234:db:blibli`.
+- `resourceId`: Optional. Default resource name (1)
+- `username`: Optional. Default `*`. Other examples: 'mark', 'peter'
+
+Only RDS proxy embeds its resource ID in its arn. This means that the `resourceId` should not be provided when the `rdsArn` is an RDS proxy. For all the other RDS resources (clusters and instances), the `resourceId` is required. For an Aurora cluster, this resource is called `clusterResourceId`, while for an instance, it is called `dbiResourceId`.
+
+> For more details around creating this policy, please refer to this article [Creating and using an IAM policy for IAM database access](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.IAMDBAuth.IAMPolicy.html)
 
 ### Using AWS Secrets Manager to manage Aurora's credentials
 
@@ -566,6 +659,7 @@ To add CloudWatch logs to the previous Lambda, we need to create a new policy th
 
 ```js
 // IAM: Allow lambda to create log groups, log streams and log events.
+// Doc: https://www.pulumi.com/docs/reference/pkg/aws/iam/policy/
 const cloudWatchPolicy = new aws.iam.Policy(PROJECT, {
 	path: '/',
 	description: 'IAM policy for logging from a lambda',
@@ -680,7 +774,7 @@ const image = awsx.ecr.buildAndPushImage(PROJECT, {
 
 const lambdaOutput = lambda({
 	name: PROJECT,
-	imageUri: image.imageUri,
+	imageUri: image.imageValue,
 	timeout:30, 
 	memorySize:128
 })
@@ -902,7 +996,55 @@ exports.url = output.then(o => o.url)
 
 ## Secret
 
+### Getting stored secrets
+
+```js
+/**
+ * Gets the DB creds stored in AWS Secrets Manager
+ * 
+ * @param  {String}		secretId				ARN of the secret in AWS secrets manager that contains the masterUsername and masterPassword
+ * 
+ * @return {Version}	output.version
+ * @return {String}		output.creds.username
+ * @return {String}		output.creds.password
+ */
+const getDBcreds = async secretId => {
+	if (!secretId)
+		return null
+
+	const secretVersion = await aws.secretsmanager.getSecretVersion({ secretId }).catch(err => {
+		throw new Error(`Fail to retrieve secret ID '${secretId}'. Details: ${err.message}`)
+	})
+	if (!secretVersion)
+		throw new Error(`Secret ID ${secretId} not found.`)
+
+	const secretString = secretVersion.secretString
+	if (!secretString)
+		throw new Error(`Secret value not found in secret ID '${secretId}'.`)
+	
+	let creds = {}
+	try {
+		creds = JSON.parse(secretString)
+	} catch(err) {
+		throw new Error(`Faile to parse to JSON the secret string stored in secret ID '${secretId}'. Corrupted secret string: ${secretString}`)
+	}
+
+	if (!creds.username)
+		throw new Error(`Missing required property 'username' in secret ID '${secretId}'.`)
+	if (!creds.password)
+		throw new Error(`Missing required property 'password' in secret ID '${secretId}'.`)
+
+	return {
+		version: secretVersion,
+		creds
+	}
+}
+```
+
 ## Security Group
+
+> WARNING: __Don't forget__ to also define an egress rule to allow traffic out from your resource. This is a typicall mistake that causes systems to not be able to contact any other services. The most common egress rule is:
+> `{  protocol: '-1',  fromPort:0, toPort:65535, cidrBlocks: ['0.0.0.0/0'],  ipv6CidrBlocks: ['::/0'],  description:'Allow all traffic' }`
 
 ## Step-function
 
@@ -1333,3 +1475,9 @@ module.exports = {
 	find
 }
 ```
+
+# Annexes
+
+# References
+
+- [Creating and using an IAM policy for IAM database access](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.IAMDBAuth.IAMPolicy.html)

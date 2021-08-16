@@ -1,10 +1,10 @@
-// Version: 0.0.1
+// Version: 0.0.5
 // Full Pulumi AWS RDS API doc at https://www.pulumi.com/docs/reference/pkg/aws/rds/
 
 require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
 const securityGroup = require('./securityGroup')
-const { resolve } = require('./utils')
+const { resolve, getDBcreds } = require('./utils')
 
 /**
  * Create an AWS Aurora cluster. Doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/cluster/
@@ -62,7 +62,8 @@ const { resolve } = require('./utils')
  * 
  * @return {Output<String>}              output.endpoint			
  * @return {Output<String>}              output.readerEndpoint		
- * @return {Output<String>}              output.proxyEnpoint	
+ * @return {Output<String>}              output.proxyEnpoint		
+ * @return {Number}              		 output.port	
  * @return {[Output<String>]}            output.instanceEndpoints		
  * @return {Output<Cluster>}             output.dbCluster	
  * @return {Output<SubnetGroup>}         output.subnetGroup
@@ -122,31 +123,11 @@ const createAurora = async ({
 	// Extract username and password from AWS secret manager and get the secret's ARN for the RDS proxy
 	let secretArn
 	if (secretId) {
-		const secretVersion = await aws.secretsmanager.getSecretVersion({ secretId }).catch(err => {
-			throw new Error(`Fail to retrieve secret ID '${secretId}'. Details: ${err.message}`)
-		})
-		if (!secretVersion)
-			throw new Error(`Secret ID ${secretId} not found.`)
-
-		secretArn = secretVersion.arn
-		const secretString = secretVersion.secretString
-		if (!secretString)
-			throw new Error(`Secret value not found in secret ID '${secretId}'.`)
+		const { version, creds } = await getDBcreds(secretId)
 		
-		let secretObj = {}
-		try {
-			secretObj = JSON.parse(secretString)
-		} catch(err) {
-			throw new Error(`Faile to parse to JSON the secret string stored in secret ID '${secretId}'. Corrupted secret string: ${secretString}`)
-		}
-
-		if (!secretObj.username)
-			throw new Error(`Missing required property 'username' in secret ID '${secretId}'.`)
-		if (!secretObj.password)
-			throw new Error(`Missing required property 'password' in secret ID '${secretId}'.`)
-
-		masterUsername = secretObj.username
-		masterPassword = secretObj.password
+		secretArn = version.arn
+		masterUsername = creds.username
+		masterPassword = creds.password
 	}
 
 	const dbEngine = `aurora-${engine}`
@@ -255,7 +236,7 @@ const createAurora = async ({
 				Name: proxyRoleName
 			}
 		})
-		// IAM: Allow lambda to create log groups, log streams and log events.
+		// IAM policy doc: https://www.pulumi.com/docs/reference/pkg/aws/iam/policy/
 		const secretsManagerPolicy = new aws.iam.Policy(proxyRoleName, {
 			path: '/',
 			description: 'IAM policy to allow the RDS proxy to get secrets from AWS Secret Manager',
@@ -343,6 +324,7 @@ const createAurora = async ({
 		endpoint: dbCluster.endpoint, // used for read-write connection string
 		readerEndpoint: dbCluster.readerEndpoint, // used for read-only connection string
 		proxyEnpoint: proxyOutput ? proxyOutput.proxy.endpoint : null,
+		port: dbPort,
 		instanceEndpoints: clusterInstanceEndpoints,
 		dbCluster,
 		subnetGroup,
@@ -422,7 +404,6 @@ const createSecurityGroups = async (clusterName, dbPort, vpcId, ingress, options
 		proxySecurityGroup
 	]
 }
-
 
 module.exports = createAurora
 
