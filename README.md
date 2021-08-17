@@ -29,6 +29,7 @@
 >		- [Using AWS Secrets Manager to manage Aurora's credentials](#using-aws-secrets-manager-to-manage-auroras-credentials)
 >	- [EC2](#ec2)
 >	- [EFS](#efs)
+>		- [Mounting an EFS access point on a Lambda](#mounting-an-efs-access-point-on-a-lambda)
 >	- [Lambda](#lambda)
 >		- [The simplest API Gateway with Lambda](#the-simplest-api-gateway-with-lambda)
 >		- [Example - Basic Lambda with an API Gateway](#example---basic-lambda-with-an-api-gateway)
@@ -542,6 +543,99 @@ const ec2Output = ec2({
 ```
 
 ## EFS
+### Mounting an EFS access point on a Lambda
+```js
+const pulumi = require('@pulumi/pulumi')
+const securityGroup = require('./src/aws/securityGroup')
+const vpc = require('./src/aws/vpc')
+const lambda = require('./src/aws/lambda')
+const efs = require('./src/aws/efs')
+const { resolve } = require('path')
+
+const ENV = pulumi.getStack()
+const PROJ = pulumi.getProject()
+const PROJECT = `${PROJ}-${ENV}`
+
+const tags = {
+	Project: PROJ,
+	Env: ENV
+}
+
+const main = async () => {
+
+	// VPC with a public subnet and an isolated subnet (i.e., private with no NAT)
+	const vpcOutput = await vpc({
+		name: PROJECT,
+		subnets: [{ type: 'public' }, { type: 'isolated', name: 'efs' }],
+		numberOfAvailabilityZones: 3,
+		protect: true,
+		tags
+	})
+
+
+	// Security group that can access EFS
+	const { securityGroup:accessToEfsSecurityGroup } = await securityGroup({ 
+		name: `${PROJECT}-access-efs`,
+		description: `Access to the EFS filesystem ${PROJECT}.`, 
+		egress: [{ 
+			protocol: '-1', 
+			fromPort: 0,
+			toPort: 65535,
+			cidrBlocks: ['0.0.0.0/0'], 
+			ipv6CidrBlocks: ['::/0'], 
+			description:'Allows to respond to all traffic' 
+		}],
+		vpcId: vpc.id, 
+		tags
+	})
+
+	// EFS
+	const efsOutput = await efs({ 
+		name: PROJECT, 
+		accessPointDir: '/projects',
+		vpcId: vpc.id,
+		subnetIds: vpc.isolatedSubnetIds, 
+		ingress:[{ 
+			// Allows traffic from resources with the 'accessToEfsSecurityGroup' SG.
+			protocol: 'tcp', fromPort: 2049, toPort: 2049, securityGroups: [accessToEfsSecurityGroup.id], description: 'SG for NFS access to EFS' 
+		}],
+		protect: true,
+		tags
+	})
+
+	// Lambda
+	const lambdaOutput = await lambda({
+		name: PROJECT,
+		runtime: 'nodejs12.x', 
+		functionFolder: resolve('./app'), 
+		timeout: 30, 
+		vpcConfig: {
+			subnetIds: vpc.isolatedSubnetIds,
+			securityGroupIds:[
+				// Use the 'accessToEfsSecurityGroup' so that this lambda can access the EFS filesystem.
+				accessToEfsSecurityGroup.id
+			], 
+			enableENIcreation: true
+		},
+		fileSystemConfig: {
+			arn: efsOutput.accessPoint.arn,
+			localMountPath: '/mnt/somefolder'
+		},
+		cloudWatch: true,
+		logsRetentionInDays: 7,
+		tags
+	})
+
+	return {
+		vpc: vpcOutput,
+		accessToEfsSecurityGroup,
+		efs: efsOutput,
+		lambda: lambdaOutput
+	}
+}
+
+module.exports = main()
+```
 
 ## Lambda
 ### The simplest API Gateway with Lambda
@@ -845,154 +939,10 @@ const image = awsx.ecr.buildAndPushImage(PROJECT, {
 
 ### Example - Lambda with EFS
 
+Please refer to the [Mounting an EFS access point on a Lambda](#mounting-an-efs-access-point-on-a-lambda) section.
+
 > For a full example of a project that uses Lambda with Docker and Git installed to save files on EFS, please refer to this project: https://github.com/nicolasdao/example-aws-lambda-efs
 
-```js
-// Original code: https://github.com/pulumi/examples/blob/master/aws-ts-lambda-efs/index.ts
-// Original blog: https://www.pulumi.com/blog/aws-lambda-efs/
-
-// To test this project:
-// 
-// 	curl -X POST -d 'Hello world' $(pulumi stack output url)files/file.txt
-// 	curl -X GET $(pulumi stack output url)files/file.txt
-
-const pulumi = require('@pulumi/pulumi')
-const aws = require('@pulumi/aws')
-const awsx = require('@pulumi/awsx')
-const cp = require('child_process')
-const fs = require('fs')
-
-const ENV = pulumi.getStack()
-const PROJ = pulumi.getProject()
-const PROJECT = `${PROJ}-${ENV}`
-const MNT_FOLDER = '/mnt/storage'
-
-const main = async () => {
-
-	// VPC: https://www.pulumi.com/docs/reference/pkg/nodejs/pulumi/awsx/ec2/
-	const vpc = new awsx.ec2.Vpc(PROJECT, { 
-		subnets: [
-			{ type: 'private' }, // Carefull, this will also create NATs 
-			{ type: 'public' }
-		],
-		numberOfAvailabilityZones: 3, // The default is 2
-		tags: {
-			Name: PROJECT // Add this tag as for side-effect to give a friendly name to your VPC
-		}
-	})
-	const subnetIds = await vpc.publicSubnetIds
-
-	// EFS
-	const filesystem = new aws.efs.FileSystem(PROJECT, {
-		tags: {
-			Name: PROJECT // That's also going to be used to add afriendly name to the resource.
-		}
-	})
-	const targets = []
-	for (let i = 0; i < subnetIds.length; i++) {
-		targets.push(new aws.efs.MountTarget(`fs-mount-${i}`, {
-			fileSystemId: filesystem.id,
-			subnetId: subnetIds[i],
-			securityGroups: [vpc.vpc.defaultSecurityGroupId],
-		}))
-	}
-	const ap = new aws.efs.AccessPoint(PROJECT, {
-		fileSystemId: filesystem.id,
-		posixUser: { uid: 1000, gid: 1000 },
-		rootDirectory: { 
-			path: '/www', // The access points only work on sub-folder. Do not use '/'.
-			creationInfo: { 
-				ownerGid: 1000, 
-				ownerUid: 1000, 
-				permissions: '755' // 7 means the read+write+exec rights. 1st nbr is User, 2nd is Group and 3rd is Other.
-			} 
-		},
-		tags: {
-			Name: PROJECT // That's also going to be used to add afriendly name to the resource.
-		}
-	}, { dependsOn: targets })
-
-	// Lambda
-	function createLambda(name, fn) {
-		return new aws.lambda.CallbackFunction(name, {
-			policies: [aws.iam.ManagedPolicy.AWSLambdaVPCAccessExecutionRole, aws.iam.ManagedPolicy.LambdaFullAccess],
-			vpcConfig: {
-				subnetIds: vpc.privateSubnetIds,
-				securityGroupIds: [vpc.vpc.defaultSecurityGroupId],
-			},
-			fileSystemConfig: { arn: ap.arn, localMountPath: MNT_FOLDER },
-			callback: fn
-		})
-	}
-
-	// API Gateway with 3 routes and 3 lambdas
-	const api = new awsx.apigateway.API(PROJECT, {
-		routes: [
-			{
-				method: 'GET', 
-				path: '/files/{filename+}', 
-				eventHandler: createLambda(`${PROJECT}-getHandler`, async ev => {
-					try {
-						const f = MNT_FOLDER + '/' +  ev.pathParameters.filename
-						const data = fs.readFileSync(f)
-						return {
-							statusCode: 200,
-							body: data.toString()
-						}
-					} catch(err) {
-						return { 
-							statusCode: 500, 
-							body: err.message
-						}
-					}
-				})
-			},
-			{
-				method: 'POST', 
-				path: '/files/{filename+}', 
-				eventHandler: createLambda(`${PROJECT}-uploadHandler`, async ev => {
-					try {
-						const f = MNT_FOLDER + '/' + ev.pathParameters.filename
-						const data = new Buffer(ev.body, 'base64')
-						fs.writeFileSync(f, data)
-						return {
-							statusCode: 200,
-							body: '',
-						}
-					} catch(err) {
-						return { 
-							statusCode: 500, 
-							body: err.message 
-						}
-					}
-				})
-			},
-			{
-				method: 'POST', 
-				path: '/', 
-				eventHandler: 
-				createLambda(`${PROJECT}-execHandler`, async ev => {
-					const cmd = new Buffer(ev.body, 'base64').toString()
-					const buf = cp.execSync(cmd)
-					return {
-						statusCode: 200,
-						body: buf.toString()
-					}
-				})
-			}
-		],
-	})
-
-	// Exports
-	return {
-		url: api.url
-	}
-}
-
-const output = main()
-
-exports.url = output.then(o => o.url)
-```
 
 ## Secret
 

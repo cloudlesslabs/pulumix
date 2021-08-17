@@ -1,4 +1,4 @@
-// Version: 0.0.1
+// Version: 0.0.2
 
 const pulumi = require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
@@ -101,7 +101,23 @@ const createLambda = async ({ name, runtime, functionFolder, imageUri, timeout=3
 
 	if (enableENIcreation)
 		// Enables the lambda to send logs to CloudWatch
-		policies.push({ name: `${canonicalName}-eni-creation`, arn:'arn:aws:iam::aws:policy/service-role/AWSLambdaENIManagementAccess' })
+		policies.push({ 
+			name: `${canonicalName}-eni-creation`, 
+			arn:'arn:aws:iam::aws:policy/service-role/AWSLambdaENIManagementAccess' 
+		})
+
+
+	if (fileSystemConfig) {
+		// To access EFS, the execution role for the lambda function must provide those two policies:
+		// Doc: https://aws.amazon.com/blogs/compute/using-amazon-efs-for-aws-lambda-in-your-serverless-applications/
+		policies.push({
+			name: `${canonicalName}-vpc-access`,
+			arn: 'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
+		}, {
+			name: `${canonicalName}-efs-access`,
+			arn: 'arn:aws:iam::aws:policy/AmazonElasticFileSystemClientFullAccess'
+		})
+	}
 
 	// Attach policies
 	for (let i=0;i<policies.length;i++) {
