@@ -1,4 +1,4 @@
-// Version: 0.0.5
+// Version: 0.0.6
 // Full Pulumi AWS RDS API doc at https://www.pulumi.com/docs/reference/pkg/aws/rds/
 
 require('@pulumi/pulumi')
@@ -83,7 +83,7 @@ const createAurora = async ({
 	instanceNbr=1, 
 	instanceSize='db.t2.small', 
 	vpcId,
-	subnetIds,
+	subnetIds:_subnetIds,
 	ingress,
 	protect=false, 
 	publicAccess=false,
@@ -116,6 +116,8 @@ const createAurora = async ({
 		if (proxy.iam && proxy.requireTls === false)
 			throw new Error('Invalid configuration. When IAM authentication is enabled on RDS proxy, the \'requireTls\' cannot be false.')
 	}
+
+	const subnetIds = !_subnetIds ? null : await resolve(_subnetIds)
 
 	let { masterUsername, masterPassword } = auth
 	const secretId = auth.secretId ? await resolve(auth.secretId) : null

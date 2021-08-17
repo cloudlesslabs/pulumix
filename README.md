@@ -1046,6 +1046,25 @@ const getDBcreds = async secretId => {
 > WARNING: __Don't forget__ to also define an egress rule to allow traffic out from your resource. This is a typicall mistake that causes systems to not be able to contact any other services. The most common egress rule is:
 > `{  protocol: '-1',  fromPort:0, toPort:65535, cidrBlocks: ['0.0.0.0/0'],  ipv6CidrBlocks: ['::/0'],  description:'Allow all traffic' }`
 
+```js
+const securityGroup = require('./src/aws/securityGroup')
+
+const { securityGroup:mySecurityGroup, securityGroupRules:myRules } = await securityGroup({
+	name: `my-special-sg`, 
+	description: `Controls something special.`, 
+	vpcId: 'vpc-1234', 
+	egress: [{  
+		protocol: '-1',  
+		fromPort:0, toPort:65535, cidrBlocks: ['0.0.0.0/0'],  
+		ipv6CidrBlocks: ['::/0'],  
+		description:'Allow all traffic' 
+	}], 
+	tags: {
+		Project: 'demo'
+	}
+})
+```
+
 ## Step-function
 
 ## VPC

@@ -1,3 +1,5 @@
+// Version: 0.0.1
+
 const pulumi = require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
 const { resolve } = require('./utils')
@@ -20,6 +22,7 @@ const { resolve } = require('./utils')
  * @param  {Output<String>}		imageUri							URI of the Docker image. Conflicts with 'functionFolder'. If both are defined, 'imageUri' wins.
  * @param  {Output<[String]>}	vpcConfig.subnetIds
  * @param  {Output<[String]>}	vpcConfig.securityGroupIds
+ * @param  {Boolean}			vpcConfig.enableENIcreation			Default false. True means that ENIs can be created if the lambda is in a private subnet.
  * @param  {Output<String>}		fileSystemConfig.arn				Used to mount an AWS EFS access point.
  * @param  {Output<String>}		fileSystemConfig.localMountPath		Used to mount an AWS EFS access point.
  * @param  {Boolean}			cloudWatch 							Default false. When true, CloudWatch is enabled.
@@ -52,6 +55,7 @@ const { resolve } = require('./utils')
 const createLambda = async ({ name, runtime, functionFolder, imageUri, timeout=3, memorySize=128, handler, policies, vpcConfig, fileSystemConfig, cloudWatch, logsRetentionInDays, tags }) => {
 	tags = tags || {}
 	policies = policies || []
+	const { enableENIcreation, ..._vpcConfig } = vpcConfig||{}
 	const dependsOn = []
 
 	if (!name)
@@ -95,6 +99,10 @@ const createLambda = async ({ name, runtime, functionFolder, imageUri, timeout=3
 		})
 	}
 
+	if (enableENIcreation)
+		// Enables the lambda to send logs to CloudWatch
+		policies.push({ name: `${canonicalName}-eni-creation`, arn:'arn:aws:iam::aws:policy/service-role/AWSLambdaENIManagementAccess' })
+
 	// Attach policies
 	for (let i=0;i<policies.length;i++) {
 		const policy = policies[i]
@@ -136,7 +144,7 @@ const createLambda = async ({ name, runtime, functionFolder, imageUri, timeout=3
 		timeout,
 		memorySize,
 		role: lambdaRole.arn,
-		vpcConfig,
+		vpcConfig:_vpcConfig,
 		fileSystemConfig,
 		dependsOn,
 		tags: {
