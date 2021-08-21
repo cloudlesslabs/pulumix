@@ -992,7 +992,7 @@ const lambdaOutput = lambda({
 
 As a quick refresher, the following `Dockerfile`:
 
-```
+```dockerfile
 FROM amazon/aws-lambda-nodejs:12
 ARG FUNCTION_DIR="/var/task"
 
@@ -1021,7 +1021,7 @@ exports.handler = async event => {
 
 This could have been set up via the `docker build` and with an `ARG` in the `Dockerfile`:
 
-```
+```dockerfile
 FROM amazon/aws-lambda-nodejs:12
 ARG FUNCTION_DIR="/var/task"
 ARG MSG
