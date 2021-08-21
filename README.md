@@ -3,6 +3,18 @@
 > __Pulumi guide__: To learn more about Pulumi, please refer to https://gist.github.com/nicolasdao/830fc1d1b6ce86e0d8bebbdedb2f2626.
 > __IAM roles & policies__: Managing AWS resources almost always involves managing IAM roles and policies. For a quick recap on that topic, please refer to this document: https://gist.github.com/nicolasdao/830fc1d1b6ce86e0d8bebbdedb2f2626#iam-recap.
 
+### AWS dependencies
+
+```
+npm i @pulumi/pulumi @pulumi/aws @pulumi/awsx
+```
+
+### GCP dependencies
+
+```
+npm i @pulumi/pulumi @pulumi/gcp
+```
+
 # Table of contents
 
 > * [Pulumi](#pulumi)
@@ -16,6 +28,8 @@
 > * [NPM `package.json` scripts](#npm-packagejson-scripts)
 >	- [Core scripts](#core-scripts)
 >	- [AWS scripts](#aws-scripts)
+> * [Automation API](#automation-api)
+>	- [Setting it up in Docker](#setting-it-up-in-docker)
 > * [AWS](#aws)
 >	- [Aurora](#aurora)
 >		- [Basic usage](#aurora---basic-usage)
@@ -31,6 +45,7 @@
 >	- [EFS](#efs)
 >		- [Mounting an EFS access point on a Lambda](#mounting-an-efs-access-point-on-a-lambda)
 >	- [Lambda](#lambda)
+>		- [A few words about AWS Lambda](#a-few-words-about-aws-lambda)
 >		- [The simplest API Gateway with Lambda](#the-simplest-api-gateway-with-lambda)
 >		- [Example - Basic Lambda with an API Gateway](#example---basic-lambda-with-an-api-gateway)
 >		- [Example - Configuring CloudWatch](#example---configuring-cloudwatch)
@@ -55,6 +70,11 @@
 >		- [Congiguring service-to-service communication](#congiguring-service-to-service-communication)
 >	- [Identity Platform](#identity-platform)
 >	- [Service Accounts](#service-accounts)
+> * [Troubleshooting](#troubleshooting)
+>	- [AWS](#aws-troubleshooting)
+>		- [Terminal utilities are failing with timeout errors `ETIMEDOUT`](#terminal-utilities-are-failing-with-timeout-errors-etimedout)
+>		- [AWS Lambda cannot access the public internet](#aws-lambda-cannot-access-the-public-internet)
+>		- [`failed to create '/home/sbx_userxxxx/.pulumi'`](#failed-to-create-homesbx_userxxxxpulumi)
 > * [Annexes](#annexes)
 > * [References](#references)
 
@@ -238,6 +258,74 @@ ARG DB_PASSWORD
 - `npm run rds dev`: Gets the RDS endpoint.
 - `npm run conn dev`: Connects tp the EC2 instance via SSM session manager.
 - `npm run ssh dev 9999`: Starts a port-forwarding session via SSM. Traffic sent to 127.0.0.1:9999 is forwarded to the EC2 on port 22.
+
+# Automation API
+## Setting it up in Docker
+
+The following example shows what a `Dockerfile` for an AWS Lambda would look like:
+
+```
+FROM amazon/aws-lambda-nodejs:12
+ARG FUNCTION_DIR="/var/task"
+
+# Pulumi setup
+## 1. Configure the Pulumi environment variables
+ENV PULUMI_SKIP_UPDATE_CHECK true
+ENV PULUMI_HOME "/tmp"
+## 2. Install Pulumi dependencies
+RUN yum install -y \
+	which \
+	tar \
+	gzip
+## 3. Install Pulumi. All version at https://www.pulumi.com/docs/get-started/install/versions/
+RUN curl -fsSL https://get.pulumi.com/ | bash -s -- --version 3.10.0 && \
+	mv ~/.pulumi/bin/* /usr/bin
+
+# Create function directory
+RUN mkdir -p  ${FUNCTION_DIR}
+
+# Install all dependencies
+COPY package*.json ${FUNCTION_DIR}
+RUN npm install --only=prod --prefix ${FUNCTION_DIR}
+
+# Copy app files
+COPY . ${FUNCTION_DIR}
+
+# Set the CMD to your handler (could also be done as a parameter override outside of the Dockerfile)
+CMD [ "index.handler" ]
+```
+
+Notice:
+1. Environment variables:
+	- `PULUMI_SKIP_UPDATE_CHECK` must be set to true to prevent the pesky warnings to update Pulumi to the latest version.
+	- `PULUMI_HOME` must be set to a folder where the Lambda has write access (by default, it only has write access to the `/tmp` folder. Use EFS to access more options). The default PULUMI_HOME value is `~`. Unfortunately, Lambda don't have access to that folder. Not configuring the PULUMI_HOME variable would result in a `failed to create '/home/sbx_userxxxx/.pulumi'` error message when the lambda executes the `pulumi login file:///tmp/` command. 
+2. `bash -s -- --version 3.10.0`: Use the explicit version to make sure Pulumi's update don't break your code.
+3. `mv ~/.pulumi/bin/* /usr/bin` moves the the executable files to where the lambda can access them (i.e., `/usr/bin`). 
+
+In you Lambda code, you can know use the Automation API, or call Pulumi via the `child_process` (which is actually what the automation API does):
+
+```js
+const cp = require('child_process')
+const util = require('util')
+
+const exec = util.promisify(cp.exec)
+
+const main = async () => {
+	let pulumiUser = await exec('pulumi whoami').catch(() => null)
+	const needToLogin = !pulumiUser || pulumiUser.indexOf('/sbx_user') < 0 // Lambda uses sandboxed users called 'sbx_userxxxx'
+	if (needToLogin) {
+		await exec('pulumi login file:///tmp/')
+		pulumiUser = await exec('pulumi whoami').catch(() => null)
+	}
+	
+	if (!pulumiUser)
+		throw new Error(`Fail to login locally to Pulumi.`)
+	else
+		console.log(`Pulumi user is: ${pulumiUser}`)
+}
+
+main()
+```
 
 # AWS
 ## Aurora
@@ -606,8 +694,10 @@ const main = async () => {
 	// Lambda
 	const lambdaOutput = await lambda({
 		name: PROJECT,
-		runtime: 'nodejs12.x', 
-		functionFolder: resolve('./app'), 
+		fn: {
+			runtime: 'nodejs12.x', 
+			dir: resolve('./app')
+		},
 		timeout: 30, 
 		vpcConfig: {
 			subnetIds: vpc.isolatedSubnetIds,
@@ -638,6 +728,24 @@ module.exports = main()
 ```
 
 ## Lambda
+### A few words about AWS Lambda
+#### Lambdas, VPC and subnets
+
+On the surface, AWS Lambdas appear to be very easy to use, but there are a few gotchas that require to be aware of the following imlementation details:
+1. AWS Lambdas _ARE ALWAYS_ in a private subnet. This cannot be changed. The only reason they can access the public internet is because by default, AWS configures them with a NAT gateway. 
+2. When an AWS Lambda is configured to access your custom VPC:
+	- It will most likely loose access to the public internet if your subnet in your VPC is not configured with internet access(1).
+	- It will need the permission to provision an ENI so that they can access your VPC. This requires the `ec2:CreateNetworkInterface` action(2).
+3. Because AWS Lambdas are always in a private subnet, it is futile to connect them to your VPC's public subnet. 
+
+> (1) When connecting your Lambda to your VPC, the only subnets that makes sense to be connected to are the private subnets. Therefore to enable public internet access, NATs must be configured in public subnets, and each private subnet's route table must contain a rule that send traffic `0.0.0.0/0` to the NAT on the public subnet.
+> (2) The easiest way to allow the `ec2:CreateNetworkInterface` action for an IAM role is to attach he AWS managed policy `AWSLambdaVPCAccessExecutionRole`.
+
+#### Lambda environment variables
+
+- `LAMBDA_TASK_ROOT`: The path to where the lambda code is.
+- `LAMBDA_RUNTIME_DIR`: The path to where the lambda code is.
+
 ### The simplest API Gateway with Lambda
 
 ```js
@@ -723,8 +831,10 @@ const tags = {
 
 const lambdaOutput = lambda({
 	name: PROJECT,
-	runtime: 'nodejs12.x', 
-	functionFolder: resolve('./app'), 
+	fn: {
+		runtime: 'nodejs12.x', 	
+		dir: resolve('./app')
+	},
 	timeout:30, 
 	memorySize:128,  
 	tags
@@ -773,8 +883,10 @@ const cloudWatchPolicy = new aws.iam.Policy(PROJECT, {
 
 const lambdaOutput = lambda({
 	name: PROJECT,
-	runtime: 'nodejs12.x', 
-	functionFolder: resolve('./app'), 
+	fn: {
+		runtime: 'nodejs12.x', 
+		dir: resolve('./app')
+	},
 	timeout:30, 
 	memorySize:128, 
 	policies: [cloudWatchPolicy],
@@ -786,8 +898,10 @@ const lambdaOutput = lambda({
 > ```js
 > const lambdaOutput = lambda({
 > 	name: PROJECT,
-> 	runtime: 'nodejs12.x', 
-> 	functionFolder: resolve('./app'), 
+> 	fn: {
+>		runtime: 'nodejs12.x', 
+> 		dir: resolve('./app')
+>	}, 
 > 	timeout:30, 
 > 	memorySize:128, 
 > 	policies: [{ arn: 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole' }],
@@ -852,22 +966,19 @@ const lambdaOutput = lambda({
 2. Create your `index.js`:
 ```js
 const pulumi = require('@pulumi/pulumi')
-const awsx = require('@pulumi/awsx')
+const { resolve } = require('path')
 const lambda = require('./src/lambda')
 
 const ENV = pulumi.getStack()
 const PROJ = pulumi.getProject()
 const PROJECT = `${PROJ}-${ENV}`
 
-// ECR images. Doc:
-// 	- buildAndPushImage API: https://www.pulumi.com/docs/reference/pkg/nodejs/pulumi/awsx/ecr/#buildAndPushImage
-// 	- 2nd argument is a DockerBuild object: https://www.pulumi.com/docs/reference/pkg/docker/image/#dockerbuild
-const image = awsx.ecr.buildAndPushImage(PROJECT, {
-	context: './app'
-})
-
 const lambdaOutput = lambda({
 	name: PROJECT,
+	fn: {
+		dir: resolve('./app'),
+		type: 'image' // If './app' contains a 'Dockerfile', this prop is not needed. 'lambda' is able to automatically infer the type is an 'image'.
+	},
 	imageUri: image.imageValue,
 	timeout:30, 
 	memorySize:128
@@ -1018,6 +1129,27 @@ const { securityGroup:mySecurityGroup, securityGroupRules:myRules } = await secu
 ## Step-function
 
 ## VPC
+
+> WARNING: Once the VPC's subnets have been created, updating them will produce a replace, which can have dire consequences to your entire infrastructure. Therefore think twice when setting them up. 
+
+The following setup is quite safe:
+
+```js
+const vpcOutput = vpc({
+	name: 'my-project-dev',
+	subnets: [{ type: 'public' }, { type: 'private' }],
+	numberOfAvailabilityZones: 3, // Provide the maximum number of AZs based on your region. The default is 2
+	protect: false,
+	tags: {
+		Project: 'my-project',
+		Env: 'dev'
+	}
+})
+```
+
+This setup will divide the VPC's CIDR block in equal portions based on the total number of subnets created. The above example shows 6 subnets (3 public and 3 private). Because the example above did not specify any CIDR block for the VPC, it is set to `10.0.0.0/16` which represents 65,536 IP addresses. This means each subnet can use up to \~`10922` IP addresses. 
+
+The last thing to be aware of is that the private subnets will also provision 3 NATs in the public subnets. The temptation would be to use `isolated` subnets instead of private ones to save on money, but from my experience, this is pointless. You'll always end up internet access from your isolated subnets, so don't bother and setup private subnets from the beginning.
 
 # GCP
 
@@ -1444,6 +1576,25 @@ module.exports = {
 	find
 }
 ```
+
+# Troubleshooting
+## AWS troubleshooting
+### Terminal utilities are failing with timeout errors `ETIMEDOUT`
+
+This is most likely due to one of the following:
+- Missing security group inbound or outbound rule.
+- The private subnet is not able to access the public internet because:
+	- It has no route table configured with a NAT gateway.
+	- Or there is no VPC endpoint configured to access the resource.
+- The VPC's ACL prevents connection to happen.
+
+### AWS Lambda cannot access the public internet
+
+Please refer to the [A few words about AWS Lambda](#a-few-words-about-aws-lambda) section.
+
+### `failed to create '/home/sbx_userxxxx/.pulumi'`
+
+Please refer to the [Setting it up in Docker](#setting-it-up-in-docker) section.
 
 # Annexes
 

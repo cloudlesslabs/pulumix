@@ -1,7 +1,10 @@
-// Version: 0.0.2
+// Version: 0.0.8
 
 const pulumi = require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
+const awsx = require('@pulumi/awsx')
+const fs = require('fs')
+const path = require('path')
 const { resolve } = require('./utils')
 
 /**
@@ -9,20 +12,25 @@ const { resolve } = require('./utils')
  * Resources:
  * 	1. IAM role
  * 	2. (Optional) Log group if 'cloudWatch' is true.
- * 	3. (Optional) Attach AWSLambdaBasicExecutionRole AWS managed policy to the IAM role if 'cloudWatch' is true. 
+ * 	3. (Optional) Up to 2 policies which are attached to the IAM role:
+ * 		- If the Lambda is configured in a VPC (i.e., 'vpcConfig' exists), then the AWS managed policy 'AWSLambdaVPCAccessExecutionRole' is added. This policy automatically grant 'send-to' CloudWatch access.
+ * 		- If 'cloudWatch' is true, then the AWS managed policy 'AWSLambdaBasicExecutionRole' is added.
+ * 		- If 'fileSystemConfig' is configured, then the AWS managed policy 'AmazonElasticFileSystemClientFullAccess' is added.
  * 	4. Lambda.
  * 	
  * @param  {String}				name								
- * @param  {String}				runtime								e.g., 'nodejs14.x'. All runtimes: https://docs.aws.amazon.com/lambda/latest/dg/API_CreateFunction.html#SSS-CreateFunction-request-Runtime
- * @param  {String}				functionFolder						e.g., './app'. That's the absolute path to the local folder containing the Lambda code that will be zipped.
+ * @param  {String}				fn.dir								The absolute path to the local folder containing the Lambda code that will be zipped.
+ * @param  {String}				fn.runtime							e.g., 'nodejs14.x'. All runtimes: https://docs.aws.amazon.com/lambda/latest/dg/API_CreateFunction.html#SSS-CreateFunction-request-Runtime
+ * @param  {String}				fn.type								Valid values: 'zip' (default), 'image' (1)											
+ * @param  {Object}				fn.args								Only valid when 'fn.type' is 'image' (1). This is what would be passed in the --build-arg option of `docker build`.
+ * @param  {Object}				fn.env								Environment variables for that fn. It works a bit differently when 'fn.type' is 'image' (2).
  * @param  {Number}				timeout								Unit seconds. Default is 3 and max is 900 (15 minutes).
  * @param  {Number}				memorySize							Unit is MB. Default is 128 and max is 10,240
  * @param  {String}				handler								Deafult is 'index.handler'.
  * @param  {[Output<Policy>]}	policies							Policies to attach to the lambda role.
- * @param  {Output<String>}		imageUri							URI of the Docker image. Conflicts with 'functionFolder'. If both are defined, 'imageUri' wins.
+ * @param  {Output<String>}		imageUri							URI of the Docker image. Conflicts with 'fn.dir'. If both are defined, 'imageUri' wins.
  * @param  {Output<[String]>}	vpcConfig.subnetIds
  * @param  {Output<[String]>}	vpcConfig.securityGroupIds
- * @param  {Boolean}			vpcConfig.enableENIcreation			Default false. True means that ENIs can be created if the lambda is in a private subnet.
  * @param  {Output<String>}		fileSystemConfig.arn				Used to mount an AWS EFS access point.
  * @param  {Output<String>}		fileSystemConfig.localMountPath		Used to mount an AWS EFS access point.
  * @param  {Boolean}			cloudWatch 							Default false. When true, CloudWatch is enabled.
@@ -51,18 +59,45 @@ const { resolve } = require('./utils')
  * 			arn: 'arn:aws:logs:ap-southeast-2:123456:log-group:/aws/lambda/1st-step'
  * 		}
  * }
+ *
+ * (1) 'fn.type' if not required. If it is not set and 'fn.dir' contains a 'Dockerfile', the type is 'image'.
+ * (2) When 'fn.env' is set and 'fn.type' is 'image'(1), then this object is merged with the 'fn.arg'. This 
+ * means there is an extra manual step to convert the docker ARG into ENV in the Dockerfile.
  */
-const createLambda = async ({ name, runtime, functionFolder, imageUri, timeout=3, memorySize=128, handler, policies, vpcConfig, fileSystemConfig, cloudWatch, logsRetentionInDays, tags }) => {
+const createLambda = async ({ name, runtime, fn, timeout=3, memorySize=128, handler, policies, vpcConfig, fileSystemConfig, cloudWatch, logsRetentionInDays, tags }) => {
 	tags = tags || {}
-	policies = policies || []
-	const { enableENIcreation, ..._vpcConfig } = vpcConfig||{}
 	const dependsOn = []
-
+	
 	if (!name)
 		throw new Error('Missing required argument \'name\'.')
+	if (!fn)
+		throw new Error('Missing required argument \'fn\'.')
+	if (!fn.dir)
+		throw new Error('Missing required argument \'fn.dir\'.')
 	
 	const canonicalName = `${name}-lambda`
 
+	if (!(await fileExists(fn.dir)))
+		throw new Error(`Function folder '${fn.dir}' not found.`)	
+
+	const dockerFileFound = await fileExists(path.join(fn.dir, 'Dockerfile'))
+	let image
+	if (fn.type == 'image' || dockerFileFound) {
+		const args = fn.args || fn.env ? { ...(fn.args||{}), ...(fn.env||{}) } : undefined
+		// ECR images. Doc:
+		// 	- buildAndPushImage API: https://www.pulumi.com/docs/reference/pkg/nodejs/pulumi/awsx/ecr/#buildAndPushImage
+		// 	- 2nd argument is a DockerBuild object: https://www.pulumi.com/docs/reference/pkg/docker/image/#dockerbuild
+		image = awsx.ecr.buildAndPushImage(canonicalName, {
+			context: fn.dir,
+			args,
+			tags: {
+				...tags,
+				Name: canonicalName
+			}
+		})
+	}
+	const imageUri = image ? image.imageValue : null
+	
 	// IAM role. Doc: https://www.pulumi.com/docs/reference/pkg/aws/iam/role/
 	const lambdaRole = new aws.iam.Role(canonicalName, {
 		assumeRolePolicy: {
@@ -85,8 +120,6 @@ const createLambda = async ({ name, runtime, functionFolder, imageUri, timeout=3
 	// Configure CloudWatch
 	let logGroup = null
 	if (cloudWatch) {
-		// Enables the lambda to send logs to CloudWatch
-		policies.push({ name: `${canonicalName}-cloudwatch`, arn:'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole' })
 		// Creates the log group where the logs are sent. Doc: https://www.pulumi.com/docs/reference/pkg/aws/cloudwatch/loggroup/
 		const logGroupId = `/aws/lambda/${name}`
 		logGroup = new aws.cloudwatch.LogGroup(logGroupId, { 
@@ -99,48 +132,26 @@ const createLambda = async ({ name, runtime, functionFolder, imageUri, timeout=3
 		})
 	}
 
-	if (enableENIcreation)
-		// Enables the lambda to send logs to CloudWatch
-		policies.push({ 
-			name: `${canonicalName}-eni-creation`, 
-			arn:'arn:aws:iam::aws:policy/service-role/AWSLambdaENIManagementAccess' 
-		})
-
-
-	if (fileSystemConfig) {
-		// To access EFS, the execution role for the lambda function must provide those two policies:
-		// Doc: https://aws.amazon.com/blogs/compute/using-amazon-efs-for-aws-lambda-in-your-serverless-applications/
-		policies.push({
-			name: `${canonicalName}-vpc-access`,
-			arn: 'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
-		}, {
-			name: `${canonicalName}-efs-access`,
-			arn: 'arn:aws:iam::aws:policy/AmazonElasticFileSystemClientFullAccess'
-		})
-	}
-
 	// Attach policies
-	for (let i=0;i<policies.length;i++) {
-		const policy = policies[i]
+	const updatedPolicies = configurePolicies(policies, canonicalName, { cloudWatch, vpcConfig, fileSystemConfig })
+	for (let i=0;i<updatedPolicies.length;i++) {
+		const policy = updatedPolicies[i]
 		if (!policy.name)
 			throw new Error(`Invalid argument exception. Some policies in lambda ${name} don't have a name.`)	
 		if (!policy.arn)
 			throw new Error(`Invalid argument exception. Some policies in lambda ${name} don't have an arn.`)	
 		
 		const policyName = await resolve(policy.name)
-		dependsOn.push(new aws.iam.RolePolicyAttachment(policyName, {
+		dependsOn.push(new aws.iam.RolePolicyAttachment(`${canonicalName}-${policyName}`, {
 			role: lambdaRole.name,
 			policyArn: policy.arn
 		}))
 	}
 
 	// Configure the function code used for that lambda
-	if (!imageUri) {
-		if (!runtime)
-			throw new Error('Missing required argument \'runtime\'. Please select one amongst the list at https://docs.aws.amazon.com/lambda/latest/dg/API_CreateFunction.html#SSS-CreateFunction-request-Runtime')
-		if (!functionFolder)
-			throw new Error('Missing required argument \'functionFolder\'.')
-	}
+	if (!imageUri && !fn.runtime)
+		throw new Error('Missing required argument \'runtime\'. Please select one amongst the list at https://docs.aws.amazon.com/lambda/latest/dg/API_CreateFunction.html#SSS-CreateFunction-request-Runtime')
+	
 	const functionCode = imageUri 
 		? {
 			packageType: 'Image',
@@ -148,7 +159,7 @@ const createLambda = async ({ name, runtime, functionFolder, imageUri, timeout=3
 		} : {
 			runtime,
 			code: new pulumi.asset.AssetArchive({
-				'.': new pulumi.asset.FileArchive(functionFolder),
+				'.': new pulumi.asset.FileArchive(fn.dir),
 			}),
 			handler: handler || 'index.handler'
 		}
@@ -160,7 +171,7 @@ const createLambda = async ({ name, runtime, functionFolder, imageUri, timeout=3
 		timeout,
 		memorySize,
 		role: lambdaRole.arn,
-		vpcConfig:_vpcConfig,
+		vpcConfig: Object.keys(vpcConfig||{}).length ? vpcConfig : undefined,
 		fileSystemConfig,
 		dependsOn,
 		tags: {
@@ -170,12 +181,93 @@ const createLambda = async ({ name, runtime, functionFolder, imageUri, timeout=3
 	})
 
 	return {
-		lambda,
-		role: lambdaRole,
-		logGroup
+		lambda: leanify(lambda),
+		image: leanifyImage(image),
+		role:leanify(lambdaRole),
+		logGroup: leanify(logGroup)
 	}
 }
 
+const leanifyImage = resource => {
+	const { imageValue, repository } = resource || {}	
+	if (!imageValue || !repository || !repository.repository)
+		return resource
+
+	const { id, arn, name, registryId, repositoryUrl } = repository.repository
+	return {
+		uri: imageValue,
+		repository: {
+			id, 
+			arn, 
+			name, 
+			registryId, 
+			url: repositoryUrl
+		}
+	}
+}
+
+const leanify = resource => {
+	/* eslint-disable */
+	const { tags, urn, tagsAll, ...rest } = resource || {}	
+	/* eslint-enable */
+	return rest
+}
+
+/**
+ * Adds the policies based on the config. 
+ * 
+ * @param  {[Policy]} policies
+ * @param  {String}   prefix
+ * @param  {Boolean}  config.cloudWatch
+ * @param  {Boolean}  config.vpcConfig
+ * @param  {Boolean}  config.fileSystemConfig
+ * 
+ * @return {[Policy]} updatedPolicies
+ */
+const configurePolicies = (policies, prefix, config) => {
+	const AWSLambdaVPCAccessExecutionRole = 'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
+	const AWSLambdaBasicExecutionRole = 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+	const AmazonElasticFileSystemClientFullAccess = 'arn:aws:iam::aws:policy/AmazonElasticFileSystemClientFullAccess'
+
+	const updatedPolicies = [...(policies || [])]
+	const { cloudWatch, fileSystemConfig, vpcConfig } = config || {}
+
+	const efsAccess = fileSystemConfig && fileSystemConfig.arn
+	const vpcAccess = efsAccess || (vpcConfig && vpcConfig.subnetIds)
+	if (vpcAccess && !updatedPolicies.some(p => p.arn == AWSLambdaVPCAccessExecutionRole))
+		updatedPolicies.push({
+			name: `${prefix}-vpc-access`,
+			// 'AWSLambdaVPCAccessExecutionRole' contains 'AWSLambdaBasicExecutionRole'
+			arn: AWSLambdaVPCAccessExecutionRole
+		})
+	else if (cloudWatch && !updatedPolicies.some(p => p.arn == AWSLambdaBasicExecutionRole))
+		// Enables the lambda to send logs to CloudWatch
+		updatedPolicies.push({ 
+			name: `${prefix}-cloudwatch`, 
+			arn: AWSLambdaBasicExecutionRole
+		})
+
+	if (efsAccess && !updatedPolicies.some(p => p.arn == AmazonElasticFileSystemClientFullAccess))
+		// To access EFS, the execution role for the lambda function must provide those two policies:
+		// Doc: https://aws.amazon.com/blogs/compute/using-amazon-efs-for-aws-lambda-in-your-serverless-applications/
+		updatedPolicies.push({
+			name: `${prefix}-efs-access`,
+			arn: AmazonElasticFileSystemClientFullAccess
+		})
+
+	return updatedPolicies
+}
+
+/**
+ * Checks if a file or folder exists
+ * 
+ * @param  {String}  filePath 	Absolute or relative path to file or folder on the local machine
+ * @return {Boolean}   
+ */
+const fileExists = filePath => new Promise(onSuccess => fs.exists(path.resolve(filePath||''), yes => onSuccess(yes ? true : false)))
+
 module.exports = createLambda
+
+
 
 

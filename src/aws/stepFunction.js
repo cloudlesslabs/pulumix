@@ -1,4 +1,4 @@
-// Version: 0.0.4
+// Version: 0.0.5
 
 const aws = require('@pulumi/aws')
 const { resolve } = require('./utils')
@@ -153,10 +153,21 @@ const createStepFunction = async ({ name, description, type, states, policies, c
 	})
 
 	return {
-		id: stepFunction.id,
-		arn: stepFunction.arn,
-		logGroup
+		...leanifyStepFunction(stepFunction),
+		logGroup: leanify(logGroup)
 	}
+}
+
+const leanify = resource => {
+	/* eslint-disable */
+	const { tags, urn, tagsAll, ...rest } = resource || {}	
+	/* eslint-enable */
+	return rest
+}
+
+const leanifyStepFunction = resource => {
+	const { id, name, type, arn, creationDate, roleArn, status, tracingConfiguration, loggingConfiguration } = resource || {}	
+	return { id, name, type, arn, creationDate, roleArn, status, tracingConfiguration, loggingConfiguration }
 }
 
 module.exports = createStepFunction

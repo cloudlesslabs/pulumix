@@ -1,4 +1,4 @@
-// Version: 0.0.6
+// Version: 0.0.7
 // Full Pulumi AWS RDS API doc at https://www.pulumi.com/docs/reference/pkg/aws/rds/
 
 require('@pulumi/pulumi')
@@ -316,7 +316,7 @@ const createAurora = async ({
 		})
 
 		return {
-			proxy: rdsProxy,
+			proxy: leanifyProxy(rdsProxy),
 			targetGroup: proxyTargetGroup,
 			target: proxyTarget
 		}
@@ -328,7 +328,7 @@ const createAurora = async ({
 		proxyEnpoint: proxyOutput ? proxyOutput.proxy.endpoint : null,
 		port: dbPort,
 		instanceEndpoints: clusterInstanceEndpoints,
-		dbCluster,
+		dbCluster: leanifyDbCluster(dbCluster),
 		subnetGroup,
 		securityGroups: {
 			rds: rdsSecurityGroup,
@@ -336,6 +336,20 @@ const createAurora = async ({
 		},
 		proxy: proxyOutput
 	}
+}
+
+const leanifyDbCluster = dbCluster => {
+	/* eslint-disable */
+	const { applyImmediately, masterPassword, tags, urn, tagsAll, ...rest } = dbCluster || {}	
+	/* eslint-enable */
+	return rest
+}
+
+const leanifyProxy = proxy => {
+	/* eslint-disable */
+	const { tags, urn, tagsAll, ...rest } = proxy || {}	
+	/* eslint-enable */
+	return rest
 }
 
 /**

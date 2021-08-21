@@ -1,4 +1,4 @@
-// Version: 0.0.6
+// Version: 0.0.7
 
 const aws = require('@pulumi/aws')
 const { resolve } = require('./utils')
@@ -114,11 +114,18 @@ const createEFS = async ({ name, vpcId, subnetIds:_subnetIds, securityGroups, ac
 	})
 
 	return {
-		fileSystem,
-		accessPoint,
+		fileSystem: leanify(fileSystem),
+		accessPoint: leanify(accessPoint),
 		targets,
 		securityGroup: efsSecurityGroup
 	}
+}
+
+const leanify = resource => {
+	/* eslint-disable */
+	const { tags, urn, tagsAll, ...rest } = resource || {}	
+	/* eslint-enable */
+	return rest
 }
 
 module.exports = createEFS
