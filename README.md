@@ -264,7 +264,7 @@ ARG DB_PASSWORD
 
 The following example shows what a `Dockerfile` for an AWS Lambda would look like:
 
-```
+```dockerfile
 FROM amazon/aws-lambda-nodejs:12
 ARG FUNCTION_DIR="/var/task"
 
