@@ -75,6 +75,7 @@ npm i @pulumi/pulumi @pulumi/gcp
 >		- [Terminal utilities are failing with timeout errors `ETIMEDOUT`](#terminal-utilities-are-failing-with-timeout-errors-etimedout)
 >		- [AWS Lambda cannot access the public internet](#aws-lambda-cannot-access-the-public-internet)
 >		- [`failed to create '/home/sbx_userxxxx/.pulumi'`](#failed-to-create-homesbx_userxxxxpulumi)
+>		- [no resource plugin 'aws-v4.17.0' found in the workspace or on your $PATH](#no-resource-plugin-aws-v4170-found-in-the-workspace-or-on-your-path)
 > * [Annexes](#annexes)
 > * [References](#references)
 
@@ -272,6 +273,7 @@ ARG FUNCTION_DIR="/var/task"
 ## 1. Configure the Pulumi environment variables
 ENV PULUMI_SKIP_UPDATE_CHECK true
 ENV PULUMI_HOME "/tmp"
+ENV PULUMI_CONFIG_PASSPHRASE "your-passphrase"
 ## 2. Install Pulumi dependencies
 RUN yum install -y \
 	which \
@@ -299,32 +301,39 @@ Notice:
 1. Environment variables:
 	- `PULUMI_SKIP_UPDATE_CHECK` must be set to true to prevent the pesky warnings to update Pulumi to the latest version.
 	- `PULUMI_HOME` must be set to a folder where the Lambda has write access (by default, it only has write access to the `/tmp` folder. Use EFS to access more options). The default PULUMI_HOME value is `~`. Unfortunately, Lambda don't have access to that folder. Not configuring the PULUMI_HOME variable would result in a `failed to create '/home/sbx_userxxxx/.pulumi'` error message when the lambda executes the `pulumi login file:///tmp/` command. 
+	- `PULUMI_CONFIG_PASSPHRASE` must be set, even if you don't use secrets, otherwise, you'll receive an `passphrase must be set with PULUMI_CONFIG_PASSPHRASE or PULUMI_CONFIG_PASSPHRASE_FILE environment variables` error message durin the `pulumi up` execution.
 2. `bash -s -- --version 3.10.0`: Use the explicit version to make sure Pulumi's update don't break your code.
 3. `mv ~/.pulumi/bin/* /usr/bin` moves the the executable files to where the lambda can access them (i.e., `/usr/bin`). 
 
 In you Lambda code, you can know use the Automation API, or call Pulumi via the `child_process` (which is actually what the automation API does):
 
 ```js
-const cp = require('child_process')
-const util = require('util')
-
-const exec = util.promisify(cp.exec)
+const pulumiAuto = require('./src/automationApi')
+const s3 = require('./src/aws/s3')
 
 const main = async () => {
-	let pulumiUser = await exec('pulumi whoami').catch(() => null)
-	const needToLogin = !pulumiUser || pulumiUser.indexOf('/sbx_user') < 0 // Lambda uses sandboxed users called 'sbx_userxxxx'
-	if (needToLogin) {
-		await exec('pulumi login file:///tmp/')
-		pulumiUser = await exec('pulumi whoami').catch(() => null)
-	}
-	
-	if (!pulumiUser)
-		throw new Error(`Fail to login locally to Pulumi.`)
-	else
-		console.log(`Pulumi user is: ${pulumiUser}`)
+	const [errors] = await pulumiAuto.up({ 
+		stackName: 'dev', 
+		projectName: `my-project-name`,
+		program: async () => {
+			const bucket = await s3({
+				name:'my-unique-website-name',
+				website: {
+					indexDocument: 'index.html'
+				}
+			})
+			return bucket
+		}, 
+		provider: {
+			name:'aws',
+			version: '4.17.0'
+		},
+		config: {
+			'aws:region': 'ap-southeast-2',
+			'aws:allowedAccountIds': [123456]
+		}
+	})
 }
-
-main()
 ```
 
 # AWS
@@ -1595,6 +1604,14 @@ Please refer to the [A few words about AWS Lambda](#a-few-words-about-aws-lambda
 ### `failed to create '/home/sbx_userxxxx/.pulumi'`
 
 Please refer to the [Setting it up in Docker](#setting-it-up-in-docker) section.
+
+### no resource plugin 'aws-v4.17.0' found in the workspace or on your $PATH
+
+This typically happens with the Automation API. The AWS Pulumi plugin is not found because:
+- You have not installed the AWS plugin with the `stack.workspace.installPlugin('aws', 'v4.17.0')`.
+- You have installed the incorrect version of this plugin. The tutorial usually shows this example: `stack.workspace.installPlugin('aws', 'v4.0.0')`. The plugin is version sensitive.
+
+Which version of the AWS SDK is required depends on the Pulumi version you're using. The best way to found out is to try to deploy without installing the AWS SDK, then read the error message to figure the version out.
 
 # Annexes
 
