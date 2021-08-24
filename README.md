@@ -1,7 +1,19 @@
 # PULUMI RECIPES
 
-> __Pulumi guide__: To learn more about Pulumi, please refer to https://gist.github.com/nicolasdao/830fc1d1b6ce86e0d8bebbdedb2f2626.
+> __Pulumi guide__: To learn more about Pulumi, please refer to https://gist.github.com/nicolasdao/6cdd85d94b8ee992297d351c248f4092.
 > __IAM roles & policies__: Managing AWS resources almost always involves managing IAM roles and policies. For a quick recap on that topic, please refer to this document: https://gist.github.com/nicolasdao/830fc1d1b6ce86e0d8bebbdedb2f2626#iam-recap.
+
+### Glocal dependencies
+
+```
+npm i @pulumi/pulumi 
+```
+
+If you need to use the __Automation API__, also install these dependencies:
+
+```
+npm i puffy fast-glob
+```
 
 ### AWS dependencies
 
@@ -30,6 +42,9 @@ npm i @pulumi/pulumi @pulumi/gcp
 >	- [AWS scripts](#aws-scripts)
 > * [Automation API](#automation-api)
 >	- [Setting it up in Docker](#setting-it-up-in-docker)
+>		- [Dockerfile for Automation API in a Lambda](#dockerfile-for-automation-api-in-a-lambda)
+>		- [Setting the adequate IAM policies](#setting-the-adequate-iam-policies)
+>		- [Using the Automation API in your code](#using-the-automation-api-in-your-code)
 > * [AWS](#aws)
 >	- [Aurora](#aurora)
 >		- [Basic usage](#aurora---basic-usage)
@@ -53,6 +68,7 @@ npm i @pulumi/pulumi @pulumi/gcp
 >			- [code](#example---lambda-with-container-code)
 >			- [Setting up environment variables and passing arguments](#setting-up-environment-variables-and-passing-arguments)	
 >		- [Example - Lambda with EFS](#example---lambda-with-efs)
+>	- [Policy](#aws-policy)
 >	- [Secret](#secret)
 >		- [Getting stored secrets](#getting-stored-secrets)
 >	- [Security Group](#security-group)
@@ -262,6 +278,7 @@ ARG DB_PASSWORD
 
 # Automation API
 ## Setting it up in Docker
+### Dockerfile for Automation API in a Lambda
 
 The following example shows what a `Dockerfile` for an AWS Lambda would look like:
 
@@ -300,10 +317,37 @@ CMD [ "index.handler" ]
 Notice:
 1. Environment variables:
 	- `PULUMI_SKIP_UPDATE_CHECK` must be set to true to prevent the pesky warnings to update Pulumi to the latest version.
-	- `PULUMI_HOME` must be set to a folder where the Lambda has write access (by default, it only has write access to the `/tmp` folder. Use EFS to access more options). The default PULUMI_HOME value is `~`. Unfortunately, Lambda don't have access to that folder. Not configuring the PULUMI_HOME variable would result in a `failed to create '/home/sbx_userxxxx/.pulumi'` error message when the lambda executes the `pulumi login file:///tmp/` command. 
+	- `PULUMI_HOME` must be set to a folder where the Lambda has write access (by default, it only has write access to the `/tmp` folder. Use EFS to access more options). The default PULUMI_HOME value is `~`. Unfortunately, Lambda don't have access to that folder. Not configuring the PULUMI_HOME variable would result in a `failed to create '/home/sbx_userxxxx/.pulumi'` error message when the lambda executes the `pulumi login file:///tmp/` command. For a detailed example of what files are contained inside this folder, please refer to [this document](https://gist.github.com/nicolasdao/6cdd85d94b8ee992297d351c248f4092#pulumi-files).
 	- `PULUMI_CONFIG_PASSPHRASE` must be set, even if you don't use secrets, otherwise, you'll receive an `passphrase must be set with PULUMI_CONFIG_PASSPHRASE or PULUMI_CONFIG_PASSPHRASE_FILE environment variables` error message durin the `pulumi up` execution.
 2. `bash -s -- --version 3.10.0`: Use the explicit version to make sure Pulumi's update don't break your code.
 3. `mv ~/.pulumi/bin/* /usr/bin` moves the the executable files to where the lambda can access them (i.e., `/usr/bin`). 
+
+### Setting the adequate IAM policies
+
+Because Pulumi relies on the standard AWS SDK to access AWS's APIs, the appropriate policies must be set in your hosting environment. For example, in order to provision S3 buckets, the following policy must be attached:
+
+```js
+const createBucketsPolicy = new aws.iam.Policy(`create-bucket`, {
+	path: '/',
+	description: 'Allows the creation of S3 buckets',
+	policy: JSON.stringify({
+		Version: '2012-10-17',
+		Statement: [{
+			Action: [
+				's3:CreateBucket',
+				's3:Delete*',
+				's3:Get*',
+				's3:List*',
+				's3:Put*'
+			],
+			Resource: '*',
+			Effect: 'Allow'
+		}]
+	})
+})
+```
+
+### Using the Automation API in your code
 
 In you Lambda code, you can know use the Automation API, or call Pulumi via the `child_process` (which is actually what the automation API does):
 
@@ -313,8 +357,18 @@ const s3 = require('./src/aws/s3')
 
 const main = async () => {
 	const [errors] = await pulumiAuto.up({ 
-		stackName: 'dev', 
-		projectName: `my-project-name`,
+		project: 'my-project-name',
+		provider: {
+			name:'aws',
+			version: '4.17.0' // IMPORTANT: This cannot be any version. Please refer to the note below.
+		},
+		stack: {
+			name: 'dev',
+			config: {
+				'aws:region': 'ap-southeast-2',
+				'aws:allowedAccountIds': [123456]
+			}
+		}, 
 		program: async () => {
 			const bucket = await s3({
 				name:'my-unique-website-name',
@@ -323,18 +377,12 @@ const main = async () => {
 				}
 			})
 			return bucket
-		}, 
-		provider: {
-			name:'aws',
-			version: '4.17.0'
-		},
-		config: {
-			'aws:region': 'ap-southeast-2',
-			'aws:allowedAccountIds': [123456]
-		}
+		} 
 	})
 }
 ```
+
+> IMPORTANT: The `provider.version` required and is tied to the Pulumi version you're using (`3.10.0` in this example). Configuring the wrong AWS version will throw an error similar to [no resource plugin 'aws-v4.17.0' found in the workspace or on your $PATH](#no-resource-plugin-aws-v4170-found-in-the-workspace-or-on-your-path). To know which AWS version to use, set one up, deploy, and check the error message.
 
 # AWS
 ## Aurora
@@ -1063,9 +1111,28 @@ Please refer to the [Mounting an EFS access point on a Lambda](#mounting-an-efs-
 
 > For a full example of a project that uses Lambda with Docker and Git installed to save files on EFS, please refer to this project: https://github.com/nicolasdao/example-aws-lambda-efs
 
+## AWS Policy
+
+```js
+const cloudWatchPolicy = new aws.iam.Policy(PROJECT, {
+	path: '/',
+	description: 'IAM policy for logging from a lambda',
+	policy: JSON.stringify({
+		Version: '2012-10-17',
+		Statement: [{
+			Action: [
+				'logs:CreateLogGroup',
+				'logs:CreateLogStream',
+				'logs:PutLogEvents'
+			],
+			Resource: 'arn:aws:logs:*:*:*',
+			Effect: 'Allow'
+		}]
+	})
+})
+```
 
 ## Secret
-
 ### Getting stored secrets
 
 ```js

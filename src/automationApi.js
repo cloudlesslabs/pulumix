@@ -1,9 +1,11 @@
-// Version: 0.0.1
+// Version: 0.0.3
 
-const { LocalWorkspace } = require('@pulumi/pulumi/automation')
 const util = require('util')
+const { join } = require('path')
 const cp = require('child_process')
+const { LocalWorkspace } = require('@pulumi/pulumi/automation')
 const { error:{ catchErrors, wrapErrors }, promise:{ delay } } = require('puffy')
+const { files } = require('../utils')
 
 const exec = util.promisify(cp.exec)
 
@@ -31,12 +33,12 @@ const login = options => catchErrors((async () => {
 /**
  * Executes `pulumi up`
  * 
- * @param  {String}		stackName		
- * @param  {String}		projectName
+ * @param  {String}		stack.name
+ * @param  {Object}		stack.config							(1). This is the config object that would usually be under the `Pulumi.<STACK>.yaml` file.	
+ * @param  {String}		project
  * @param  {Promise}	program
  * @param  {Promise}	provider.name							e.g., 'aws', 'gcp'
- * @param  {Promise}	provider.version						e.g., '4.17.0'
- * @param  {Object}		config									(1). This is the config object that would usually be under the `Pulumi.<STACK>.yaml` file.	
+ * @param  {Promise}	provider.version						e.g., '4.17.0'								
  * @param  {Function}	onOutput								(Optional)
  * 
  * @return {[String]}	result.info								stdout from the `pulumi up` command.
@@ -50,44 +52,49 @@ const login = options => catchErrors((async () => {
  *
  * (1) Example: { 'aws:region': 'ap-southeast-2', 'aws:allowedAccountIds':[196799624576] }
  */
-const pulumiUp = ({ stackName, projectName, program, provider, config, onOutput:_onOutput }) => catchErrors((async () => {
-	const errMsg = `Command 'pulumi up --stack ${stackName}' failed.`
+const pulumiUp = ({ stack:_stack, project, program, provider, onOutput:_onOutput }) => catchErrors((async () => {
+	const errMsg = `Command 'pulumi up --stack ${(_stack||{}).name}' failed.`
 
-	if (!stackName)
-		throw wrapErrors(errMsg, [new Error('Missing required argument \'stackName\'')])
-	if (!projectName)
-		throw wrapErrors(errMsg, [new Error('Missing required argument \'projectName\'')])
+	if (!_stack)
+		throw wrapErrors(errMsg, [new Error('Missing required argument \'stack\'')])
+	if (!_stack.name)
+		throw wrapErrors(errMsg, [new Error('Missing required argument \'stack.name\'')])
+	if (!_stack.config)
+		throw wrapErrors(errMsg, [new Error('Missing required argument \'stack.config\'')])
+	if (!project)
+		throw wrapErrors(errMsg, [new Error('Missing required argument \'project\'')])
 	if (!program)
 		throw wrapErrors(errMsg, [new Error('Missing required argument \'program\'')])
 	if (!provider)
 		throw wrapErrors(errMsg, [new Error('Missing required argument \'provider\'')])
 	if (!provider.name)
 		throw wrapErrors(errMsg, [new Error('Missing required argument \'provider.name\'')])
-	if (!config)
-		throw wrapErrors(errMsg, [new Error('Missing required argument \'config\'')])
-	if (provider.name == 'aws' && !config['aws:region'])
-		throw wrapErrors(errMsg, [new Error('Missing required argument. \'config["aws:region"]\' is required and the provider is \'aws\'')])
-	if (provider.name == 'gcp' && !config['gcp:region'])
-		throw wrapErrors(errMsg, [new Error('Missing required argument. \'config["gcp:region"]\' is required and the provider is \'gcp\'')])
+	if (provider.name == 'aws' && !_stack.config['aws:region'])
+		throw wrapErrors(errMsg, [new Error('Missing required argument. \'stack.config["aws:region"]\' is required and the provider is \'aws\'')])
+	if (provider.name == 'gcp' && !_stack.config['gcp:region'])
+		throw wrapErrors(errMsg, [new Error('Missing required argument. \'stack.config["gcp:region"]\' is required and the provider is \'gcp\'')])
 
 	const [loginErrors] = await login()
 	if (loginErrors)
 		throw wrapErrors(errMsg, loginErrors)
 
-	const stackArgs = { stackName, projectName, program }
-	const stackConfig = !config ? undefined : { pulumiHome: process.env.PULUMI_HOME, stackSettings: { [stackName]: { config } } }
+	const stackName = _stack.name
+	const stackArgs = { stackName, projectName: project, program }
+	const stackConfig = { 
+		pulumiHome: process.env.PULUMI_HOME, 
+		stackSettings: { 
+			[stackName]: { 
+				config:_stack.config 
+			} 
+		} 		
+	}
 	const [stackErrors, stack] = await catchErrors(LocalWorkspace.createOrSelectStack(stackArgs, stackConfig))
 	if (stackErrors)
-		throw wrapErrors(errMsg, [new Error(`Failed to create stack '${stackName}' for project '${projectName}'`), ...stackErrors])
+		throw wrapErrors(errMsg, [new Error(`Failed to create stack '${stackName}' for project '${project}'`), ...stackErrors])
 
 	const [installErrors] = await catchErrors(stack.workspace.installPlugin(provider.name, `v${provider.version||'4.0.0'}`))
 	if (installErrors)
-		throw wrapErrors(errMsg, [new Error(`Failed to install AWS plugin for stack '${stackName}' for project '${projectName}'`), ...installErrors])
-
-	// console.log('INSTALLED AWS')
-	// console.log(data)
-	// await stack.setConfig('aws:region', { value: 'ap-southeast-2' })
-	// await stack.refresh()
+		throw wrapErrors(errMsg, [new Error(`Failed to install AWS plugin for stack '${stackName}' for project '${project}'`), ...installErrors])
 
 	const info = []
 	const onOutput = !_onOutput ? m => info.push(m) : m => {
@@ -98,7 +105,7 @@ const pulumiUp = ({ stackName, projectName, program, provider, config, onOutput:
 	const [upErrors, upRes] = await catchErrors(stack.up({ onOutput }))
 	if (upErrors) {
 		const rootError = new Error(errMsg)
-		const currentError = new Error(`Failed to execute 'pulumi up' for stack '${stackName}' for project '${projectName}'`)
+		const currentError = new Error(`Failed to execute 'pulumi up' for stack '${stackName}' for project '${project}'`)
 		const localErrors = [currentError, ...upErrors]
 		const allErrors = [rootError, ...localErrors]
 		// Log all the errors now, because as of August 2021, a failure here makes the entire program crash.
@@ -114,9 +121,98 @@ const pulumiUp = ({ stackName, projectName, program, provider, config, onOutput:
 	}
 })())
 
+/**
+ * Compiles a list of predicates into a single function that can decide whether or not a file is valid or not.
+ * 
+ * @param  {String|RegExp|[]}	filter	e.g., 'project-name', ['project-name', 'automation-']
+ * 
+ * @return {Function}			fn
+ */
+const getFilterFn = filter => {
+	if (!filter)
+		return () => true
+
+	const aFilter = Array.isArray(filter) ? filter : [filter]
+	const fns = aFilter.reduce((acc,f) => {
+		const fn = f instanceof RegExp 
+			? file => file && f.test(file) 
+			: typeof(f) == 'string' 
+				? file => file && file.indexOf(f) >= 0
+				: null
+		if (fn)
+			acc.push(fn)
+		return acc
+	}, [])
+
+	if (fns.length)
+		return file => fns.some(fn => fn(file))
+	else
+		return () => true
+}
+
+/**
+ * Removes all the non-critical files under the pulumi home folder.
+ * 
+ * @param  {String}			pulumiHome
+ * @param  {String|RegExp}	options.filter		e.g., 'project-name', ['project-name', 'automation-']
+ * 
+ * @return {[String]}		filesDeleted		
+ */
+const cleanLocalFiles = (pulumiHome, options) => catchErrors((async() => {
+	const errMsg = 'Failed to clean Pulumi\'s local files'
+	const [pulumiFilesErrors, pulumiFiles] = await getLocalFiles(pulumiHome, { ignore: ['**/plugins/**', 'credentials.json'] })
+	if (pulumiFilesErrors)
+		throw wrapErrors(errMsg, pulumiFilesErrors)
+
+	const { filter } = options || {}
+	const filterfn = getFilterFn(filter)
+	
+	const targetList = pulumiFiles.filter(f => filterfn(f))
+	const count = targetList.length
+
+	// Deletes those files
+	for (let i=0;i<count;i++) {
+		const file = targetList[i]
+		const [deleteErrors] = await files.remove(file)
+		if (deleteErrors)
+			throw wrapErrors(`Failed to delete file '${file}'`, deleteErrors)
+	}
+
+	return targetList
+})())
+
+/**
+ * Gets all the files under the pulumi home folder.
+ * 
+ * @param  {String}   pulumiHome
+ * @param  {String}   options.ignore		Glob pattern to ignore file (e.g., ['credentials.json'])
+ * 
+ * @return {[String]} pulumiFiles
+ */
+const getLocalFiles = (pulumiHome, options) => catchErrors((async() => {
+	const errMsg = 'Failed to get the Pulumi local files'
+	if (!pulumiHome)
+		throw wrapErrors(errMsg, [new Error('Missing required argument \'pulumiHome\'.')])
+
+	const [filesErrors, pulumiFiles] = await files.list(pulumiHome, { ...(options||{}), pattern:'**/*.*' })
+	if (filesErrors)
+		throw wrapErrors(errMsg, filesErrors)
+
+	const checkpointsFolder = join(pulumiHome,'.pulumi')
+	const [checkpointErrors, checkpointFiles] = await files.list(checkpointsFolder, { pattern:'**/*.*' })
+	if (checkpointErrors)
+		throw wrapErrors(errMsg, checkpointErrors)
+
+	return [...(pulumiFiles||[]), ...(checkpointFiles||[])]
+})())
+
 module.exports = {
 	up: pulumiUp,
-	login
+	login,
+	local: {
+		getFiles: getLocalFiles,
+		cleanFiles: cleanLocalFiles
+	}
 }
 
 
