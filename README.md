@@ -68,6 +68,7 @@ npm i @pulumi/pulumi @pulumi/gcp
 >			- [code](#example---lambda-with-container-code)
 >			- [Setting up environment variables and passing arguments](#setting-up-environment-variables-and-passing-arguments)	
 >		- [Example - Lambda with EFS](#example---lambda-with-efs)
+>		- [Example - Lambda with Layers](#example---lambda-with-layers)
 >	- [Policy](#aws-policy)
 >	- [Secret](#secret)
 >		- [Getting stored secrets](#getting-stored-secrets)
@@ -612,7 +613,7 @@ const db = mysql.createPool({
 ##### Configure a `rds-db:connect` action on the IAM role
 
 ```js
-const lambda = require('./src/aws/lambda')
+const { lambda } = require('./src/aws/lambda')
 const { createRdsConnectPolicy } = require('./src/aws/utils')
 
 const rdsAccessPolicy = createRdsConnectPolicy({ name:`my-project-access-rds`, rdsArn:proxy.arn })
@@ -693,7 +694,7 @@ const ec2Output = ec2({
 const pulumi = require('@pulumi/pulumi')
 const securityGroup = require('./src/aws/securityGroup')
 const vpc = require('./src/aws/vpc')
-const lambda = require('./src/aws/lambda')
+const { lambda } = require('./src/aws/lambda')
 const efs = require('./src/aws/efs')
 const { resolve } = require('path')
 
@@ -786,22 +787,8 @@ module.exports = main()
 
 ## Lambda
 ### A few words about AWS Lambda
-#### Lambdas, VPC and subnets
 
-On the surface, AWS Lambdas appear to be very easy to use, but there are a few gotchas that require to be aware of the following imlementation details:
-1. AWS Lambdas _ARE ALWAYS_ in a private subnet. This cannot be changed. The only reason they can access the public internet is because by default, AWS configures them with a NAT gateway. 
-2. When an AWS Lambda is configured to access your custom VPC:
-	- It will most likely loose access to the public internet if your subnet in your VPC is not configured with internet access(1).
-	- It will need the permission to provision an ENI so that they can access your VPC. This requires the `ec2:CreateNetworkInterface` action(2).
-3. Because AWS Lambdas are always in a private subnet, it is futile to connect them to your VPC's public subnet. 
-
-> (1) When connecting your Lambda to your VPC, the only subnets that makes sense to be connected to are the private subnets. Therefore to enable public internet access, NATs must be configured in public subnets, and each private subnet's route table must contain a rule that send traffic `0.0.0.0/0` to the NAT on the public subnet.
-> (2) The easiest way to allow the `ec2:CreateNetworkInterface` action for an IAM role is to attach he AWS managed policy `AWSLambdaVPCAccessExecutionRole`.
-
-#### Lambda environment variables
-
-- `LAMBDA_TASK_ROOT`: The path to where the lambda code is.
-- `LAMBDA_RUNTIME_DIR`: The path to where the lambda code is.
+It is important to know the key design principles behind AWS Lambdas before using them. Please refer to this document for a quick refresher course: https://gist.github.com/nicolasdao/e72beb55f3550351e777a4a52d18f0be#a-few-words-about-aws-lambda
 
 ### The simplest API Gateway with Lambda
 
@@ -873,7 +860,7 @@ exports.handler = async ev => {
 const pulumi = require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
 const { resolve } = require('path')
-const lambda = require('./src/lambda')
+const { lambda } = require('./src/lambda')
 
 const ENV = pulumi.getStack()
 const PROJ = pulumi.getProject()
@@ -886,29 +873,33 @@ const tags = {
 	Region: REGION
 }
 
-const lambdaOutput = lambda({
-	name: PROJECT,
-	fn: {
-		runtime: 'nodejs12.x', 	
-		dir: resolve('./app')
-	},
-	timeout:30, 
-	memorySize:128,  
-	tags
-})
+const main = async () => {
+	const lambdaOutput = await lambda({
+		name: PROJECT,
+		fn: {
+			runtime: 'nodejs12.x', 	
+			dir: resolve('./app')
+		},
+		timeout:30, 
+		memorySize:128,  
+		tags
+	})
 
-// API GATEWAY: https://www.pulumi.com/docs/reference/pkg/nodejs/pulumi/awsx/apigateway/
-const api = new awsx.apigateway.API(PROJECT, {
-	routes: [
-		{
-			method: 'GET', 
-			path: '/{subFolder}/{subSubFolders+}', 
-			eventHandler: lambdaOutput.lambda
-		}
-	]
-})
+	// API GATEWAY: https://www.pulumi.com/docs/reference/pkg/nodejs/pulumi/awsx/apigateway/
+	const api = new awsx.apigateway.API(PROJECT, {
+		routes: [
+			{
+				method: 'GET', 
+				path: '/{subFolder}/{subSubFolders+}', 
+				eventHandler: lambdaOutput.lambda
+			}
+		]
+	})
 
-exports.url = api.url
+	return api.url
+}
+
+module.exports = main()
 ```
 
 ### Example - Configuring CloudWatch
@@ -1024,7 +1015,7 @@ const lambdaOutput = lambda({
 ```js
 const pulumi = require('@pulumi/pulumi')
 const { resolve } = require('path')
-const lambda = require('./src/lambda')
+const { lambda } = require('./src/lambda')
 
 const ENV = pulumi.getStack()
 const PROJ = pulumi.getProject()
@@ -1110,6 +1101,116 @@ const image = awsx.ecr.buildAndPushImage(PROJECT, {
 Please refer to the [Mounting an EFS access point on a Lambda](#mounting-an-efs-access-point-on-a-lambda) section.
 
 > For a full example of a project that uses Lambda with Docker and Git installed to save files on EFS, please refer to this project: https://github.com/nicolasdao/example-aws-lambda-efs
+
+### Example - Lambda with Layers
+
+For a refresher on how Lambda Layers work, please refer to this document: https://gist.github.com/nicolasdao/e72beb55f3550351e777a4a52d18f0be#layers
+
+Pulumi file `index.js`:
+
+```js
+const pulumi = require('@pulumi/pulumi')
+const aws = require('@pulumi/aws')
+const { resolve } = require('path')
+const { lambda, lambdaLayer } = require('./src/lambda')
+
+const ENV = pulumi.getStack()
+const PROJ = pulumi.getProject()
+const PROJECT = `${PROJ}-${ENV}`
+const REGION = aws.config.region
+const RUNTIME = 'nodejs12.x'
+
+const tags = {
+	Project: PROJ,
+	Env: ENV,
+	Region: REGION
+}
+
+const main = async () => {
+	const lambdaLayerOutput1 = await lambdaLayer({
+		name: `${PROJECT}-layer-01`,
+		description: 'Includes puffy',
+		runtime: RUNTIME, 	
+		dir: resolve('./layers/layer01'),
+		tags
+	})
+	const lambdaLayerOutput2 = await lambdaLayer({
+		name: `${PROJECT}-layer-02`,
+		description: 'Do something else',
+		runtime: RUNTIME, 	
+		dir: resolve('./layers/layer02'),
+		tags
+	})
+
+	const lambdaOutput = await lambda({
+		name: PROJECT,
+		fn: {
+			runtime: RUNTIME, 	
+			dir: resolve('./app')
+		},
+		layers:[
+			lambdaLayerOutput1.arn,
+			lambdaLayerOutput2.arn
+		],
+		timeout:30, 
+		memorySize:128,  
+		tags
+	})
+
+	return {
+		lambda: lambdaOutput,
+		lambdaLayer: lambdaLayerOutput1
+	}
+}
+
+module.exports = main()
+```
+
+Lambda file:
+
+```js
+exports.handler = async () => {
+	console.log('Welcome to lambda test layers!')
+	try {
+		require('puffy')
+		console.log('puffy is ready')
+	} catch (err) {
+		console.error('ERROR')
+		console.log(err)
+	}
+	try {
+		const { sayHi } = require('/opt/nodejs/utils')
+		sayHi()
+		sayBye()
+	} catch (err) {
+		console.error('ERROR IN LAYER ONE')
+		console.log(err)
+	}
+	try {
+		const { sayHi } = require('/opt/nodejs')
+		sayHi()
+	} catch (err) {
+		console.error('ERRor in layer twO')
+		console.log(err)
+	}
+}
+```
+
+Layer01 code `./layers/layer01/nodejs/utils.js`
+
+```js
+module.exports = {
+	sayHi: () => console.log('Hello, I am layer One')
+}
+```
+
+Layer02 code `./layers/layer01/nodejs/index.js`
+
+```js
+module.exports = {
+	sayHi: () => console.log('Hello, I am layer Two')
+}
+```
 
 ## AWS Policy
 

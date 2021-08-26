@@ -1,4 +1,4 @@
-// Version: 0.0.8
+// Version: 0.1.0
 
 const pulumi = require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
@@ -18,12 +18,14 @@ const { resolve } = require('./utils')
  * 		- If 'fileSystemConfig' is configured, then the AWS managed policy 'AmazonElasticFileSystemClientFullAccess' is added.
  * 	4. Lambda.
  * 	
- * @param  {String}				name								
+ * @param  {String}				name	
+ * @param  {String}				description							
  * @param  {String}				fn.dir								The absolute path to the local folder containing the Lambda code that will be zipped.
  * @param  {String}				fn.runtime							e.g., 'nodejs14.x'. All runtimes: https://docs.aws.amazon.com/lambda/latest/dg/API_CreateFunction.html#SSS-CreateFunction-request-Runtime
  * @param  {String}				fn.type								Valid values: 'zip' (default), 'image' (1)											
  * @param  {Object}				fn.args								Only valid when 'fn.type' is 'image' (1). This is what would be passed in the --build-arg option of `docker build`.
  * @param  {Object}				fn.env								Environment variables for that fn. It works a bit differently when 'fn.type' is 'image' (2).
+ * @param  {[Output<String>]}	layers								Layer ARNS.
  * @param  {Number}				timeout								Unit seconds. Default is 3 and max is 900 (15 minutes).
  * @param  {Number}				memorySize							Unit is MB. Default is 128 and max is 10,240
  * @param  {String}				handler								Deafult is 'index.handler'.
@@ -64,7 +66,7 @@ const { resolve } = require('./utils')
  * (2) When 'fn.env' is set and 'fn.type' is 'image'(1), then this object is merged with the 'fn.arg'. This 
  * means there is an extra manual step to convert the docker ARG into ENV in the Dockerfile.
  */
-const createLambda = async ({ name, runtime, fn, timeout=3, memorySize=128, handler, policies, vpcConfig, fileSystemConfig, cloudWatch, logsRetentionInDays, tags }) => {
+const createLambda = async ({ name, description, fn, layers, timeout=3, memorySize=128, handler, policies, vpcConfig, fileSystemConfig, cloudWatch, logsRetentionInDays, tags }) => {
 	tags = tags || {}
 	const dependsOn = []
 	
@@ -150,14 +152,14 @@ const createLambda = async ({ name, runtime, fn, timeout=3, memorySize=128, hand
 
 	// Configure the function code used for that lambda
 	if (!imageUri && !fn.runtime)
-		throw new Error('Missing required argument \'runtime\'. Please select one amongst the list at https://docs.aws.amazon.com/lambda/latest/dg/API_CreateFunction.html#SSS-CreateFunction-request-Runtime')
+		throw new Error('Missing required argument \'fn.runtime\'. Please select one amongst the list at https://docs.aws.amazon.com/lambda/latest/dg/API_CreateFunction.html#SSS-CreateFunction-request-Runtime')
 	
 	const functionCode = imageUri 
 		? {
 			packageType: 'Image',
 			imageUri
 		} : {
-			runtime,
+			runtime: fn.runtime,
 			code: new pulumi.asset.AssetArchive({
 				'.': new pulumi.asset.FileArchive(fn.dir),
 			}),
@@ -167,9 +169,11 @@ const createLambda = async ({ name, runtime, fn, timeout=3, memorySize=128, hand
 	// Create tha Lambda. Doc: https://www.pulumi.com/docs/reference/pkg/aws/lambda/function/ 
 	const lambda = new aws.lambda.Function(name, {
 		name,
+		description,
 		...functionCode,
 		timeout,
 		memorySize,
+		layers: layers && layers.length ? layers : undefined,
 		role: lambdaRole.arn,
 		vpcConfig: Object.keys(vpcConfig||{}).length ? vpcConfig : undefined,
 		fileSystemConfig,
@@ -187,6 +191,57 @@ const createLambda = async ({ name, runtime, fn, timeout=3, memorySize=128, hand
 		logGroup: leanify(logGroup)
 	}
 }
+
+/**
+ * Creates a new Lambda layer. Doc: https://www.pulumi.com/docs/reference/pkg/aws/lambda/layerversion/
+ * 
+ * @param  {String}					name        
+ * @param  {String}					runtime					e.g., 'nodejs12.x', 'nodejs14.x'. Full list at https://docs.aws.amazon.com/lambda/latest/dg/API_PublishLayerVersion.html#SSS-PublishLayerVersion-request-CompatibleRuntimes
+ * @param  {String}					dir						Absolute path to the folder that contains the layer's code.
+ * @param  {String}					description		
+ * @param  {String}					licenseInfo 			e.g., 'BSD-3-Clause' (or 'https://opensource.org/licenses/BSD-3-Clause'), 'MIT' (or 'https://opensource.org/licenses/MIT') doc: https://docs.aws.amazon.com/lambda/latest/dg/API_PublishLayerVersion.html#SSS-PublishLayerVersion-request-LicenseInfo
+ * @param  {Object}					tags
+ * 
+ * @return {Output<LayerVersion>}	LayerVersion
+ * @return {Output<LayerVersion>}	LayerVersion...			All the usuals (id, arn, ...)
+ * @return {Output<String>}			LayerVersion.version	e.g., '1', '2'
+ * @return {Output<LayerVersion>}	LayerVersion.layerArn	Different from the 'arn'. The 'arn' includes the version (1). 
+ *
+ * (1) 'arn' vs 'layerArn': 
+ * 		- arn: 		'arn:aws:lambda:ap-southeast-2:1234:layer:aws-layer-dev-layer-01:1' 
+ * 		- layerArn: 'arn:aws:lambda:ap-southeast-2:1234:layer:aws-layer-dev-layer-01' 
+ */
+const createLayer = async ({ name, runtime, dir, description, licenseInfo, tags }) => {
+	if (!name)
+		throw new Error('Missing required \'name\' argument .')
+	if (!runtime)
+		throw new Error('Missing required \'runtime\' argument .')
+	if (!dir)
+		throw new Error('Missing required \'dir\' argument .')
+	if (!(await fileExists(dir)))
+		throw new Error(`Directory '${dir}' not found.`)
+
+	tags = tags || {}
+
+	// Lambda layer doc: https://www.pulumi.com/docs/reference/pkg/aws/lambda/layerversion/
+	const lambdaLayer = new aws.lambda.LayerVersion(name, {
+		layerName: name,
+		compatibleRuntimes: [runtime],
+		description,
+		licenseInfo,
+		code: new pulumi.asset.AssetArchive({
+			'.': new pulumi.asset.FileArchive(dir),
+		}),
+		// code: new pulumi.asset.FileArchive("lambda_layer_payload.zip"),
+		tags: {
+			...tags,
+			Name: name
+		}
+	})
+
+	return lambdaLayer
+}
+
 
 const leanifyImage = resource => {
 	const { imageValue, repository } = resource || {}	
@@ -266,7 +321,10 @@ const configurePolicies = (policies, prefix, config) => {
  */
 const fileExists = filePath => new Promise(onSuccess => fs.exists(path.resolve(filePath||''), yes => onSuccess(yes ? true : false)))
 
-module.exports = createLambda
+module.exports = {
+	lambda: createLambda,
+	lambdaLayer: createLayer
+}
 
 
 
