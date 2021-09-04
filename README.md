@@ -242,8 +242,9 @@ ARG DB_PASSWORD
 		"up": "func() { pulumi up -s $1 -y; }; func",
 		"prev": "func() { pulumi preview -s $1; }; func",
 		"out": "func() { pulumi stack output -s $1; }; func",
-		"refresh": "func() { pulumi refresh -s lineup/$1 -y; }; func",
+		"refresh": "func() { pulumi refresh -s $1 -y; }; func",
 		"blast": "func() { pulumi destroy -s $1; }; func",
+		"clean": "func() { pulumi stack rm $1; }; func",
 		"import": "func() { pulumi stack export -s $1 > stack.json; }; func",
 		"export": "func() { pulumi stack import -s $1 --file stack.json; }; func"
 
@@ -256,6 +257,7 @@ ARG DB_PASSWORD
 - `npm run out dev`: Prints the dev stack's outputs. 
 - `npm run refresh dev`: Update the Pulumi stack using the real stack as reference. Used to remove drift. This has no consequences on your physical files.
 - `npm run blast dev`: Destroys the dev stack.
+- `npm run remove dev`: Removes the dev stack.
 - `npm run import dev`: Imports the Pulumi dev state into a local `./stack.json` file. Use this to inspect all resources or to fix a `pending_operations` issues.
 - `npm run export dev`: Exports the local `./stack.json` file to the Pulumi dev state.
 
