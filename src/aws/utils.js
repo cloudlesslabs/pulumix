@@ -14,7 +14,7 @@ const resolve = resource => new Promise((next, fail) => {
 		next(resource)
 	try {
 		if (Array.isArray(resource)) {
-			if (resource.every(r => r.apply))
+			if (resource.every(r => r && r.apply))
 				pulumi.all(resource).apply(data => next(data))	
 			else
 				Promise.all(resource.map(r => resolve(r))).then(data => next(data)).catch(fail)

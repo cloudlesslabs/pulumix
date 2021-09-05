@@ -31,6 +31,7 @@ npm i @pulumi/pulumi @pulumi/gcp
 
 > * [Pulumi](#pulumi)
 >	- [Cross referencing stacks](#cross-referencing-stacks)
+>	- [Project config](#project-config)
 > * [Helper methods](#helper-methods)
 >	- [Resolving `Output<T>`](#resolving-outputt)
 > * [Docker](#docker)
@@ -56,6 +57,7 @@ npm i @pulumi/pulumi @pulumi/gcp
 >				- [Using AWS Signer to create a DB password](#using-aws-signer-to-create-a-db-password)
 >				- [Configure a `rds-db:connect` action on the IAM role](#configure-a-rds-dbconnect-action-on-the-iam-role)
 >		- [Using AWS Secrets Manager to manage Aurora's credentials](#using-aws-secrets-manager-to-manage-auroras-credentials)
+>	- [ECR](#ecr)
 >	- [EC2](#ec2)
 >	- [EFS](#efs)
 >		- [Mounting an EFS access point on a Lambda](#mounting-an-efs-access-point-on-a-lambda)
@@ -130,6 +132,19 @@ Outputs cannot be accessed explicitly. Instead, you must use the __`getOutput`__
 
 ```js
 const endpoint = yourStack.getOutput('aurora-endpoint')
+```
+
+## Project config
+
+```js
+const pulumi = require('@pulumi/pulumi')
+const aws = require('@pulumi/aws')
+
+const ENV = pulumi.getStack()
+const PROJ = pulumi.getProject()
+const PROJECT = `${PROJ}-${ENV}`
+const REGION = aws.config.region
+const ACCOUNT_ID = aws.config.allowedAccountIds[0]
 ```
 
 # Helper methods
@@ -247,7 +262,6 @@ ARG DB_PASSWORD
 		"clean": "func() { pulumi stack rm $1; }; func",
 		"import": "func() { pulumi stack export -s $1 > stack.json; }; func",
 		"export": "func() { pulumi stack import -s $1 --file stack.json; }; func"
-
 	}
 }
 ```
@@ -690,6 +704,105 @@ const ec2Output = ec2({
 })
 ```
 
+## ECR - Container Repository
+
+```js
+const awsx = require('@pulumi/awsx')
+const path = require('path')
+
+// ECR images. Doc:
+// 	- buildAndPushImage API: https://www.pulumi.com/docs/reference/pkg/nodejs/pulumi/awsx/ecr/#buildAndPushImage
+// 	- 2nd argument is a DockerBuild object: https://www.pulumi.com/docs/reference/pkg/docker/image/#dockerbuild
+const image = awsx.ecr.buildAndPushImage('my-image-name', {
+	context: path.resolve('../app'),
+	args:{
+		SOME_ARG: 'hello'
+	},
+	tags: {
+		Name: 'my-image-name'
+	}
+})
+```
+
+Where `args` is what is passed to the `--build-arg` option of the `docker build` command.
+
+The URL for this new image is inside the `image.imageValue` property.
+
+## ECR
+
+```js
+const image = require('./src/ecr')
+
+const myImage = await image({ 
+	name: 'my-image',
+	tag: 'v2',
+	dir: path.resolve('./app')
+})
+```
+
+Where `myImage` is structured as follow:
+- `myImage.imageValues`: It contains the values you can use in the `FROM` directive of another Dockerfile (e.g., `FROM 12345.dkr.ecr.ap-southeast-2.amazonaws.com/my-image:v2`). If the `tag` property is set, this array contains two values. The first item is tagged with the the `tag` value, and the second is tagged with `<tag>-<SHA-digest>`. If the `tag` is not set, this array contains only one item tagged with the SHA-digest.
+- `myImage.repository`: Output object with the repository's details.
+- `lifecyclePolicy`: Output object with the lifecycle policy.
+
+```js
+const myImage = await image({ 
+	name: 'my-image',
+	tag: 'v3',
+	dir: path.resolve('./app'),
+	args: {
+		DB_USER: '1234',
+		DB_PASSWORD: '4567'
+	},
+	imageTagMutable: false, // the default is true
+	lifecyclePolicies:[{
+		description: 'Only keep up to 50 tagged images',
+		tagPrefixList:['v'],
+		countNumber: 50
+	}], 
+	tags: {
+		Project: 'my-cool-project',
+		Env: 'prod',
+		Name: 'my-image'
+	}
+})
+```
+
+> NOTICE:
+>	- When `imageTagMutable` is set to false, each tagged version becomes immutable, which means your deployment will fail if you're pushing a tag that already exists.
+
+By default, repositories are private. To make them public, use:
+
+```js
+const myImage = await image({ 
+	name: 'my-image',
+	tag: 'v3',
+	dir: path.resolve('./app'),
+	args: {
+		DB_USER: '1234',
+		DB_PASSWORD: '4567'
+	},
+	imageTagMutable: false, // the default is true
+	lifecyclePolicies:[{
+		description: 'Only keep up to 50 tagged images',
+		tagPrefixList:['v'],
+		countNumber: 50
+	}], 
+	publicConfig: {
+		aboutText: 'This is a public repo',
+		description: 'This is a public repo',
+		usageText: 'Use it as follow...',
+		architectures: ['ARM', 'ARM 64', 'x86', 'x86-64'],
+		operatingSystems: ['Linux']
+	},
+	tags: {
+		Project: 'my-cool-project',
+		Env: 'prod',
+		Name: 'my-image'
+	}
+})
+```
+
 ## EFS
 ### Mounting an EFS access point on a Lambda
 ```js
@@ -1105,6 +1218,8 @@ Please refer to the [Mounting an EFS access point on a Lambda](#mounting-an-efs-
 > For a full example of a project that uses Lambda with Docker and Git installed to save files on EFS, please refer to this project: https://github.com/nicolasdao/example-aws-lambda-efs
 
 ### Example - Lambda with Layers
+
+> IMPORTANT: Your layer code must be under `/your-layer/nodejs/`, not `your-layer/`
 
 For a refresher on how Lambda Layers work, please refer to this document: https://gist.github.com/nicolasdao/e72beb55f3550351e777a4a52d18f0be#layers
 
