@@ -1,4 +1,4 @@
-// Version: 0.0.1
+// Version: 0.0.2
 // Doc: https://www.pulumi.com/docs/reference/pkg/aws/ec2/instance/
 
 const aws = require('@pulumi/aws')
@@ -23,7 +23,7 @@ const aws = require('@pulumi/aws')
  * @param  {String}   userDataBase64					e.g., Same as 'userData' but base64 encoded (to support gzip for example).
  * @param  {String}   publicKey							Public key for EC2 keypair.
  * @param  {Boolean}  toggleSSM							Default false. When true, the AWS managed policy 'AmazonSSMManagedInstanceCore' is attached to the instance to allow SSM to connect.
- * ssmVpcId
+ * @param  {string}   ssmVpcId							Only required if 'toggleSSM' is set to true. 
  * @param  {string}   ssmVpcSecurityGroupId				Only required if 'toggleSSM' is set to true. 
  * @param  {Object}   tags
  * 
