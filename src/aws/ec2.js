@@ -24,7 +24,7 @@ const aws = require('@pulumi/aws')
  * @param  {String}   publicKey							Public key for EC2 keypair.
  * @param  {Boolean}  toggleSSM							Default false. When true, the AWS managed policy 'AmazonSSMManagedInstanceCore' is attached to the instance to allow SSM to connect.
  * @param  {string}   ssmVpcId							Only required if 'toggleSSM' is set to true. 
- * @param  {string}   ssmVpcSecurityGroupId				Only required if 'toggleSSM' is set to true. 
+ * @param  {string}   ssmVpcSecurityGroupId				Only required if 'toggleSSM' is set to true. Default VPC security group. The EC2 instance needs to be configured with a security group that can talk to this SG.
  * @param  {Object}   tags
  * 
  * @return {Output<String>}   ec2.id
