@@ -29,10 +29,10 @@ const { resolve } = require('./utils')
  * @return {Output<String>}        defaultSecurityGroupId
  * @return {Output<String>}        dhcpOptionsId
  * @return {Output<String>}        mainRouteTableId
- * @return {Output<[String]>}      publicSubnetIds
- * @return {Output<[String]>}      privateSubnetIds
- * @return {Output<[String]>}      isolatedSubnetIds
- * @return {Output<[String]>}      natGatewayIds
+ * @return {[String]}              publicSubnetIds
+ * @return {[String]}              privateSubnetIds
+ * @return {[String]}              isolatedSubnetIds
+ * @return {[String]}              natGatewayIds
  * @return {Promise<[String]>}     availabilityZones            WARNING: This is a promise, not an output.
  *
  * (1) The reason the default subnets is a warning is because it provisions a "Pulumi private subnet" in each AZ. Standard 
