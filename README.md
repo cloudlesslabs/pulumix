@@ -694,9 +694,10 @@ const ec2Output = ec2({
 	subnetId: privateSubnetId,
 	userData: EC2_SHELL,
 	publicKey:EC2_RSA_PUBLIC_KEY,
-	toggleSSM: true,
-	ssmVpcId:vpc.id,
-	ssmVpcSecurityGroupId: vpc.vpc.defaultSecurityGroupId,
+	ssm: { // Toggles SSM
+		vpcId:vpc.id,
+		vpcDefaultSecurityGroupId: vpc.vpc.defaultSecurityGroupId
+	},
 	tags: {
 		Project: 'my-cool-project',
 		Env: 'dev'
