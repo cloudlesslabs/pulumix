@@ -1,4 +1,4 @@
-// Version: 0.0.3
+// Version: 0.0.4
 
 const awsx = require('@pulumi/awsx')
 const { resolve } = require('./utils')
@@ -65,6 +65,9 @@ const createVPC = async ({ name, cidrBlock, subnets, numberOfAvailabilityZones, 
 	const subnetsDetails = await getSubnets(vpc)
 	const availabilityZones = await getAvailabilityZones(subnetsDetails)
 	const natGateways = await getNatGateways(vpc.natGateways, subnetsDetails)
+	const publicSubnetIds = await resolve(vpc.publicSubnetIds)
+	const privateSubnetIds = await resolve(vpc.privateSubnetIds)
+	const isolatedSubnetIds = await resolve(vpc.isolatedSubnetIds)
 
 	return {
 		id: vpc.id,
@@ -76,9 +79,9 @@ const createVPC = async ({ name, cidrBlock, subnets, numberOfAvailabilityZones, 
 		defaultSecurityGroupId: vpc.vpc.defaultSecurityGroupId,
 		dhcpOptionsId: vpc.vpc.dhcpOptionsId,
 		mainRouteTableId: vpc.vpc.mainRouteTableId,
-		publicSubnetIds: vpc.publicSubnetIds,
-		privateSubnetIds: vpc.privateSubnetIds,
-		isolatedSubnetIds: vpc.isolatedSubnetIds,
+		publicSubnetIds,
+		privateSubnetIds,
+		isolatedSubnetIds,
 		natGateways,
 		availabilityZones
 	}
@@ -87,19 +90,19 @@ const createVPC = async ({ name, cidrBlock, subnets, numberOfAvailabilityZones, 
 /**
  * Resolves the NAT gateways details. 
  * 
- * @param  {[Output<NAT>]}    unresolvedNatGateways        
- * @param  {[Output<NAT>]}    
- * @param  {String}            subnets[].id                            e.g., 'subnet-1234566'
- * @param  {String}            subnets[].name                            e.g., 'my-app-dev-public-1'
- * @param  {String}            subnets[].availabilityZone                e.g., 'ap-southeast-2c'
+ * @param  {[Output<NAT>]}	unresolvedNatGateways		
+ * @param  {[Output<NAT>]}	
+ * @param  {String}			subnets[].id							e.g., 'subnet-1234566'
+ * @param  {String}			subnets[].name							e.g., 'my-app-dev-public-1'
+ * @param  {String}			subnets[].availabilityZone				e.g., 'ap-southeast-2c'
  * 
- * @return {String}            natGateways[].id                        e.g., 'nat-1234567'
- * @return {String}            natGateways[].name                        e.g., 'my-app-dev-0'
- * @return {String}            natGateways[].privateIp                    e.g., '10.0.26.107'
- * @return {String}            natGateways[].publicIp                    e.g., '13.147.192.140'
- * @return {String}            natGateways[].subnet.id                    e.g., 'subnet-1234566'
- * @return {String}            natGateways[].subnet.name                e.g., 'my-app-dev-public-0'
- * @return {String}            natGateways[].subnet.availabilityZone    e.g., 'ap-southeast-2a'
+ * @return {String}			natGateways[].id						e.g., 'nat-1234567'
+ * @return {String}			natGateways[].name						e.g., 'my-app-dev-0'
+ * @return {String}			natGateways[].privateIp					e.g., '10.0.26.107'
+ * @return {String}			natGateways[].publicIp					e.g., '13.147.192.140'
+ * @return {String}			natGateways[].subnet.id					e.g., 'subnet-1234566'
+ * @return {String}			natGateways[].subnet.name				e.g., 'my-app-dev-public-0'
+ * @return {String}			natGateways[].subnet.availabilityZone	e.g., 'ap-southeast-2a'
  */
 const getNatGateways = async (unresolvedNatGateways, subnets) => {
 	if (!unresolvedNatGateways)
@@ -138,13 +141,13 @@ const getNatGateways = async (unresolvedNatGateways, subnets) => {
 /**
  * Aggregates all subnets in a single array. 
  * 
- * @param  {[Output<Subnet>]}    vpc.publicSubnets
- * @param  {[Output<Subnet>]}    vpc.privateSubnets
- * @param  {[Output<Subnet>]}    vpc.isolatedSubnets
+ * @param  {[Output<Subnet>]}	vpc.publicSubnets
+ * @param  {[Output<Subnet>]}	vpc.privateSubnets
+ * @param  {[Output<Subnet>]}	vpc.isolatedSubnets
  * 
- * @return {String}                subnets[].id                e.g., 'subnet-0fb5a6a53c701836a'
- * @return {String}                subnets[].name                e.g., 'lineup-network-dev-public-1'
- * @return {String}                subnets[].availabilityZone    e.g., 'ap-southeast-2c'
+ * @return {String}				subnets[].id				e.g., 'subnet-0fb5a6a53c701836a'
+ * @return {String}				subnets[].name				e.g., 'lineup-network-dev-public-1'
+ * @return {String}				subnets[].availabilityZone	e.g., 'ap-southeast-2c'
  */
 const getSubnets = async vpc => {
 	const [subnetsA, subnetsB, subnetsC] = await resolve([vpc.publicSubnets, vpc.privateSubnets, vpc.isolatedSubnets])
@@ -161,9 +164,9 @@ const getSubnets = async vpc => {
 /**
  * Gets a VPC's AZs.
  * 
- * @param  {[Subnet]}            subnets
+ * @param  {[Subnet]}    		subnets
  * 
- * @return {Promise<[String]>}    availabilityZones
+ * @return {Promise<[String]>}	availabilityZones
  */
 const getAvailabilityZones = async subnets => {
 	const azs = []
