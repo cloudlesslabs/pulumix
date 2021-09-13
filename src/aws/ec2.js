@@ -1,4 +1,4 @@
-// Version: 0.0.2
+// Version: 0.0.3
 // Doc: https://www.pulumi.com/docs/reference/pkg/aws/ec2/instance/
 
 const aws = require('@pulumi/aws')
@@ -7,9 +7,9 @@ const aws = require('@pulumi/aws')
  * Creates a new EC2. Doc: https://www.pulumi.com/docs/reference/pkg/aws/ec2/instance/
  * Resources:
  * 	1. IAM role.
- * 	2. (Optional) Attach the 'AmazonSSMManagedInstanceCore' AWS managed policies if 'toggleSSM' is true.
+ * 	2. (Optional) Attach the 'AmazonSSMManagedInstanceCore' AWS managed policies if 'ssm' is set.
  * 	3. Instance profile to attach the IAM role to the EC2 instance.
- * 	4. (Optional) Security Group to allow SSM access if 'toggleSSM' is true.
+ * 	4. (Optional) Security Group to allow SSM access if 'ssm' is set.
  * 	5. (Optional) KeyPair is 'publicKey' is provided.
  * 	6. EC2 instance.
  * 
@@ -22,9 +22,9 @@ const aws = require('@pulumi/aws')
  * @param  {String}   userData							e.g., `#!/bin/bash\ncd /tmp\nsudo yum install...`
  * @param  {String}   userDataBase64					e.g., Same as 'userData' but base64 encoded (to support gzip for example).
  * @param  {String}   publicKey							Public key for EC2 keypair.
- * @param  {Boolean}  toggleSSM							Default false. When true, the AWS managed policy 'AmazonSSMManagedInstanceCore' is attached to the instance to allow SSM to connect.
- * @param  {string}   ssmVpcId							Only required if 'toggleSSM' is set to true. 
- * @param  {string}   ssmVpcSecurityGroupId				Only required if 'toggleSSM' is set to true. Default VPC security group. The EC2 instance needs to be configured with a security group that can talk to this SG.
+ * @param  {Object}   ssm								Default null. When set, the AWS managed policy 'AmazonSSMManagedInstanceCore' is attached to the instance to allow SSM to connect.
+ * @param  {string}   ssm.vpcId							
+ * @param  {string}   ssm.vpcDefaultSecurityGroupId		The EC2 instance needs to be configured with a security group that can talk to this SG.
  * @param  {Object}   tags
  * 
  * @return {Output<String>}   ec2.id
@@ -41,7 +41,15 @@ const aws = require('@pulumi/aws')
  * @return {Output<[String]>} ec2.keyPair.name
  * @return {Output<[String]>} ec2.keyPair.keyPairId
  */
-const createEC2 = async ({ name, ami, instanceType, availabilityZone, subnetId, vpcSecurityGroupIds, userData, userDataBase64, publicKey, toggleSSM, ssmVpcId, ssmVpcSecurityGroupId, tags }) => {
+const createEC2 = async ({ name, ami, instanceType, availabilityZone, subnetId, vpcSecurityGroupIds, userData, userDataBase64, publicKey, ssm, tags }) => {
+	if (!name)
+		throw new Error('Missing required \'name\' argument.')
+	if (ssm) {
+		if (!ssm.vpcId)
+			throw new Error('When \'ssm\' is defined, \'ssm.vpcId\' is required to create a security group that allows HTTPS access.')
+		if (!ssm.vpcDefaultSecurityGroupId)
+			throw new Error('When \'ssm\' is defined, \'ssm.vpcDefaultSecurityGroupId\' is required to create a security group that allows HTTPS access.')
+	}
 	tags = tags || {}
 
 	// IAM role. Doc: https://www.pulumi.com/docs/reference/pkg/aws/iam/role/
@@ -66,7 +74,7 @@ const createEC2 = async ({ name, ami, instanceType, availabilityZone, subnetId, 
 	})
 
 	// IAM policy: Enables SSM to access this instance. Doc: https://www.pulumi.com/docs/reference/pkg/aws/iam/rolepolicyattachment/
-	const ssmAttachedPolicy = !toggleSSM ? null : new aws.iam.RolePolicyAttachment(`${name}-amazonssmmanagedinstancecore`, {
+	const ssmAttachedPolicy = !ssm ? null : new aws.iam.RolePolicyAttachment(`${name}-amazonssmmanagedinstancecore`, {
 		role: role.name,
 		policyArn: 'arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore' // AWS managed policies
 	})
@@ -78,19 +86,14 @@ const createEC2 = async ({ name, ami, instanceType, availabilityZone, subnetId, 
 	})
 
 	// Security Group to enable SSM access (making sure that HTTPS on all traffic is enabled)
-	if (toggleSSM) {
-		if (!ssmVpcId)
-			throw new Error('When \'toggleSSM\' is true, \'ssmVpcId\' is required to create a security group that allows HTTPS access.')
-		if (!ssmVpcSecurityGroupId)
-			throw new Error('When \'toggleSSM\' is true, \'ssmVpcSecurityGroupId\' is required to create a security group that allows HTTPS access.')
-
+	if (ssm) {
 		// Security Group. Doc: https://www.pulumi.com/docs/reference/pkg/aws/ec2/securitygroup/
 		const ec2SgName = `${name}-ssm-sg`
 		const ec2Sg = new aws.ec2.SecurityGroup(ec2SgName, {
 			description: `Enables SSM access to EC2 ${name}`,
-			ingress: [{ protocol: 'tcp', fromPort: 443, toPort: 443, securityGroups: [ssmVpcSecurityGroupId], description:'Allows SSM to get access' }],
+			ingress: [{ protocol: 'tcp', fromPort: 443, toPort: 443, securityGroups: [ssm.vpcDefaultSecurityGroupId], description:'Allows SSM to get access' }],
 			egress: [{ protocol: '-1', fromPort: 0, toPort: 0, cidrBlocks: ['0.0.0.0/0'], ipv6CidrBlocks: ['::/0'], description:'Allows instance to respond to SSM' }],
-			vpcId: ssmVpcId,
+			vpcId: ssm.vpcId,
 			tags: {
 				...tags,
 				Name: ec2SgName
