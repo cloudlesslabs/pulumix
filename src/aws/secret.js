@@ -1,4 +1,4 @@
-// Version: 0.0.1
+// Version: 0.0.2
 
 /*
  * To create a secret with AWS secrets manager, you need to:
@@ -80,6 +80,44 @@ const serializeValue = value => {
 		return { secretString: `${value}` }
 }
 
-module.exports = createSecret
+/**
+ * Gets the DB creds stored in AWS Secrets Manager
+ * 
+ * @param  {String}		secretId				ARN, name or ID of the secret in AWS secrets manager
+ * 
+ * @return {Version}	output.version
+ * @return {Object}		output.data
+ */
+const getSecret = async secretId => {
+	if (!secretId)
+		return null
+
+	const secretVersion = await aws.secretsmanager.getSecretVersion({ secretId }).catch(err => {
+		throw new Error(`Fail to retrieve secret ID '${secretId}'. Details: ${err.message}`)
+	})
+	if (!secretVersion)
+		throw new Error(`Secret ID ${secretId} not found.`)
+
+	const secretString = secretVersion.secretString
+	if (!secretString)
+		throw new Error(`Secret value not found in secret ID '${secretId}'.`)
+	
+	let data = {}
+	try {
+		data = JSON.parse(secretString)
+	} catch(err) {
+		throw new Error(`Faile to parse to JSON the secret string stored in secret ID '${secretId}'. Corrupted secret string: ${secretString}`)
+	}
+
+	return {
+		version: secretVersion,
+		data
+	}
+}
+
+module.exports = {
+	create: createSecret,
+	get: getSecret
+}
 
 

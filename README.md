@@ -1355,46 +1355,12 @@ const cloudWatchPolicy = new aws.iam.Policy(PROJECT, {
 ### Getting stored secrets
 
 ```js
-/**
- * Gets the DB creds stored in AWS Secrets Manager
- * 
- * @param  {String}		secretId				ARN of the secret in AWS secrets manager that contains the masterUsername and masterPassword
- * 
- * @return {Version}	output.version
- * @return {String}		output.creds.username
- * @return {String}		output.creds.password
- */
-const getDBcreds = async secretId => {
-	if (!secretId)
-		return null
+const secretHelper = require('./src/aws/secret')
 
-	const secretVersion = await aws.secretsmanager.getSecretVersion({ secretId }).catch(err => {
-		throw new Error(`Fail to retrieve secret ID '${secretId}'. Details: ${err.message}`)
-	})
-	if (!secretVersion)
-		throw new Error(`Secret ID ${secretId} not found.`)
-
-	const secretString = secretVersion.secretString
-	if (!secretString)
-		throw new Error(`Secret value not found in secret ID '${secretId}'.`)
-	
-	let creds = {}
-	try {
-		creds = JSON.parse(secretString)
-	} catch(err) {
-		throw new Error(`Faile to parse to JSON the secret string stored in secret ID '${secretId}'. Corrupted secret string: ${secretString}`)
-	}
-
-	if (!creds.username)
-		throw new Error(`Missing required property 'username' in secret ID '${secretId}'.`)
-	if (!creds.password)
-		throw new Error(`Missing required property 'password' in secret ID '${secretId}'.`)
-
-	return {
-		version: secretVersion,
-		creds
-	}
-}
+secretHelper.get('my-secret-name').then(({ version, data }) => {
+	console.log(version)
+	console.log(data) // Actual secret object
+})
 ```
 
 ## Security Group
