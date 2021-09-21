@@ -1,5 +1,5 @@
 {
-  "name": "@nicolasdao/pulumi-recipes",
+  "name": "@cloudlesslabs/pulumi-recipes",
   "version": "0.0.1",
   "description": "NodeJS Pulumi helpers.",
   "main": "src/index.js",

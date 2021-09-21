@@ -1,4 +1,5 @@
 module.exports = {
 	aws: require('./aws'),
-	automationApi: require('./automationApi')
+	automationApi: require('./automationApi'),
+	resolve: require('./utils').resolve
 }
