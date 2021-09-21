@@ -1,7 +1,15 @@
-// Version: 0.0.5
+/*
+Copyright (c) 2019-2021, Cloudless Consulting Lty Ltd
+All rights reserved.
+
+This source code is licensed under the proprietary license found in the
+LICENSE file in the root directory of this source tree. 
+*/
+
+// Version: 0.0.6
 
 const aws = require('@pulumi/aws')
-const { resolve } = require('./utils')
+const { resolve } = require('../utils')
 
 const VALID_CLOUDWATCH_LEVELS = ['ALL', 'ERROR', 'FATAL']
 

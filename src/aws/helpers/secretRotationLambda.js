@@ -1,3 +1,11 @@
+/*
+Copyright (c) 2019-2021, Cloudless Consulting Lty Ltd
+All rights reserved.
+
+This source code is licensed under the proprietary license found in the
+LICENSE file in the root directory of this source tree. 
+*/
+
 /* eslint-disable */
 // Use this code snippet in your app.
 // If you need more information about configurations or implementing the sample code, visit the AWS docs:

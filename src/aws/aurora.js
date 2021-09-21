@@ -1,10 +1,19 @@
-// Version: 0.0.7
+/*
+Copyright (c) 2019-2021, Cloudless Consulting Lty Ltd
+All rights reserved.
+
+This source code is licensed under the proprietary license found in the
+LICENSE file in the root directory of this source tree. 
+*/
+
+// Version: 0.0.8
 // Full Pulumi AWS RDS API doc at https://www.pulumi.com/docs/reference/pkg/aws/rds/
 
 require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
 const securityGroup = require('./securityGroup')
-const { resolve, getDBcreds } = require('./utils')
+const { getDBcreds } = require('./utils')
+const { resolve } = require('../utils')
 
 /**
  * Create an AWS Aurora cluster. Doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/cluster/

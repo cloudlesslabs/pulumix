@@ -1,19 +1,22 @@
 {
-  "name": "pulumi-recipes",
+  "name": "@nicolasdao/pulumi-recipes",
   "version": "0.0.1",
-  "description": "Pulumi recipes",
-  "main": "index.js",
+  "description": "NodeJS Pulumi helpers.",
+  "main": "src/index.js",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/"
+  },
   "repository": {
     "type": "git",
-    "url": "https://github.com/nicolasdao/pulumi-recipes.git"
+    "url": "https://github.com/cloudlesslabs/pulumi-recipes.git"
   },
   "bugs": {
-    "url": "https://github.com/nicolasdao/pulumi-recipes/issues"
+    "url": "https://github.com/cloudlesslabs/pulumi-recipes/issues"
   },
-  "homepage": "https://github.com/nicolasdao/pulumi-recipes#readme",
+  "homepage": "https://github.com/cloudlesslabs/pulumi-recipes#readme",
   "scripts": {
     "dev": "TZ=UTC NODE_ENV=dev node index.js",
-    "lint": "eslint index.js src/ test/ --fix",
+    "lint": "eslint src/ test/ --fix",
     "push": "git push --follow-tags origin master",
     "push:npm": "git push --follow-tags origin master",
     "rls": "standard-version --release-as",
@@ -22,7 +25,7 @@
     "v": "node -e \"console.log(require('./package.json').version)\""
   },
   "author": "Nicolas Dao",
-  "license": "BSD-3-Clause",
+  "license": "UNLICENSED",
   "devDependencies": {
     "chai": "^4.1.2",
     "eslint": "^6.8.0",

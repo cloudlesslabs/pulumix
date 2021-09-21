@@ -1,31 +1,14 @@
-// Version: 0.0.4
+/*
+Copyright (c) 2019-2021, Cloudless Consulting Lty Ltd
+All rights reserved.
 
-const pulumi = require('@pulumi/pulumi')
+This source code is licensed under the proprietary license found in the
+LICENSE file in the root directory of this source tree. 
+*/
+
+// Version: 0.0.5
+
 const aws = require('@pulumi/aws')
-
-/**
- * Converts an Output<T> to a Promise<T>
- * 
- * @param  {Output<T>||[Output<T>]} 	resource
- * @return {Promise<T>||Promise<[T]>}
- */
-const resolve = resource => new Promise((next, fail) => {
-	if (!resource)
-		next(resource)
-	try {
-		if (Array.isArray(resource)) {
-			if (resource.every(r => r && r.apply))
-				pulumi.all(resource).apply(data => next(data))	
-			else
-				Promise.all(resource.map(r => resolve(r))).then(data => next(data)).catch(fail)
-		} else if (resource.apply)
-			resource.apply(data => next(data))
-		else
-			next(resource)
-	} catch(err) {
-		fail(err)
-	}
-})
 
 /**
  * Gets the DB creds stored in AWS Secrets Manager
@@ -120,7 +103,6 @@ const createRdsConnectPolicy = ({ name, rdsArn, resourceId, username }) => {
 }
 
 module.exports = {
-	resolve,
 	getDBcreds,
 	getUserDbArn,
 	createRdsConnectPolicy

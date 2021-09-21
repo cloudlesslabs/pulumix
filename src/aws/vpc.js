@@ -1,7 +1,15 @@
-// Version: 0.0.4
+/*
+Copyright (c) 2019-2021, Cloudless Consulting Lty Ltd
+All rights reserved.
+
+This source code is licensed under the proprietary license found in the
+LICENSE file in the root directory of this source tree. 
+*/
+
+// Version: 0.0.5
 
 const awsx = require('@pulumi/awsx')
-const { resolve } = require('./utils')
+const { resolve } = require('../utils')
 
 /**
  * Creates a new VPC. Doc: https://www.pulumi.com/docs/reference/pkg/nodejs/pulumi/awsx/ec2/

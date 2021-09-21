@@ -5,7 +5,7 @@ const { join } = require('path')
 const cp = require('child_process')
 const { LocalWorkspace } = require('@pulumi/pulumi/automation')
 const { error:{ catchErrors, wrapErrors }, promise:{ delay } } = require('puffy')
-const { files } = require('../utils')
+const { files } = require('./utils')
 
 const exec = util.promisify(cp.exec)
 
@@ -29,6 +29,14 @@ const login = options => catchErrors((async () => {
 			throw wrapErrors(errMsg, loginErrors)	
 	}
 })())
+
+/*
+Copyright (c) 2019-2021, Cloudless Consulting Lty Ltd
+All rights reserved.
+
+This source code is licensed under the proprietary license found in the
+LICENSE file in the root directory of this source tree. 
+*/
 
 /**
  * Executes `pulumi up`

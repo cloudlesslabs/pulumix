@@ -1,7 +1,40 @@
+/*
+Copyright (c) 2019-2021, Cloudless Consulting Lty Ltd
+All rights reserved.
+
+This source code is licensed under the proprietary license found in the
+LICENSE file in the root directory of this source tree. 
+*/
+
+const pulumi = require('@pulumi/pulumi')
 const { join } = require('path')
 const fg = require('fast-glob')
 const fs = require('fs')
 const { error:{ catchErrors } } = require('puffy')
+
+/**
+ * Converts an Output<T> to a Promise<T>
+ * 
+ * @param  {Output<T>||[Output<T>]}     resource
+ * @return {Promise<T>||Promise<[T]>}
+ */
+const resolve = resource => new Promise((next, fail) => {
+	if (!resource)
+		next(resource)
+	try {
+		if (Array.isArray(resource)) {
+			if (resource.every(r => r && r.apply))
+				pulumi.all(resource).apply(data => next(data))    
+			else
+				Promise.all(resource.map(r => resolve(r))).then(data => next(data)).catch(fail)
+		} else if (resource.apply)
+			resource.apply(data => next(data))
+		else
+			next(resource)
+	} catch(err) {
+		fail(err)
+	}
+})
 
 //
 // Gets an array of absolute file paths located under the 'folderPath', or a Channel that streams those files.
@@ -42,6 +75,7 @@ const deleteFile = filePath => catchErrors(new Promise((onSuccess, onFailure) =>
 const readFile = filePath => catchErrors(new Promise((onSuccess, onFailure) => fs.readFile(filePath||'', (err, data) => err ? onFailure(err) : onSuccess(data))))
 
 module.exports = {
+	resolve,
 	files: {
 		list: listFiles,
 		remove: deleteFile,
