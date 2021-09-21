@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.1](https://github.com/cloudlesslabs/pulumi-recipes/compare/v0.1.0...v0.1.1) (2021-09-21)
+
+
+### Bug Fixes
+
+* aurora module not found ([49bf9b2](https://github.com/cloudlesslabs/pulumi-recipes/commit/49bf9b2c9ca46c737cd1d6588e5461ba139656a5))
+
 ## [0.1.0](https://github.com/cloudlesslabs/pulumi-recipes/compare/v0.0.2...v0.1.0) (2021-09-21)
 
 ### 0.0.2 (2021-09-21)
