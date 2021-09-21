@@ -1,6 +1,6 @@
 {
   "name": "@cloudlesslabs/pulumi-recipes",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "description": "NodeJS Pulumi helpers.",
   "main": "src/index.js",
   "publishConfig": {
