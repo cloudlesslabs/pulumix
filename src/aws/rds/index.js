@@ -60,7 +60,7 @@ const createConnectPolicy = ({ name, rdsArn, resourceId, username }) => {
 }
 
 module.exports = {
-	aurora: require('aurora'),
+	aurora: require('./aurora'),
 	getUserDbArn,
 	policy: {
 		createConnectPolicy
