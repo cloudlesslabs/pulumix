@@ -11,9 +11,9 @@ LICENSE file in the root directory of this source tree.
 
 require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
-const securityGroup = require('./securityGroup')
-const { getDBcreds } = require('./utils')
-const { resolve } = require('../utils')
+const securityGroup = require('../securityGroup')
+const { getDBcreds } = require('../utils')
+const { resolve } = require('../../utils')
 
 /**
  * Create an AWS Aurora cluster. Doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/cluster/
