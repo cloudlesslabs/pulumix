@@ -17,8 +17,7 @@
   "scripts": {
     "dev": "TZ=UTC NODE_ENV=dev node index.js",
     "lint": "eslint src/ test/ --fix",
-    "push": "git push --follow-tags origin master",
-    "push:npm": "git push --follow-tags origin master",
+    "push": "git push --follow-tags origin master && npm publish",
     "rls": "standard-version --release-as",
     "start": "TZ=UTC NODE_ENV=production node index.js",
     "test": "mocha --exit",
