@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.1](https://github.com/cloudlesslabs/pulumi-recipes/compare/v0.2.0...v0.2.1) (2021-09-22)
+
+
+### Bug Fixes
+
+* The step-function name is suffixed with a random ID ([41f0900](https://github.com/cloudlesslabs/pulumi-recipes/commit/41f09005629bddc32559bc7679e728e785de063c))
+
 ## [0.2.0](https://github.com/cloudlesslabs/pulumi-recipes/compare/v0.1.1...v0.2.0) (2021-09-22)
 
 ### [0.1.1](https://github.com/cloudlesslabs/pulumi-recipes/compare/v0.1.0...v0.1.1) (2021-09-21)
