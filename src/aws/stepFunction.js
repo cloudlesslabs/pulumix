@@ -145,6 +145,7 @@ const createStepFunction = async ({ name, description, type, states, policies, c
 
 	// Step function. Doc: https://www.pulumi.com/docs/reference/pkg/aws/sfn/statemachine/
 	const stepFunction = new aws.sfn.StateMachine(name, {
+		name,
 		roleArn: stepFuncRole.arn,
 		type: (type||'').trim().toLowerCase() == 'express' ? 'EXPRESS' : 'STANDARD',
 		definition: JSON.stringify({
