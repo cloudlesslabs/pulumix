@@ -215,7 +215,9 @@ const createRepo = ({ name, scanOnPush, imageTagMutable, publicConfig, tags }) =
 	}
 }
 
-module.exports = createImage
+module.exports = {
+	image: createImage
+}
 
 
 

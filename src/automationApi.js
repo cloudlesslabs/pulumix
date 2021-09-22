@@ -50,7 +50,7 @@ LICENSE file in the root directory of this source tree.
  * @param  {Function}	onOutput								(Optional)
  * 
  * @return {[String]}	result.info								stdout from the `pulumi up` command.
- * @return {Object}		result.outputs
+ * @return {Object}		result.outputs							Ref: https://github.com/cloudlesslabs/pulumi-recipes#using-the-automation-api-in-your-code
  * @return {String}		result.stack.name
  * @return {String}		result.stack.workspace.pulumiHome
  * @return {Promise}	result.stack.workspace.program

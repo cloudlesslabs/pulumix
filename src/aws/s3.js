@@ -16,18 +16,21 @@ const aws = require('@pulumi/aws')
  * 	1. S3 bucket.
  * 	
  * @param  {String}           name				
- * @param  {String}           acl								Valid values: 'private' (default), 'public-read' (for website), 'public-read-write', 'aws-exec-read', 'authenticated-read', and 'log-delivery-write'	
- * @param  {Object}           website							If exists, overwrites 'acl' with 'public-read'
- * @param  {String}           website.indexDocument				e.g., 'index.html'	
- * @param  {String}           website.errorDocument				e.g., 'error.html'
- * @param  {String}           website.redirectAllRequestsTo		e.g., 'https://neap.co'
+ * @param  {String}           acl										Valid values: 'private' (default), 'public-read' (for website), 'public-read-write', 'aws-exec-read', 'authenticated-read', and 'log-delivery-write'	
+ * @param  {Object}           website									If exists, overwrites 'acl' with 'public-read'
+ * @param  {String}           website.indexDocument						e.g., 'index.html'	
+ * @param  {String}           website.errorDocument						e.g., 'error.html'
+ * @param  {String}           website.redirectAllRequestsTo				e.g., 'https://neap.co'
  * @param  {Object}           website.routingRules
- * @param  {[Object]}         website.cors						https://www.pulumi.com/docs/reference/pkg/aws/s3/bucket/#using-cors	
- * @param  {Boolean}          versioning						Default false.		
+ * @param  {[Object]}         website.cors								https://www.pulumi.com/docs/reference/pkg/aws/s3/bucket/#using-cors	
+ * @param  {Boolean}          versioning								Default false.		
  * @param  {String}           tags				
  * 
  * @return {Output<Bucket>}   output.bucket
- * @return {Output<String>}   output.bucket.websiteEndpoint
+ * @return {Output<String>}   output.bucket.websiteEndpoint				Unfriendly AWS URL where the S3 website can be accessed (only set when the 'website' property is set).
+ * @return {Output<String>}   output.bucket.bucketDomainName			e.g., 'bucketname.s3.amazonaws.com'
+ * @return {Output<String>}   output.bucket.bucketRegionalDomainName	e.g., 'https://bucketname.s3.ap-southeast-2.amazonaws.com'
+ * @return {Output<String>}   output.bucket.region						e.g., 'ap-southeast-2'
  */
 const createS3 = async ({ name, acl:_acl, website:_website, versioning, tags }) => {
 	if (!name)

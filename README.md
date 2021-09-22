@@ -3,28 +3,9 @@
 > __Pulumi guide__: To learn more about Pulumi, please refer to https://gist.github.com/nicolasdao/6cdd85d94b8ee992297d351c248f4092.
 > __IAM roles & policies__: Managing AWS resources almost always involves managing IAM roles and policies. For a quick recap on that topic, please refer to this document: https://gist.github.com/nicolasdao/830fc1d1b6ce86e0d8bebbdedb2f2626#iam-recap.
 
-### Glocal dependencies
-
 ```
-npm i @pulumi/pulumi 
-```
-
-If you need to use the __Automation API__, also install these dependencies:
-
-```
-npm i puffy fast-glob
-```
-
-### AWS dependencies
-
-```
-npm i @pulumi/pulumi @pulumi/aws @pulumi/awsx
-```
-
-### GCP dependencies
-
-```
-npm i @pulumi/pulumi @pulumi/gcp
+(test -f .npmrc || echo @cloudlesslabs:registry=https://npm.pkg.github.com/cloudlesslabs >> .npmrc) && \ 
+npm i @cloudlesslabs/pulumi-recipes
 ```
 
 # Table of contents
@@ -44,8 +25,8 @@ npm i @pulumi/pulumi @pulumi/gcp
 > * [Automation API](#automation-api)
 >	- [Setting it up in Docker](#setting-it-up-in-docker)
 >		- [Dockerfile for Automation API in a Lambda](#dockerfile-for-automation-api-in-a-lambda)
->		- [Setting the adequate IAM policies](#setting-the-adequate-iam-policies)
->		- [Using the Automation API in your code](#using-the-automation-api-in-your-code)
+>	- [Setting the adequate IAM policies](#setting-the-adequate-iam-policies)
+>	- [Using the Automation API in your code](#using-the-automation-api-in-your-code)
 > * [AWS](#aws)
 >	- [Aurora](#aurora)
 >		- [Basic usage](#aurora---basic-usage)
@@ -72,6 +53,7 @@ npm i @pulumi/pulumi @pulumi/gcp
 >		- [Example - Lambda with EFS](#example---lambda-with-efs)
 >		- [Example - Lambda with Layers](#example---lambda-with-layers)
 >	- [Policy](#aws-policy)
+>	- [S3](#s3)
 >	- [Secret](#secret)
 >		- [Getting stored secrets](#getting-stored-secrets)
 >	- [Security Group](#security-group)
@@ -339,7 +321,7 @@ Notice:
 2. `bash -s -- --version 3.10.0`: Use the explicit version to make sure Pulumi's update don't break your code.
 3. `mv ~/.pulumi/bin/* /usr/bin` moves the the executable files to where the lambda can access them (i.e., `/usr/bin`). 
 
-### Setting the adequate IAM policies
+## Setting the adequate IAM policies
 
 Because Pulumi relies on the standard AWS SDK to access AWS's APIs, the appropriate policies must be set in your hosting environment. For example, in order to provision S3 buckets, the following policy must be attached:
 
@@ -364,16 +346,15 @@ const createBucketsPolicy = new aws.iam.Policy(`create-bucket`, {
 })
 ```
 
-### Using the Automation API in your code
+## Using the Automation API in your code
 
 In you Lambda code, you can know use the Automation API, or call Pulumi via the `child_process` (which is actually what the automation API does):
 
 ```js
-const pulumiAuto = require('./src/automationApi')
-const s3 = require('./src/aws/s3')
+const { automationApi, aws:{ s3 } } = require('@cloudlesslabs/pulumi-recipes')
 
 const main = async () => {
-	const [errors] = await pulumiAuto.up({ 
+	const [errors, result] = await automationApi.up({ 
 		project: 'my-project-name',
 		provider: {
 			name:'aws',
@@ -387,17 +368,42 @@ const main = async () => {
 			}
 		}, 
 		program: async () => {
-			const bucket = await s3({
+			const myBucket = await s3({
 				name:'my-unique-website-name',
 				website: {
 					indexDocument: 'index.html'
 				}
 			})
-			return bucket
+			return myBucket
 		} 
 	})
+
+	console.log(`Pulumi home dir: ${result.stack.workspace.pulumiHome}`)
+	console.log(`Pulumi work dir(contains checkpoints): ${result.stack.workspace.workDir}`)
+	console.log(`Pulumi output:`)
+	console.log(result.outputs.myBucket.value)
+	// Example
+	// { 
+	// 	id: 'lu-20210922kogrikvuow',
+	// 	arn: 'arn:aws:s3:::lu-20210922kogrikvuow',
+	// 	bucket: 'lu-20210922kogrikvuow',
+	// 	bucketDomainName: 'lu-20210922kogrikvuow.s3.amazonaws.com',
+	// 	bucketRegionalDomainName: 'lu-20210922kogrikvuow.s3.ap-southeast-2.amazonaws.com',
+	// 	websiteDomain: 's3-website-ap-southeast-2.amazonaws.com',
+	// 	websiteEndpoint: 'lu-20210922kogrikvuow.s3-website-ap-southeast-2.amazonaws.com'
+	// }
 }
+
 ```
+
+console.log('RESULT')
+	console.log(result)
+	console.log('RESULT OUTPUTS')
+	console.log((result||{}).outputs)
+
+	// Clean Pulumi checkpoints
+	const workspace = ((result||{}).stack||{}).workspace||{}
+	const { pulumiHome, workDir } = workspace
 
 > IMPORTANT: The `provider.version` required and is tied to the Pulumi version you're using (`3.10.0` in this example). Configuring the wrong AWS version will throw an error similar to [no resource plugin 'aws-v4.17.0' found in the workspace or on your $PATH](#no-resource-plugin-aws-v4170-found-in-the-workspace-or-on-your-path). To know which AWS version to use, set one up, deploy, and check the error message.
 
@@ -419,6 +425,8 @@ const main = async () => {
 > WARNING: Once the `masterUsername` is set, it cannot be changed. Attempting to change it will create a delete and replace operation, which is obvioulsy not what you may want. 
 
 ```js
+const { aws:{ rds:{ aurora } } } = require('@cloudlesslabs/pulumi-recipes')
+
 const auroraOutput = aurora({
 	name: 'my-db', 
 	engine: 'mysql',
@@ -457,6 +465,8 @@ ingress:[
 ```
 
 ```js
+const { aws:{ ec2, rds:{ aurora } } } = require('@cloudlesslabs/pulumi-recipes')
+
 // Bastion server
 const ec2Name = `${PROJECT}-rds-bastion`
 const { ami, instanceType } = config.requireObject('bastion')
@@ -629,10 +639,9 @@ const db = mysql.createPool({
 ##### Configure a `rds-db:connect` action on the IAM role
 
 ```js
-const { lambda } = require('./src/aws/lambda')
-const { createRdsConnectPolicy } = require('./src/aws/utils')
+const { aws:{ lambda:{ lambda }, rds:{ policy: { createConnectPolicy } } } } = require('@cloudlesslabs/pulumi-recipes')
 
-const rdsAccessPolicy = createRdsConnectPolicy({ name:`my-project-access-rds`, rdsArn:proxy.arn })
+const rdsAccessPolicy = createConnectPolicy({ name:`my-project-access-rds`, rdsArn:proxy.arn })
 
 const lambdaOutput = await lambda({
 	//...
@@ -641,7 +650,7 @@ const lambdaOutput = await lambda({
 })
 ```
 
-`createRdsConnectPolicy` accepts the following input:
+`createConnectPolicy` accepts the following input:
 - `rdsArn`: It is required. Examples: `arn:aws:rds:ap-southeast-2:1234:db-proxy:prx-123`, `arn:aws:rds:ap-southeast-2:1234:cluster:blabla` or `arn:aws:rds:ap-southeast-2:1234:db:blibli`.
 - `resourceId`: Optional. Default resource name (1)
 - `username`: Optional. Default `*`. Other examples: 'mark', 'peter'
@@ -679,6 +688,8 @@ The next sample shows how to provision an EC2 bastion host secured via SSM in a 
 Also, notice that we are passing the RSA public key to this instance. This will set up the RSA key for the `ec2-user` SSH user. The RSA private key is intended to be shared to any engineer that needs to establish a secured SSH tunnel between their local machine and this bastion host. Private RSA keys are usually not supposed to be shared lightly, but in this case, the security and accesses are managed by SSM, which relaxes the restrictions around sharing the RSA private key. For more details about SSH tunneling with SSM, please refer to this document: https://gist.github.com/nicolasdao/4808f0a1e5e50fdd29ede50d2e56024d#ssh-tunnel-to-private-rds-instances.
 
 ```js
+const { aws:{ ec2 } } = require('@cloudlesslabs/pulumi-recipes')
+
 const EC2_SHELL = `#!/bin/bash
 set -ex
 cd /tmp
@@ -732,9 +743,9 @@ The URL for this new image is inside the `image.imageValue` property.
 ## ECR
 
 ```js
-const image = require('./src/ecr')
+const { aws:{ ecr } } = require('@cloudlesslabs/pulumi-recipes')
 
-const myImage = await image({ 
+const myImage = await ecr.image({ 
 	name: 'my-image',
 	tag: 'v2',
 	dir: path.resolve('./app')
@@ -747,7 +758,7 @@ Where `myImage` is structured as follow:
 - `lifecyclePolicy`: Output object with the lifecycle policy.
 
 ```js
-const myImage = await image({ 
+const myImage = await ecr.image({ 
 	name: 'my-image',
 	tag: 'v3',
 	dir: path.resolve('./app'),
@@ -775,7 +786,7 @@ const myImage = await image({
 By default, repositories are private. To make them public, use:
 
 ```js
-const myImage = await image({ 
+const myImage = await ecr.image({ 
 	name: 'my-image',
 	tag: 'v3',
 	dir: path.resolve('./app'),
@@ -808,10 +819,7 @@ const myImage = await image({
 ### Mounting an EFS access point on a Lambda
 ```js
 const pulumi = require('@pulumi/pulumi')
-const securityGroup = require('./src/aws/securityGroup')
-const vpc = require('./src/aws/vpc')
-const { lambda } = require('./src/aws/lambda')
-const efs = require('./src/aws/efs')
+const { aws:{ securityGroup, vpc, lambda:{ lambda }, efs } } = require('@cloudlesslabs/pulumi-recipes')
 const { resolve } = require('path')
 
 const ENV = pulumi.getStack()
@@ -976,7 +984,7 @@ exports.handler = async ev => {
 const pulumi = require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
 const { resolve } = require('path')
-const { lambda } = require('./src/lambda')
+const { aws:{ lambda:{ lambda } } } = require('@cloudlesslabs/pulumi-recipes')
 
 const ENV = pulumi.getStack()
 const PROJ = pulumi.getProject()
@@ -1131,7 +1139,7 @@ const lambdaOutput = lambda({
 ```js
 const pulumi = require('@pulumi/pulumi')
 const { resolve } = require('path')
-const { lambda } = require('./src/lambda')
+const { aws:{ lambda:{ lambda } } } = require('@cloudlesslabs/pulumi-recipes')
 
 const ENV = pulumi.getStack()
 const PROJ = pulumi.getProject()
@@ -1230,7 +1238,7 @@ Pulumi file `index.js`:
 const pulumi = require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
 const { resolve } = require('path')
-const { lambda, lambdaLayer } = require('./src/lambda')
+const { aws:{ lambda:{ lambda, layer } } } = require('@cloudlesslabs/pulumi-recipes')
 
 const ENV = pulumi.getStack()
 const PROJ = pulumi.getProject()
@@ -1245,14 +1253,14 @@ const tags = {
 }
 
 const main = async () => {
-	const lambdaLayerOutput1 = await lambdaLayer({
+	const lambdaLayerOutput1 = await layer({
 		name: `${PROJECT}-layer-01`,
 		description: 'Includes puffy',
 		runtime: RUNTIME, 	
 		dir: resolve('./layers/layer01'),
 		tags
 	})
-	const lambdaLayerOutput2 = await lambdaLayer({
+	const lambdaLayerOutput2 = await layer({
 		name: `${PROJECT}-layer-02`,
 		description: 'Do something else',
 		runtime: RUNTIME, 	
@@ -1351,13 +1359,39 @@ const cloudWatchPolicy = new aws.iam.Policy(PROJECT, {
 })
 ```
 
+## S3
+
+```js
+const { aws:{ s3 }, resolve } = require('@cloudlesslabs/pulumi-recipes')
+
+const createBucket = async name => {
+	const bucket = await s3({
+		name,
+		website: { // When this property is set, the bucket is public. Otherwise, the bucket is private.
+			indexDocument: 'index.html'
+		}
+	})
+
+	const [websiteEndpoint, bucketDomainName, bucketRegionalDomainName] = await resolve([
+		bucket.websiteEndpoint, 
+		bucket.bucketDomainName,
+		bucket.bucketRegionalDomainName])
+
+	console.log(`Website URL: ${websiteEndpoint}`)
+	console.log(`Bucket domain name: ${bucketDomainName}`) // e.g., 'bucketname.s3.amazonaws.com'
+	console.log(`Bucket regional domain name: ${bucketRegionalDomainName}`) // e.g., 'https://bucketname.s3.ap-southeast-2.amazonaws.com'
+}
+
+createBucket('my-unique-name')
+```
+
 ## Secret
 ### Getting stored secrets
 
 ```js
-const secretHelper = require('./src/aws/secret')
+const { aws:{ secret } } = require('@cloudlesslabs/pulumi-recipes')
 
-secretHelper.get('my-secret-name').then(({ version, data }) => {
+secret.get('my-secret-name').then(({ version, data }) => {
 	console.log(version)
 	console.log(data) // Actual secret object
 })
@@ -1369,7 +1403,7 @@ secretHelper.get('my-secret-name').then(({ version, data }) => {
 > `{  protocol: '-1',  fromPort:0, toPort:65535, cidrBlocks: ['0.0.0.0/0'],  ipv6CidrBlocks: ['::/0'],  description:'Allow all traffic' }`
 
 ```js
-const securityGroup = require('./src/aws/securityGroup')
+const { aws:{ securityGroup } } = require('@cloudlesslabs/pulumi-recipes')
 
 const { securityGroup:mySecurityGroup, securityGroupRules:myRules } = await securityGroup({
 	name: `my-special-sg`, 

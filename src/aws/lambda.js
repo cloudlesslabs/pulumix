@@ -331,7 +331,7 @@ const fileExists = filePath => new Promise(onSuccess => fs.exists(path.resolve(f
 
 module.exports = {
 	lambda: createLambda,
-	lambdaLayer: createLayer
+	layer: createLayer
 }
 
 
