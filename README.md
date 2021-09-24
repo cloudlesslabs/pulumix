@@ -1151,7 +1151,6 @@ const lambdaOutput = lambda({
 		dir: resolve('./app'),
 		type: 'image' // If './app' contains a 'Dockerfile', this prop is not needed. 'lambda' is able to automatically infer the type is an 'image'.
 	},
-	imageUri: image.imageValue,
 	timeout:30, 
 	memorySize:128
 })

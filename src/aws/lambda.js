@@ -29,8 +29,8 @@ const { resolve } = require('../utils')
  * @param  {String}				name	
  * @param  {String}				description							
  * @param  {String}				fn.dir								The absolute path to the local folder containing the Lambda code that will be zipped.
- * @param  {String}				fn.runtime							e.g., 'nodejs14.x'. All runtimes: https://docs.aws.amazon.com/lambda/latest/dg/API_CreateFunction.html#SSS-CreateFunction-request-Runtime
  * @param  {String}				fn.type								Valid values: 'zip' (default), 'image' (1)											
+ * @param  {String}				fn.runtime							Only required if 'fn.type' is 'zip'. e.g., 'nodejs14.x'. All runtimes: https://docs.aws.amazon.com/lambda/latest/dg/API_CreateFunction.html#SSS-CreateFunction-request-Runtime
  * @param  {Object}				fn.args								Only valid when 'fn.type' is 'image' (1). This is what would be passed in the --build-arg option of `docker build`.
  * @param  {Object}				fn.env								Environment variables for that fn. It works a bit differently when 'fn.type' is 'image' (2).
  * @param  {[Output<String>]}	layers								Layer ARNS.
@@ -38,7 +38,6 @@ const { resolve } = require('../utils')
  * @param  {Number}				memorySize							Unit is MB. Default is 128 and max is 10,240
  * @param  {String}				handler								Deafult is 'index.handler'.
  * @param  {[Output<Policy>]}	policies							Policies to attach to the lambda role.
- * @param  {Output<String>}		imageUri							URI of the Docker image. Conflicts with 'fn.dir'. If both are defined, 'imageUri' wins.
  * @param  {Output<[String]>}	vpcConfig.subnetIds
  * @param  {Output<[String]>}	vpcConfig.securityGroupIds
  * @param  {Output<String>}		fileSystemConfig.arn				Used to mount an AWS EFS access point.
@@ -70,7 +69,7 @@ const { resolve } = require('../utils')
  * 		}
  * }
  *
- * (1) 'fn.type' if not required. If it is not set and 'fn.dir' contains a 'Dockerfile', the type is 'image'.
+ * (1) 'fn.type' is not required. If it is not set and 'fn.dir' contains a 'Dockerfile', the type is 'image'.
  * (2) When 'fn.env' is set and 'fn.type' is 'image'(1), then this object is merged with the 'fn.arg'. This 
  * means there is an extra manual step to convert the docker ARG into ENV in the Dockerfile.
  */
