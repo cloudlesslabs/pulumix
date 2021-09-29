@@ -19,10 +19,10 @@ const { resolve } = require('../utils')
  * Creates an AWS Lambda. Doc: https://www.pulumi.com/docs/reference/pkg/aws/lambda/function/
  * Resources:
  * 	1. IAM role
- * 	2. (Optional) Log group if 'cloudWatch' is true.
+ * 	2. (Optional) Log group if 'cloudwatch' is true.
  * 	3. (Optional) Up to 2 policies which are attached to the IAM role:
- * 		- If the Lambda is configured in a VPC (i.e., 'vpcConfig' exists), then the AWS managed policy 'AWSLambdaVPCAccessExecutionRole' is added. This policy automatically grant 'send-to' CloudWatch access.
- * 		- If 'cloudWatch' is true, then the AWS managed policy 'AWSLambdaBasicExecutionRole' is added.
+ * 		- If the Lambda is configured in a VPC (i.e., 'vpcConfig' exists), then the AWS managed policy 'AWSLambdaVPCAccessExecutionRole' is added. This policy automatically grant 'send-to' cloudwatch access.
+ * 		- If 'cloudwatch' is true, then the AWS managed policy 'AWSLambdaBasicExecutionRole' is added.
  * 		- If 'fileSystemConfig' is configured, then the AWS managed policy 'AmazonElasticFileSystemClientFullAccess' is added.
  * 	4. Lambda.
  * 	
@@ -42,8 +42,9 @@ const { resolve } = require('../utils')
  * @param  {Output<[String]>}	vpcConfig.securityGroupIds
  * @param  {Output<String>}		fileSystemConfig.arn				Used to mount an AWS EFS access point.
  * @param  {Output<String>}		fileSystemConfig.localMountPath		Used to mount an AWS EFS access point.
- * @param  {Boolean}			cloudWatch 							Default false. When true, CloudWatch is enabled.
- * @param  {Number}				logsRetentionInDays					Default 0 (i.e., never expires). Only applies when 'cloudWatch' is true.
+ * @param  {Boolean}			cloudwatch 							Default false. When true, cloudwatch is enabled.
+ * @param  {Boolean}			cloudWatch 							Deprecated. Use 'cloudwatch' instead.
+ * @param  {Number}				logsRetentionInDays					Default 0 (i.e., never expires). Only applies when 'cloudwatch' is true.
  * @param  {String}				tags		
  * 				
  * @return {Output<Lambda>}		output.lambda						
@@ -73,9 +74,11 @@ const { resolve } = require('../utils')
  * (2) When 'fn.env' is set and 'fn.type' is 'image'(1), then this object is merged with the 'fn.arg'. This 
  * means there is an extra manual step to convert the docker ARG into ENV in the Dockerfile.
  */
-const createLambda = async ({ name, description, fn, layers, timeout=3, memorySize=128, handler, policies, vpcConfig, fileSystemConfig, cloudWatch, logsRetentionInDays, tags }) => {
+const createLambda = async ({ name, description, fn, layers, timeout=3, memorySize=128, handler, policies, vpcConfig, fileSystemConfig, cloudWatch, cloudwatch, logsRetentionInDays, tags }) => {
 	tags = tags || {}
 	const dependsOn = []
+	if (cloudWatch !== undefined && cloudwatch === undefined)
+		cloudwatch = cloudWatch
 	
 	if (!name)
 		throw new Error('Missing required argument \'name\'.')
@@ -109,6 +112,8 @@ const createLambda = async ({ name, description, fn, layers, timeout=3, memorySi
 	
 	// IAM role. Doc: https://www.pulumi.com/docs/reference/pkg/aws/iam/role/
 	const lambdaRole = new aws.iam.Role(canonicalName, {
+		name: canonicalName,
+		description: `Role for lambda '${name}'`,
 		assumeRolePolicy: {
 			Version: '2012-10-17',
 			Statement: [{
@@ -126,9 +131,9 @@ const createLambda = async ({ name, description, fn, layers, timeout=3, memorySi
 		}
 	})
 
-	// Configure CloudWatch
+	// Configure cloudwatch
 	let logGroup = null
-	if (cloudWatch) {
+	if (cloudwatch) {
 		// Creates the log group where the logs are sent. Doc: https://www.pulumi.com/docs/reference/pkg/aws/cloudwatch/loggroup/
 		const logGroupId = `/aws/lambda/${name}`
 		logGroup = new aws.cloudwatch.LogGroup(logGroupId, { 
@@ -142,7 +147,7 @@ const createLambda = async ({ name, description, fn, layers, timeout=3, memorySi
 	}
 
 	// Attach policies
-	const updatedPolicies = configurePolicies(policies, canonicalName, { cloudWatch, vpcConfig, fileSystemConfig })
+	const updatedPolicies = configurePolicies(policies, canonicalName, { cloudwatch, vpcConfig, fileSystemConfig })
 	for (let i=0;i<updatedPolicies.length;i++) {
 		const policy = updatedPolicies[i]
 		if (!policy.name)
@@ -280,7 +285,7 @@ const leanify = resource => {
  * 
  * @param  {[Policy]} policies
  * @param  {String}   prefix
- * @param  {Boolean}  config.cloudWatch
+ * @param  {Boolean}  config.cloudwatch
  * @param  {Boolean}  config.vpcConfig
  * @param  {Boolean}  config.fileSystemConfig
  * 
@@ -292,7 +297,7 @@ const configurePolicies = (policies, prefix, config) => {
 	const AmazonElasticFileSystemClientFullAccess = 'arn:aws:iam::aws:policy/AmazonElasticFileSystemClientFullAccess'
 
 	const updatedPolicies = [...(policies || [])]
-	const { cloudWatch, fileSystemConfig, vpcConfig } = config || {}
+	const { cloudwatch, fileSystemConfig, vpcConfig } = config || {}
 
 	const efsAccess = fileSystemConfig && fileSystemConfig.arn
 	const vpcAccess = efsAccess || (vpcConfig && vpcConfig.subnetIds)
@@ -302,8 +307,8 @@ const configurePolicies = (policies, prefix, config) => {
 			// 'AWSLambdaVPCAccessExecutionRole' contains 'AWSLambdaBasicExecutionRole'
 			arn: AWSLambdaVPCAccessExecutionRole
 		})
-	else if (cloudWatch && !updatedPolicies.some(p => p.arn == AWSLambdaBasicExecutionRole))
-		// Enables the lambda to send logs to CloudWatch
+	else if (cloudwatch && !updatedPolicies.some(p => p.arn == AWSLambdaBasicExecutionRole))
+		// Enables the lambda to send logs to cloudwatch
 		updatedPolicies.push({ 
 			name: `${prefix}-cloudwatch`, 
 			arn: AWSLambdaBasicExecutionRole

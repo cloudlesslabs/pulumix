@@ -28,6 +28,7 @@ npm i @cloudlesslabs/pulumi-recipes
 >	- [Setting the adequate IAM policies](#setting-the-adequate-iam-policies)
 >	- [Using the Automation API in your code](#using-the-automation-api-in-your-code)
 > * [AWS](#aws)
+>	- [AppSync](#appsync)
 >	- [Aurora](#aurora)
 >		- [Basic usage](#aurora---basic-usage)
 >		- [Grant access to EC2 instance](#grant-access-to-ec2-instance)
@@ -408,6 +409,82 @@ console.log('RESULT')
 > IMPORTANT: The `provider.version` required and is tied to the Pulumi version you're using (`3.10.0` in this example). Configuring the wrong AWS version will throw an error similar to [no resource plugin 'aws-v4.17.0' found in the workspace or on your $PATH](#no-resource-plugin-aws-v4170-found-in-the-workspace-or-on-your-path). To know which AWS version to use, set one up, deploy, and check the error message.
 
 # AWS
+## AppSync
+
+```js
+const pulumi = require('@pulumi/pulumi')
+const { resolve } = require('@cloudlesslabs/pulumi-recipes')
+const appSync = require('./src/appSync')
+
+const ENV = pulumi.getStack()
+const PROJ = pulumi.getProject()
+const PROJECT = `${PROJ}-${ENV}`
+const PRODUCT_STACK = `your-product-stack/${ENV}`
+
+const productStack = new pulumi.StackReference(PRODUCT_STACK)
+const productApi = productStack.getOutput('lambda')
+
+const main = async () => {
+	const tags = {
+		Project: PROJ,
+		Env: ENV
+	}
+
+	const productLambda = await resolve(productApi.lambda)
+
+	const graphql = await appSync.api({
+		name: PROJECT, 
+		description: `Lineup ${ENV} GraphQL API`, 
+		schema:`
+			schema {
+				query: Query
+			}
+			type Product {
+				id: ID!
+				name: String
+			}
+			type User {
+				id: ID!
+			}
+			type Query {
+				products: [Product]
+				users: [User]
+			}`, 
+		resolver: {
+			lambdaArns:[productLambda.arn]
+		},
+		cloudwatch: true, 
+		tags
+	})
+
+	const productResolver = await appSync.resolver({
+		name: `${PROJECT}-resolver-product`, 
+		api:{
+			id: graphql.api.id,
+			roleArn: graphql.roleArn
+		}, 
+		type: 'Query', 
+		field: 'projects', 
+		functionArn: productLambda.arn,
+		mappingTemplate:{
+			payload: {
+				field: 'projects'
+			}
+		}, 
+		tags
+	})
+
+	return {
+		graphql,
+		resolvers: {
+			productResolver
+		}
+	}
+}
+
+module.exports = main()
+```
+
 ## Aurora
 
 > __WARNING__: If both an Aurora cluster and an RDS proxy are provisioned at the same time, the initial `pulumi up` will probably fail
@@ -893,7 +970,7 @@ const main = async () => {
 			arn: efsOutput.accessPoint.arn,
 			localMountPath: '/mnt/somefolder'
 		},
-		cloudWatch: true,
+		cloudwatch: true,
 		logsRetentionInDays: 7,
 		tags
 	})
@@ -1028,7 +1105,7 @@ module.exports = main()
 
 ### Example - Configuring CloudWatch
 
-> WARNING: The next sample demonstrates how to attach a policy explicitly. To set one up for CloudWatch, the recommended way is to use the `cloudWatch` and `logsRetentionInDays` properties as explained in the TIPS at the bottom of this section.
+> WARNING: The next sample demonstrates how to attach a policy explicitly. To set one up for CloudWatch, the recommended way is to use the `cloudwatch` and `logsRetentionInDays` properties as explained in the TIPS at the bottom of this section.
 
 To add CloudWatch logs to the previous Lambda, we need to create a new policy that allows the creations of log groups, log streams and log event as associate that policy to the Lambda's role.
 
@@ -1085,7 +1162,7 @@ const lambdaOutput = lambda({
 >```js
 > const lambdaOutput = lambda({
 > 	...
-> 	cloudWatch: true,
+> 	cloudwatch: true,
 >	logsRetentionInDays: 7 // This is optional. The default is 0 (i.e., never expires). 
 > })
 >```
