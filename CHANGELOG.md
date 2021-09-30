@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.3.1](https://github.com/cloudlesslabs/pulumix/compare/v0.3.0...v0.3.1) (2021-09-30)
+
+
+### Features
+
+* Add support for ARM architecture on Lambdas ([088bacc](https://github.com/cloudlesslabs/pulumix/commit/088bacce9e84f6905fd4cb670e3cc16a1d0a3253))
+
 ## [0.3.0](https://github.com/cloudlesslabs/pulumix/compare/v0.2.3...v0.3.0) (2021-09-30)
 
 ### [0.2.3](https://github.com/cloudlesslabs/pulumi-recipes/compare/v0.2.2...v0.2.3) (2021-09-29)
