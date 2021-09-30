@@ -1,11 +1,11 @@
-# PULUMI RECIPES
+# PULUMIX - PULUMI RECIPES
 
 > __Pulumi guide__: To learn more about Pulumi, please refer to https://gist.github.com/nicolasdao/6cdd85d94b8ee992297d351c248f4092.
 > __IAM roles & policies__: Managing AWS resources almost always involves managing IAM roles and policies. For a quick recap on that topic, please refer to this document: https://gist.github.com/nicolasdao/830fc1d1b6ce86e0d8bebbdedb2f2626#iam-recap.
 
 ```
 (test -f .npmrc || echo @cloudlesslabs:registry=https://npm.pkg.github.com/cloudlesslabs >> .npmrc) && \ 
-npm i @cloudlesslabs/pulumi-recipes
+npm i @cloudlesslabs/pulumix
 ```
 
 # Table of contents
@@ -352,7 +352,7 @@ const createBucketsPolicy = new aws.iam.Policy(`create-bucket`, {
 In you Lambda code, you can know use the Automation API, or call Pulumi via the `child_process` (which is actually what the automation API does):
 
 ```js
-const { automationApi, aws:{ s3 } } = require('@cloudlesslabs/pulumi-recipes')
+const { automationApi, aws:{ s3 } } = require('@cloudlesslabs/pulumix')
 
 const main = async () => {
 	const [errors, result] = await automationApi.up({ 
@@ -413,7 +413,7 @@ console.log('RESULT')
 
 ```js
 const pulumi = require('@pulumi/pulumi')
-const { resolve } = require('@cloudlesslabs/pulumi-recipes')
+const { resolve } = require('@cloudlesslabs/pulumix')
 const appSync = require('./src/appSync')
 
 const ENV = pulumi.getStack()
@@ -502,7 +502,7 @@ module.exports = main()
 > WARNING: Once the `masterUsername` is set, it cannot be changed. Attempting to change it will create a delete and replace operation, which is obvioulsy not what you may want. 
 
 ```js
-const { aws:{ rds:{ aurora } } } = require('@cloudlesslabs/pulumi-recipes')
+const { aws:{ rds:{ aurora } } } = require('@cloudlesslabs/pulumix')
 
 const auroraOutput = aurora({
 	name: 'my-db', 
@@ -542,7 +542,7 @@ ingress:[
 ```
 
 ```js
-const { aws:{ ec2, rds:{ aurora } } } = require('@cloudlesslabs/pulumi-recipes')
+const { aws:{ ec2, rds:{ aurora } } } = require('@cloudlesslabs/pulumix')
 
 // Bastion server
 const ec2Name = `${PROJECT}-rds-bastion`
@@ -716,7 +716,7 @@ const db = mysql.createPool({
 ##### Configure a `rds-db:connect` action on the IAM role
 
 ```js
-const { aws:{ lambda:{ lambda }, rds:{ policy: { createConnectPolicy } } } } = require('@cloudlesslabs/pulumi-recipes')
+const { aws:{ lambda:{ lambda }, rds:{ policy: { createConnectPolicy } } } } = require('@cloudlesslabs/pulumix')
 
 const rdsAccessPolicy = createConnectPolicy({ name:`my-project-access-rds`, rdsArn:proxy.arn })
 
@@ -765,7 +765,7 @@ The next sample shows how to provision an EC2 bastion host secured via SSM in a 
 Also, notice that we are passing the RSA public key to this instance. This will set up the RSA key for the `ec2-user` SSH user. The RSA private key is intended to be shared to any engineer that needs to establish a secured SSH tunnel between their local machine and this bastion host. Private RSA keys are usually not supposed to be shared lightly, but in this case, the security and accesses are managed by SSM, which relaxes the restrictions around sharing the RSA private key. For more details about SSH tunneling with SSM, please refer to this document: https://gist.github.com/nicolasdao/4808f0a1e5e50fdd29ede50d2e56024d#ssh-tunnel-to-private-rds-instances.
 
 ```js
-const { aws:{ ec2 } } = require('@cloudlesslabs/pulumi-recipes')
+const { aws:{ ec2 } } = require('@cloudlesslabs/pulumix')
 
 const EC2_SHELL = `#!/bin/bash
 set -ex
@@ -820,7 +820,7 @@ The URL for this new image is inside the `image.imageValue` property.
 ## ECR
 
 ```js
-const { aws:{ ecr } } = require('@cloudlesslabs/pulumi-recipes')
+const { aws:{ ecr } } = require('@cloudlesslabs/pulumix')
 
 const myImage = await ecr.image({ 
 	name: 'my-image',
@@ -896,7 +896,7 @@ const myImage = await ecr.image({
 ### Mounting an EFS access point on a Lambda
 ```js
 const pulumi = require('@pulumi/pulumi')
-const { aws:{ securityGroup, vpc, lambda:{ lambda }, efs } } = require('@cloudlesslabs/pulumi-recipes')
+const { aws:{ securityGroup, vpc, lambda:{ lambda }, efs } } = require('@cloudlesslabs/pulumix')
 const { resolve } = require('path')
 
 const ENV = pulumi.getStack()
@@ -1061,7 +1061,7 @@ exports.handler = async ev => {
 const pulumi = require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
 const { resolve } = require('path')
-const { aws:{ lambda:{ lambda } } } = require('@cloudlesslabs/pulumi-recipes')
+const { aws:{ lambda:{ lambda } } } = require('@cloudlesslabs/pulumix')
 
 const ENV = pulumi.getStack()
 const PROJ = pulumi.getProject()
@@ -1216,7 +1216,7 @@ const lambdaOutput = lambda({
 ```js
 const pulumi = require('@pulumi/pulumi')
 const { resolve } = require('path')
-const { aws:{ lambda:{ lambda } } } = require('@cloudlesslabs/pulumi-recipes')
+const { aws:{ lambda:{ lambda } } } = require('@cloudlesslabs/pulumix')
 
 const ENV = pulumi.getStack()
 const PROJ = pulumi.getProject()
@@ -1314,7 +1314,7 @@ Pulumi file `index.js`:
 const pulumi = require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
 const { resolve } = require('path')
-const { aws:{ lambda:{ lambda, layer } } } = require('@cloudlesslabs/pulumi-recipes')
+const { aws:{ lambda:{ lambda, layer } } } = require('@cloudlesslabs/pulumix')
 
 const ENV = pulumi.getStack()
 const PROJ = pulumi.getProject()
@@ -1438,7 +1438,7 @@ const cloudWatchPolicy = new aws.iam.Policy(PROJECT, {
 ## S3
 
 ```js
-const { aws:{ s3 }, resolve } = require('@cloudlesslabs/pulumi-recipes')
+const { aws:{ s3 }, resolve } = require('@cloudlesslabs/pulumix')
 
 const createBucket = async name => {
 	const bucket = await s3({
@@ -1465,7 +1465,7 @@ createBucket('my-unique-name')
 ### Getting stored secrets
 
 ```js
-const { aws:{ secret } } = require('@cloudlesslabs/pulumi-recipes')
+const { aws:{ secret } } = require('@cloudlesslabs/pulumix')
 
 secret.get('my-secret-name').then(({ version, data }) => {
 	console.log(version)
@@ -1479,7 +1479,7 @@ secret.get('my-secret-name').then(({ version, data }) => {
 > `{  protocol: '-1',  fromPort:0, toPort:65535, cidrBlocks: ['0.0.0.0/0'],  ipv6CidrBlocks: ['::/0'],  description:'Allow all traffic' }`
 
 ```js
-const { aws:{ securityGroup } } = require('@cloudlesslabs/pulumi-recipes')
+const { aws:{ securityGroup } } = require('@cloudlesslabs/pulumix')
 
 const { securityGroup:mySecurityGroup, securityGroupRules:myRules } = await securityGroup({
 	name: `my-special-sg`, 

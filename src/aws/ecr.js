@@ -120,18 +120,13 @@ const createImage = async ({ name, tag, publicConfig, dir, args, scanOnPush, ima
 		extraOptions
 	}
 
-	console.log({registryId, repositoryUrl})
-
 	// Pushes image to repo.
 	const imageValue = await resolve(docker.buildAndPushImage(taggedName, dockerBuildConfig, repositoryUrl, null, async () => {
 		// Construct Docker registry auth data by getting the short-lived authorizationToken from ECR, and
 		// extracting the username/password pair after base64-decoding the token.
 		//
 		// See: http://docs.aws.amazon.com/cli/latest/reference/ecr/get-authorization-token.html
-		console.log('GET CREDS')
 		const credentials = await aws.ecr.getCredentials({ registryId }, { async: true })
-		console.log('CREDS')
-		console.log(credentials)
 		const decodedCredentials = Buffer.from(credentials.authorizationToken, 'base64').toString()
 		const [username, password] = decodedCredentials.split(':')
 		if (!password || !username)

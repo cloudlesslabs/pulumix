@@ -10,9 +10,9 @@ LICENSE file in the root directory of this source tree.
 
 const pulumi = require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
-const awsx = require('@pulumi/awsx')
 const fs = require('fs')
 const path = require('path')
+const ecr = require('./ecr')
 const { resolve } = require('../utils')
 
 /**
@@ -99,16 +99,22 @@ const createLambda = async ({ name, description, fn, layers, timeout=3, memorySi
 		// ECR images. Doc:
 		// 	- buildAndPushImage API: https://www.pulumi.com/docs/reference/pkg/nodejs/pulumi/awsx/ecr/#buildAndPushImage
 		// 	- 2nd argument is a DockerBuild object: https://www.pulumi.com/docs/reference/pkg/docker/image/#dockerbuild
-		image = awsx.ecr.buildAndPushImage(canonicalName, {
-			context: fn.dir,
+		// image = awsx.ecr.buildAndPushImage(canonicalName, {
+		// 	context: fn.dir,
+		// 	args,
+		// 	tags: {
+		// 		...tags,
+		// 		Name: canonicalName
+		// 	}
+		// })
+		image = await ecr.image({ 
+			name: canonicalName,
+			dir: fn.dir,
 			args,
-			tags: {
-				...tags,
-				Name: canonicalName
-			}
+			tags
 		})
 	}
-	const imageUri = image ? image.imageValue : null
+	const imageUri = image ? image.imageValues[0] : null
 	
 	// IAM role. Doc: https://www.pulumi.com/docs/reference/pkg/aws/iam/role/
 	const lambdaRole = new aws.iam.Role(canonicalName, {

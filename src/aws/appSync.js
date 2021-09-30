@@ -339,19 +339,28 @@ const getLambdaRequestResponseTemplate = input => {
 	let { operation, payload, responseTemplate } = input || {}
 	payload = payload || {}
 	if (payload.source)
-		throw new Error('\'source\' is a reserved payload property. It contains is reserved to contain \'$utils.toJson($context.source)\'.')
+		throw new Error('\'source\' is a reserved payload property. It is reserved to contain \'$utils.toJson($context.source)\'.')
+	if (payload.args)
+		throw new Error('\'args\' is a reserved payload property. It is reserved to contain \'$utils.toJson($context.arguments)\'.')
+	if (payload.identity)
+		throw new Error('\'identity\' is a reserved payload property. It is reserved to contain \'$utils.toJson($context.identity)\'.')
 	
 	const requestTemplate = {
 		version: '2017-02-28',
 		operation: operation||'Invoke',
 		payload: {
 			...payload,
-			source: '$utils.toJson($context.source)'
+			source: '$utils.toJson($context.source)',
+			args: '$utils.toJson($context.arguments)',
+			identity: '$utils.toJson($context.identity)'
 		}
 	}
 	
 	const template = {
-		requestTemplate: JSON.stringify(requestTemplate, null, '  ').replace('"$utils.toJson($context.source)"','$utils.toJson($context.source)'),
+		requestTemplate: JSON.stringify(requestTemplate, null, '  ')
+			.replace('"$utils.toJson($context.source)"','$utils.toJson($context.source)')
+			.replace('"$utils.toJson($context.arguments)"','$utils.toJson($context.arguments)')
+			.replace('"$utils.toJson($context.identity)"','$utils.toJson($context.identity)'),
 	}
 
 	if (responseTemplate)
