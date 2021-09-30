@@ -27,7 +27,8 @@ const { resolve } = require('../utils')
  * 	4. Lambda.
  * 	
  * @param  {String}				name	
- * @param  {String}				description							
+ * @param  {String}				description		
+ * @param  {String}				architecture						Valid values: 'x86_64', 'arm64'(default) WARNING (3)
  * @param  {String}				fn.dir								The absolute path to the local folder containing the Lambda code that will be zipped.
  * @param  {String}				fn.type								Valid values: 'zip' (default), 'image' (1)											
  * @param  {String}				fn.runtime							Only required if 'fn.type' is 'zip'. e.g., 'nodejs14.x'. All runtimes: https://docs.aws.amazon.com/lambda/latest/dg/API_CreateFunction.html#SSS-CreateFunction-request-Runtime
@@ -73,8 +74,10 @@ const { resolve } = require('../utils')
  * (1) 'fn.type' is not required. If it is not set and 'fn.dir' contains a 'Dockerfile', the type is 'image'.
  * (2) When 'fn.env' is set and 'fn.type' is 'image'(1), then this object is merged with the 'fn.arg'. This 
  * means there is an extra manual step to convert the docker ARG into ENV in the Dockerfile.
+ * (3) If the lambda uses Docker, the architecture MUST BE COMPATIBLE with the Docker image. For a list of all the 
+ * lambda images with their associated OS, please refer to https://hub.docker.com/r/amazon/aws-lambda-nodejs/tags?page=1&ordering=last_updated
  */
-const createLambda = async ({ name, description, fn, layers, timeout=3, memorySize=128, handler, policies, vpcConfig, fileSystemConfig, cloudWatch, cloudwatch, logsRetentionInDays, tags }) => {
+const createLambda = async ({ name, description, architecture, fn, layers, timeout=3, memorySize=128, handler, policies, vpcConfig, fileSystemConfig, cloudWatch, cloudwatch, logsRetentionInDays, tags }) => {
 	tags = tags || {}
 	const dependsOn = []
 	if (cloudWatch !== undefined && cloudwatch === undefined)
@@ -188,6 +191,7 @@ const createLambda = async ({ name, description, fn, layers, timeout=3, memorySi
 	const lambda = new aws.lambda.Function(name, {
 		name,
 		description,
+		architectures: [architecture == 'x86_64' ? 'x86_64' : 'arm64'],
 		...functionCode,
 		timeout,
 		memorySize,

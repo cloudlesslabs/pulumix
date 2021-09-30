@@ -45,6 +45,8 @@ npm i @cloudlesslabs/pulumix
 >		- [Mounting an EFS access point on a Lambda](#mounting-an-efs-access-point-on-a-lambda)
 >	- [Lambda](#lambda)
 >		- [A few words about AWS Lambda](#a-few-words-about-aws-lambda)
+>			- [AWS Lambda key design principles](#aws-lambda-key-design-principles)
+>			- [ARM architecture recommended](#arm-architecture-recommended)
 >		- [The simplest API Gateway with Lambda](#the-simplest-api-gateway-with-lambda)
 >		- [Example - Basic Lambda with an API Gateway](#example---basic-lambda-with-an-api-gateway)
 >		- [Example - Configuring CloudWatch](#example---configuring-cloudwatch)
@@ -78,6 +80,7 @@ npm i @cloudlesslabs/pulumix
 >		- [AWS Lambda cannot access the public internet](#aws-lambda-cannot-access-the-public-internet)
 >		- [`failed to create '/home/sbx_userxxxx/.pulumi'`](#failed-to-create-homesbx_userxxxxpulumi)
 >		- [no resource plugin 'aws-v4.17.0' found in the workspace or on your $PATH](#no-resource-plugin-aws-v4170-found-in-the-workspace-or-on-your-path)
+>		- [AWS Lambda: `IMAGE Launch error: fork/exec /lambda-entrypoint.sh: exec format error`](#aws-lambda:-image-launch-error-forkexec-lambda-entrypointsh-exec-format-error)
 > * [Annexes](#annexes)
 > * [References](#references)
 
@@ -988,8 +991,31 @@ module.exports = main()
 
 ## Lambda
 ### A few words about AWS Lambda
+#### AWS Lambda key design principles
 
 It is important to know the key design principles behind AWS Lambdas before using them. Please refer to this document for a quick refresher course: https://gist.github.com/nicolasdao/e72beb55f3550351e777a4a52d18f0be#a-few-words-about-aws-lambda
+
+#### ARM architecture recommended
+
+As of 29 of September 2021, [ARM-based lambdas are powered by the AWS Graviton2 processor](https://aws.amazon.com/blogs/aws/aws-lambda-functions-powered-by-aws-graviton2-processor-run-your-functions-on-arm-and-get-up-to-34-better-price-performance/). This results in a significantly better of performance/price ratio. 
+
+This is why `@cloudlesslabs/pulumix` uses the `arm64` architecture as default rather than `x86_64` (which is the normal AWS SDK and Pulumi default). This configuration can be changed via the `architecture` property:
+
+```js
+const { resolve } = require('path')
+const { aws:{ lambda:{ lambda } } } = require('@cloudlesslabs/pulumix')
+
+lambda({
+	name: 'my-lambda',
+	architecture: 'x86_64', // Default is 'arm64'
+	fn: {
+		runtime: 'nodejs12.x', 	
+		dir: resolve('./app')
+	}
+})
+```
+
+__WARNING__: If you're using Docker, you must make sure that the Docker image is compatible with the choosen architecture. For a list of all the AWS lambda images with their associated OS, please refer to https://hub.docker.com/r/amazon/aws-lambda-nodejs/tags?page=1&ordering=last_updated.
 
 ### The simplest API Gateway with Lambda
 
@@ -1168,6 +1194,9 @@ const lambdaOutput = lambda({
 >```
 
 ### Example - Lambda with container
+
+__WARNING__: You must make sure that the Docker image is compatible with the choosen architecture. For a list of all the AWS lambda images with their associated OS, please refer to https://hub.docker.com/r/amazon/aws-lambda-nodejs/tags?page=1&ordering=last_updated.
+
 #### Example - Lambda with container code
 
 1. Create a new container for you lambda as follow:
@@ -1974,6 +2003,12 @@ This typically happens with the Automation API. The AWS Pulumi plugin is not fou
 - You have installed the incorrect version of this plugin. The tutorial usually shows this example: `stack.workspace.installPlugin('aws', 'v4.0.0')`. The plugin is version sensitive.
 
 Which version of the AWS SDK is required depends on the Pulumi version you're using. The best way to found out is to try to deploy without installing the AWS SDK, then read the error message to figure the version out.
+
+### AWS Lambda: `IMAGE Launch error: fork/exec /lambda-entrypoint.sh: exec format error`
+
+This typically happens when the image used to run Lambda containers is using an OS that is incompatible with the expected Lambda OS. For example, [amazon/aws-lambda-nodejs:12](https://hub.docker.com/layers/amazon/aws-lambda-nodejs/12/images/sha256-e94c6b08604388b12cb4c457ca2d14aff99f1e96f00179b91429807301e9db82?context=explore) uses the `arm64` architecture. This error will occur if the Lambda has been configured with its default `x86_64` architecture. 
+
+To fix this issue, please refer to the [ARM architecture recommended](#arm-architecture-recommended) section.
 
 # Annexes
 
