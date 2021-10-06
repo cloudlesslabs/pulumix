@@ -37,7 +37,8 @@ const { resolve } = require('../utils')
  * @param  {[Output<String>]}	layers								Layer ARNS.
  * @param  {Number}				timeout								Unit seconds. Default is 3 and max is 900 (15 minutes).
  * @param  {Number}				memorySize							Unit is MB. Default is 128 and max is 10,240
- * @param  {String}				handler								Deafult is 'index.handler'.
+ * @param  {String}				handler								Default is 'index.handler'.
+ * @param  {[String]}			allowedPrincipals					Default is null, which means only 'lambda.amazonaws.com' can invoke the lambda.
  * @param  {[Output<Policy>]}	policies							Policies to attach to the lambda role.
  * @param  {Output<[String]>}	vpcConfig.subnetIds
  * @param  {Output<[String]>}	vpcConfig.securityGroupIds
@@ -77,7 +78,7 @@ const { resolve } = require('../utils')
  * (3) If the lambda uses Docker, the architecture MUST BE COMPATIBLE with the Docker image. For a list of all the 
  * lambda images with their associated OS, please refer to https://hub.docker.com/r/amazon/aws-lambda-nodejs/tags?page=1&ordering=last_updated
  */
-const createLambda = async ({ name, description, architecture, fn, layers, timeout=3, memorySize=128, handler, policies, vpcConfig, fileSystemConfig, cloudWatch, cloudwatch, logsRetentionInDays, tags }) => {
+const createLambda = async ({ name, description, architecture, fn, layers, timeout=3, memorySize=128, handler, allowedPrincipals, policies, vpcConfig, fileSystemConfig, cloudWatch, cloudwatch, logsRetentionInDays, tags }) => {
 	tags = tags || {}
 	const dependsOn = []
 	if (cloudWatch !== undefined && cloudwatch === undefined)
@@ -120,19 +121,22 @@ const createLambda = async ({ name, description, architecture, fn, layers, timeo
 	const imageUri = image ? image.imageValues[0] : null
 	
 	// IAM role. Doc: https://www.pulumi.com/docs/reference/pkg/aws/iam/role/
+	allowedPrincipals = allowedPrincipals || []
+	if (!allowedPrincipals.some(x => x == 'lambda.amazonaws.com'))
+		allowedPrincipals.push('lambda.amazonaws.com')
 	const lambdaRole = new aws.iam.Role(canonicalName, {
 		name: canonicalName,
 		description: `Role for lambda '${name}'`,
 		assumeRolePolicy: {
 			Version: '2012-10-17',
-			Statement: [{
+			Statement: allowedPrincipals.map(Service => ({
 				Action: 'sts:AssumeRole',
 				Principal: {
-					Service: 'lambda.amazonaws.com',
+					Service
 				},
 				Effect: 'Allow',
 				Sid: ''
-			}],
+			})),
 		},
 		tags: {
 			...tags,

@@ -47,14 +47,15 @@ npm i @cloudlesslabs/pulumix
 >		- [A few words about AWS Lambda](#a-few-words-about-aws-lambda)
 >			- [AWS Lambda key design principles](#aws-lambda-key-design-principles)
 >			- [ARM architecture recommended](#arm-architecture-recommended)
->		- [The simplest API Gateway with Lambda](#the-simplest-api-gateway-with-lambda)
->		- [Example - Basic Lambda with an API Gateway](#example---basic-lambda-with-an-api-gateway)
->		- [Example - Configuring CloudWatch](#example---configuring-cloudwatch)
->		- [Example - Lambda with container](#example---lambda-with-container)
->			- [code](#example---lambda-with-container-code)
+>		- [API Gateway with explicit Lambda handlers](#api-gateway-with-explicit-lambda-handlers)
+>		- [Basic Lambda with an API Gateway](#basic-lambda-with-an-api-gateway)
+>		- [Configuring IAM policies to enable Lambda access to other resources](#configuring-iam-policies-to-enable-lambda-access-to-other-resources)
+>		- [Letting other AWS services to access a lambda](#letting-other-aws-services-to-access-a-lambda)
+>		- [Lambda with container](#lambda-with-container)
+>			- [code](#lambda-with-container-code)
 >			- [Setting up environment variables and passing arguments](#setting-up-environment-variables-and-passing-arguments)	
->		- [Example - Lambda with EFS](#example---lambda-with-efs)
->		- [Example - Lambda with Layers](#example---lambda-with-layers)
+>		- [Lambda with EFS](#lambda-with-efs)
+>		- [Lambda with Layers](#lambda-with-layers)
 >	- [Policy](#aws-policy)
 >	- [S3](#s3)
 >	- [Secret](#secret)
@@ -1017,7 +1018,35 @@ lambda({
 
 __WARNING__: If you're using Docker, you must make sure that the Docker image is compatible with the choosen architecture. For a list of all the AWS lambda images with their associated OS, please refer to https://hub.docker.com/r/amazon/aws-lambda-nodejs/tags?page=1&ordering=last_updated.
 
-### The simplest API Gateway with Lambda
+### Basic lambda
+
+```js
+const { resolve } = require('path')
+const { aws:{ lambda:{ lambda } } } = require('@cloudlesslabs/pulumix')
+
+lambda({
+	name: 'my-lambda',
+	fn: {
+		runtime: 'nodejs12.x', 	
+		dir: resolve('./app')
+	},
+	timeout: 30,					// Optional. Default 3 seconds.
+	memorySize: 128,				// Optional. Default 128MB
+	cloudwatch: true,				// Optional. Default false.
+	logsRetentionInDays: 7			// Optional. The default is 0 (i.e., never expires). 
+	policies: [somePolicy],			// Optional. Default null.			
+	tags: {							// Optional.
+		Project: 'my-project',
+		Env: 'dev'
+	}
+}).then(output => {
+	console.log(output.lambda)
+	console.log(output.role)
+	console.log(output.logGroup)
+})
+```
+
+### API Gateway with explicit Lambda handlers
 
 ```js
 const pulumi = require('@pulumi/pulumi')
@@ -1051,11 +1080,9 @@ exports.url = api.url
 
 > CloudWatch is automatically configured for each Lambda provisioned via each route.
 
-### Example - Basic Lambda with an API Gateway
+### Basic Lambda with an API Gateway
 
-This next sample is more explicit than the previous example. You'll also notice that out-of-the-box, CloudWatch is not setup. The [Configuring CloudWatch for the Lambda](#configuring-cloudwatch-for-the-lambda) section details how to set it up. 
-
-This next sample assumes that the root folder contains an `app/` folder which contains the actual NodeJS lambda code:
+This next sample is more explicit than the previous example. It assumes that the root folder contains an `app/` folder which contains the actual NodeJS lambda code:
 
 ```
 app/
@@ -1129,7 +1156,7 @@ const main = async () => {
 module.exports = main()
 ```
 
-### Example - Configuring CloudWatch
+### Configuring IAM policies to enable Lambda access to other resources
 
 Tl;dr:
 
@@ -1203,11 +1230,24 @@ const lambdaOutput = lambda({
 > })
 >```
 
-### Example - Lambda with container
+### Letting other AWS services to access a lambda
+
+Use the `allowedPrincipals` property. The following example allows AWS Cognito to access the Lambda:
+
+```js
+const { aws:{ lambda:{ lambda } } } = require('@cloudlesslabs/pulumix')
+
+lambda({
+	//...
+	allowedPrincipals:['cognito-idp.amazonaws.com']
+})
+```
+
+### Lambda with container
 
 __WARNING__: You must make sure that the Docker image is compatible with the choosen architecture. For a list of all the AWS lambda images with their associated OS, please refer to https://hub.docker.com/r/amazon/aws-lambda-nodejs/tags?page=1&ordering=last_updated.
 
-#### Example - Lambda with container code
+#### Lambda with container code
 
 1. Create a new container for you lambda as follow:
 	1. Create a new `app` folder as follow:
@@ -1335,13 +1375,13 @@ const image = awsx.ecr.buildAndPushImage(PROJECT, {
 })
 ```
 
-### Example - Lambda with EFS
+### Lambda with EFS
 
 Please refer to the [Mounting an EFS access point on a Lambda](#mounting-an-efs-access-point-on-a-lambda) section.
 
 > For a full example of a project that uses Lambda with Docker and Git installed to save files on EFS, please refer to this project: https://github.com/nicolasdao/example-aws-lambda-efs
 
-### Example - Lambda with Layers
+### Lambda with Layers
 
 > IMPORTANT: Your layer code must be under `/your-layer/nodejs/`, not `your-layer/`
 
