@@ -1131,7 +1131,17 @@ module.exports = main()
 
 ### Example - Configuring CloudWatch
 
-> WARNING: The next sample demonstrates how to attach a policy explicitly. To set one up for CloudWatch, the recommended way is to use the `cloudwatch` and `logsRetentionInDays` properties as explained in the TIPS at the bottom of this section.
+Tl;dr:
+
+```js
+const lambdaOutput = lambda({
+	// ...
+	cloudwatch: true,
+	logsRetentionInDays: 7 // This is optional. The default is 0 (i.e., never expires). 
+})
+```
+
+The rest of this section focuses on how the above configuration works under the hood.
 
 To add CloudWatch logs to the previous Lambda, we need to create a new policy that allows the creations of log groups, log streams and log event as associate that policy to the Lambda's role.
 
@@ -1187,9 +1197,9 @@ const lambdaOutput = lambda({
 > Because enabling CloudWatch on a Lambda is so common, this policy can be automatically toggled as follow:
 >```js
 > const lambdaOutput = lambda({
-> 	...
+> 	// ...
 > 	cloudwatch: true,
->	logsRetentionInDays: 7 // This is optional. The default is 0 (i.e., never expires). 
+> 	logsRetentionInDays: 7 // This is optional. The default is 0 (i.e., never expires). 
 > })
 >```
 
