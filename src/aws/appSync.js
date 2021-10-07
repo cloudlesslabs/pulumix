@@ -39,7 +39,18 @@ const DATA_SOURCE = {
  * @param  {String}				schema							GraphQL schema	
  * @param  {[Output<String>]}	resolver.lambdaArns				Lambda ARNs. This is needed to create invoke policies
  * 
- * @param  {[AuthConfig]}		authConfigs[]					(1) Default [{ type: 'API_KEY' }]
+ * @param  {Object}				authConfig						Default { apiKey:true }
+ * @param  {Boolean}				.apiKey						Default true if none of the other methods are enabled.
+ * @param  {Boolean}				.iam
+ * @param  {Object}					.cognito
+ * @param  {Oupput<String>}				.userPoolId				Required.
+ * @param  {Oupput<String>}				.appIdClientRegex
+ * @param  {Oupput<String>}				.awsRegion
+ * @param  {Object}					.oidc
+ * @param  {Oupput<String>}				.issuer					Required.
+ * @param  {Oupput<String>}				.clientId
+ * @param  {Oupput<Number>}				.authTtl				Number of milliseconds a token is valid after being authenticated.
+ * @param  {Oupput<Number>}				.iatTtl					Number of milliseconds a token is valid after being issued to a user.
  * @param  {String}				tags		
  * 				
  * @return {Output<GraphQLApi>}	output.api						The usual properties (i.e., id, arn, name)		
@@ -52,7 +63,7 @@ const DATA_SOURCE = {
  * 		- openidConnectConfig: https://www.pulumi.com/docs/reference/pkg/aws/appsync/graphqlapi/#graphqlapiadditionalauthenticationprovideropenidconnectconfig
  * 		- userPoolConfig: https://www.pulumi.com/docs/reference/pkg/aws/appsync/graphqlapi/#graphqlapiadditionalauthenticationprovideruserpoolconfig 		
  */
-const createApi = async ({ name, description, schema, resolver, authConfigs, cloudwatch, tags }) => {
+const createApi = async ({ name, description, schema, resolver, authConfig, cloudwatch, tags }) => {
 	tags = tags || {}
 	const dependsOn = []
 	
@@ -120,23 +131,11 @@ const createApi = async ({ name, description, schema, resolver, authConfigs, clo
 		}))
 	}
 
-	// AppSync GraphQL API doc: https://www.pulumi.com/docs/reference/pkg/aws/appsync/graphqlapi/
-	const authConfiguration = !authConfigs || !authConfigs.length 
-		? { authenticationType:'API_KEY' }
-		: { 
-			authenticationType:authConfigs[0].type, 
-			openidConnectConfig:authConfigs[0].openidConnectConfig, 
-			userPoolConfig:authConfigs[0].userPoolConfig,
-			additionalAuthenticationProviders: authConfigs.length > 1 
-				? authConfigs.slice(1).map(x => ({ authenticationType:x.type, userPoolConfig:x.userPoolConfig, openidConnectConfig:x.openidConnectConfig }))
-				: undefined
-		}
-
 	// GraphQL API doc: https://www.pulumi.com/docs/reference/pkg/aws/appsync/graphqlapi/
 	const graphQlApi = new aws.appsync.GraphQLApi(name, {
 		name,
 		description,
-		...authConfiguration,
+		...getAuth(authConfig),
 		schema,
 		logConfig,
 		dependsOn,
@@ -235,6 +234,91 @@ const createResolver = async ({ api, name, field, type, functionArn, tableName, 
 		resolver: leanify(resolver),
 		dataSource: leanify(_dataSource)
 	}
+}
+
+/**
+ * 
+ * @param  {Object}				authConfig						Default { apiKey:true }
+ * @param  {Boolean}				.apiKey						Default true if none of the other methods are enabled.
+ * @param  {Boolean}				.iam
+ * @param  {Object}					.cognito
+ * @param  {Oupput<String>}				.userPoolId				Required.
+ * @param  {Oupput<String>}				.appIdClientRegex
+ * @param  {Oupput<String>}				.awsRegion
+ * @param  {Object}					.oidc
+ * @param  {Oupput<String>}				.issuer					Required.
+ * @param  {Oupput<String>}				.clientId
+ * @param  {Oupput<Number>}				.authTtl				Number of milliseconds a token is valid after being authenticated.
+ * @param  {Oupput<Number>}				.iatTtl					Number of milliseconds a token is valid after being issued to a user.
+ * 
+ * @return {Object}				config
+ * @return {String}					.authenticationType
+ * @return {Object}					.openidConnectConfig
+ * @return {String}						.issuer
+ * @return {String}						.clientId
+ * @return {Number}						.authTtl
+ * @return {Number}						.iatTtl
+ * @return {Object}					.userPoolConfig
+ * @return {String}						.userPoolId
+ * @return {String}						.appIdClientRegex
+ * @return {String}						.awsRegion
+ * @return {Object}					.additionalAuthenticationProviders[]
+ * @return {String}						.authenticationType
+ * @return {Object}						.openidConnectConfig
+ * @return {String}							.issuer
+ * @return {String}							.clientId
+ * @return {Number}							.authTtl
+ * @return {Number}							.iatTtl
+ * @return {Object}						.userPoolConfig
+ * @return {String}							.userPoolId
+ * @return {String}							.appIdClientRegex
+ * @return {String}							.awsRegion
+ */
+const getAuth = authConfig => {
+	const { apiKey, iam, cognito, oidc } = authConfig || {}
+	const { userPoolId, appIdClientRegex, awsRegion } = cognito || {}
+	const { issuer, clientId, authTtl, iatTtl } = oidc || {}
+
+	if (!apiKey && !iam && !cognito && !oidc)
+		return { authenticationType:'API_KEY' }
+
+	const authConfigs = []
+	if (apiKey)
+		authConfigs.push({ authenticationType:'API_KEY' })
+	if (iam)
+		authConfigs.push({ authenticationType:'AWS_IAM' })
+	if (userPoolId)
+		authConfigs.push({ 
+			authenticationType:'AMAZON_COGNITO_USER_POOLS',
+			userPoolConfig: {
+				userPoolId, 
+				appIdClientRegex, 
+				awsRegion
+			}
+		})
+	if (issuer)
+		authConfigs.push({ 
+			authenticationType:'OPENID_CONNECT',
+			openidConnectConfig: {
+				issuer, 
+				clientId, 
+				authTtl, 
+				iatTtl
+			}
+		})
+
+	const authConfiguration = !authConfigs || !authConfigs.length 
+		? { authenticationType:'API_KEY' }
+		: { 
+			authenticationType:authConfigs[0].type, 
+			openidConnectConfig:authConfigs[0].openidConnectConfig, 
+			userPoolConfig:authConfigs[0].userPoolConfig,
+			additionalAuthenticationProviders: authConfigs.length > 1 
+				? authConfigs.slice(1).map(x => ({ authenticationType:x.type, userPoolConfig:x.userPoolConfig, openidConnectConfig:x.openidConnectConfig }))
+				: undefined
+		}
+
+	return authConfiguration
 }
 
 /**
