@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.5.3](https://github.com/cloudlesslabs/pulumix/compare/v0.5.2...v0.5.3) (2021-10-08)
+
+
+### Bug Fixes
+
+* Remove 'defaultAction' from userPoolConfig cause this option is broken ([d18901a](https://github.com/cloudlesslabs/pulumix/commit/d18901a7a271063d176c81fe31719c6be2a560ac))
+
 ### [0.5.2](https://github.com/cloudlesslabs/pulumix/compare/v0.5.1...v0.5.2) (2021-10-08)
 
 
