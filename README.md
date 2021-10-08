@@ -29,6 +29,11 @@ npm i @cloudlesslabs/pulumix
 >	- [Using the Automation API in your code](#using-the-automation-api-in-your-code)
 > * [AWS](#aws)
 >	- [AppSync](#appsync)
+>		- [Default AppSync settings](#default-appsync-settings)
+>		- [Auth with Cognito, OIDC and IAM](#auth-with-cognito-oidc-and-iam)
+>			- [IAM config](#iam-config)
+>			- [Cognito config](#cognito-config)
+>			- [OIDC config](#oidc-config)
 >	- [Aurora](#aurora)
 >		- [Basic usage](#aurora---basic-usage)
 >		- [Grant access to EC2 instance](#grant-access-to-ec2-instance)
@@ -414,7 +419,7 @@ console.log('RESULT')
 
 # AWS
 ## AppSync
-
+### Default AppSync settings
 ```js
 const pulumi = require('@pulumi/pulumi')
 const { resolve } = require('@cloudlesslabs/pulumix')
@@ -487,6 +492,93 @@ const main = async () => {
 }
 
 module.exports = main()
+```
+
+> NOTE: The sample above is similar to:
+```js
+const graphql = await appSync.api({
+	// ...
+	authConfig: {
+		apiKey: true
+	}
+})
+```
+
+### Auth with Cognito, OIDC and IAM
+
+Use the `authConfig` property. For example, Cognito:
+
+```js
+const graphql = await appSync.api({
+	name: 'my-api', 
+	description: `My GraphQL API`, 
+	schema:`
+		schema {
+			query: Query
+		}
+		type Product {
+			id: ID!
+			name: String
+		}
+		type User {
+			id: ID!
+		}
+		type Query {
+			products: [Product]
+			users: [User]
+		}`, 
+	resolver: {
+		lambdaArns:[productLambda.arn]
+	},
+	authConfig: {
+		cognito: {
+			userPoolId: '1234'
+			appIdClientRegex: '^my-app.*',
+			awsRegion: 'ap-southeast-2'
+		}
+	},
+	cloudwatch: true, 
+	tags
+})
+```
+
+#### IAM config
+
+`authConfig`:
+
+```js
+{
+	iam: true
+}
+```
+
+#### Cognito config
+
+`authConfig`:
+
+```js
+{
+	cognito: {
+		userPoolId: '1234'
+		appIdClientRegex: '^my-app.*',
+		awsRegion: 'ap-southeast-2'
+	}
+}
+```
+
+#### OIDC config
+
+`authConfig`:
+
+```js
+{
+	oidc: {
+		issuer: 'dewd'
+		clientId: '1121321'
+		authTtl: '60000', // 60,000 ms (1 min)
+		iatTtl: '60000' // 60,000 ms (1 min)
+	}
+}
 ```
 
 ## Aurora

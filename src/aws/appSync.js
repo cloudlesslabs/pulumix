@@ -310,11 +310,11 @@ const getAuth = authConfig => {
 	const authConfiguration = !authConfigs || !authConfigs.length 
 		? { authenticationType:'API_KEY' }
 		: { 
-			authenticationType:authConfigs[0].type, 
+			authenticationType:authConfigs[0].authenticationType, 
 			openidConnectConfig:authConfigs[0].openidConnectConfig, 
 			userPoolConfig:authConfigs[0].userPoolConfig,
 			additionalAuthenticationProviders: authConfigs.length > 1 
-				? authConfigs.slice(1).map(x => ({ authenticationType:x.type, userPoolConfig:x.userPoolConfig, openidConnectConfig:x.openidConnectConfig }))
+				? authConfigs.slice(1).map(x => ({ authenticationType:x.authenticationType, userPoolConfig:x.userPoolConfig, openidConnectConfig:x.openidConnectConfig }))
 				: undefined
 		}
 
