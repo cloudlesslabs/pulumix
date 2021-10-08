@@ -44,8 +44,9 @@ const DATA_SOURCE = {
  * @param  {Boolean}				.iam
  * @param  {Object}					.cognito
  * @param  {Oupput<String>}				.userPoolId				Required.
+ * @param  {Oupput<String>}				.awsRegion				Required.
  * @param  {Oupput<String>}				.appIdClientRegex
- * @param  {Oupput<String>}				.awsRegion
+ * @return {Oupput<String>}				.defaultAction			Default 'DENY'. Allowed values: 'DENY', 'ALLOW'
  * @param  {Object}					.oidc
  * @param  {Oupput<String>}				.issuer					Required.
  * @param  {Oupput<String>}				.clientId
@@ -243,8 +244,8 @@ const createResolver = async ({ api, name, field, type, functionArn, tableName, 
  * @param  {Boolean}				.iam
  * @param  {Object}					.cognito
  * @param  {Oupput<String>}				.userPoolId				Required.
+ * @param  {Oupput<String>}				.awsRegion				Required.
  * @param  {Oupput<String>}				.appIdClientRegex
- * @param  {Oupput<String>}				.awsRegion
  * @param  {Object}					.oidc
  * @param  {Oupput<String>}				.issuer					Required.
  * @param  {Oupput<String>}				.clientId
@@ -262,6 +263,7 @@ const createResolver = async ({ api, name, field, type, functionArn, tableName, 
  * @return {String}						.userPoolId
  * @return {String}						.appIdClientRegex
  * @return {String}						.awsRegion
+ * @return {String}						.defaultAction						Default 'DENY'. Allowed values: 'DENY', 'ALLOW'
  * @return {Object}					.additionalAuthenticationProviders[]
  * @return {String}						.authenticationType
  * @return {Object}						.openidConnectConfig
@@ -273,10 +275,11 @@ const createResolver = async ({ api, name, field, type, functionArn, tableName, 
  * @return {String}							.userPoolId
  * @return {String}							.appIdClientRegex
  * @return {String}							.awsRegion
+ * @return {String}							.defaultAction					Default 'DENY'. Allowed values: 'DENY', 'ALLOW'
  */
 const getAuth = authConfig => {
 	const { apiKey, iam, cognito, oidc } = authConfig || {}
-	const { userPoolId, appIdClientRegex, awsRegion } = cognito || {}
+	const { userPoolId, appIdClientRegex, awsRegion, defaultAction } = cognito || {}
 	const { issuer, clientId, authTtl, iatTtl } = oidc || {}
 
 	if (!apiKey && !iam && !cognito && !oidc)
@@ -287,15 +290,20 @@ const getAuth = authConfig => {
 		authConfigs.push({ authenticationType:'API_KEY' })
 	if (iam)
 		authConfigs.push({ authenticationType:'AWS_IAM' })
-	if (userPoolId)
+	if (userPoolId) {
+		if (!awsRegion)
+			throw new Error('Missing required \'authConfig.cognito.awsRegion\'. This property is required when the \'authConfig.cognito\' is configured.')
+		
 		authConfigs.push({ 
 			authenticationType:'AMAZON_COGNITO_USER_POOLS',
 			userPoolConfig: {
 				userPoolId, 
 				appIdClientRegex, 
-				awsRegion
+				awsRegion,
+				defaultAction: defaultAction || 'DENY'
 			}
 		})
+	}
 	if (issuer)
 		authConfigs.push({ 
 			authenticationType:'OPENID_CONNECT',
