@@ -46,7 +46,6 @@ const DATA_SOURCE = {
  * @param  {Oupput<String>}				.userPoolId				Required.
  * @param  {Oupput<String>}				.awsRegion				Required.
  * @param  {Oupput<String>}				.appIdClientRegex
- * @return {Oupput<String>}				.defaultAction			Default 'DENY'. Allowed values: 'DENY', 'ALLOW'
  * @param  {Object}					.oidc
  * @param  {Oupput<String>}				.issuer					Required.
  * @param  {Oupput<String>}				.clientId
@@ -263,7 +262,6 @@ const createResolver = async ({ api, name, field, type, functionArn, tableName, 
  * @return {String}						.userPoolId
  * @return {String}						.appIdClientRegex
  * @return {String}						.awsRegion
- * @return {String}						.defaultAction						Default 'DENY'. Allowed values: 'DENY', 'ALLOW'
  * @return {Object}					.additionalAuthenticationProviders[]
  * @return {String}						.authenticationType
  * @return {Object}						.openidConnectConfig
@@ -275,11 +273,10 @@ const createResolver = async ({ api, name, field, type, functionArn, tableName, 
  * @return {String}							.userPoolId
  * @return {String}							.appIdClientRegex
  * @return {String}							.awsRegion
- * @return {String}							.defaultAction					Default 'DENY'. Allowed values: 'DENY', 'ALLOW'
  */
 const getAuth = authConfig => {
 	const { apiKey, iam, cognito, oidc } = authConfig || {}
-	const { userPoolId, appIdClientRegex, awsRegion, defaultAction } = cognito || {}
+	const { userPoolId, appIdClientRegex, awsRegion } = cognito || {}
 	const { issuer, clientId, authTtl, iatTtl } = oidc || {}
 
 	if (!apiKey && !iam && !cognito && !oidc)
@@ -299,8 +296,7 @@ const getAuth = authConfig => {
 			userPoolConfig: {
 				userPoolId, 
 				appIdClientRegex, 
-				awsRegion,
-				defaultAction: defaultAction || 'DENY'
+				awsRegion
 			}
 		})
 	}
