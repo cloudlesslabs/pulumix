@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.6.1](https://github.com/cloudlesslabs/pulumix/compare/v0.6.0...v0.6.1) (2021-10-11)
+
+
+### Bug Fixes
+
+* content is not a supported bucket website property ([184fc95](https://github.com/cloudlesslabs/pulumix/commit/184fc95478db6699b79e4b4b31934f87f3ee669a))
+
 ## [0.6.0](https://github.com/cloudlesslabs/pulumix/compare/v0.5.3...v0.6.0) (2021-10-11)
 
 
