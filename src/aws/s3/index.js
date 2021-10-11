@@ -33,7 +33,6 @@ const { error: { mergeErrors } } = require('puffy')
  * @param  {String}							.key				Bucket object key
  * @param  {String}							.hash				Bucket object hash
  * @param  {Boolean}					.remove					Default false. True means all files must be removed from the bucket.
- * @param  {Boolean}					.noWarning				Default false.
  * @param  {Boolean}			versioning						Default false.		
  * @param  {String}				tags				
  * 
@@ -58,7 +57,7 @@ const createBucket = async ({ name, acl:_acl, website:_website, versioning, tags
 
 	tags = tags || {}
 	const acl = _website ? 'public-read' : _acl
-	const { website, corsRules } = getWebsiteProps(_website)
+	const { website, corsRules, content } = getWebsiteProps(_website)
 
 	const policy = !website ? undefined : JSON.stringify({
 		Version: '2012-10-17',
@@ -86,15 +85,15 @@ const createBucket = async ({ name, acl:_acl, website:_website, versioning, tags
 	})
 
 	// Uploading content
-	if (_website && _website.content && _website.content.dir) {
-		const [bucketName] = await resolve([bucket.name, bucket.urn])
+	if (content && content.dir) {
+		const [bucketName] = await resolve([bucket.bucket, bucket.urn])
 
 		const [errors, files] = await syncFiles({ 
 			bucket:bucketName, 
-			dir:_website.content.dir, 
-			ignore: _website.content.ignore,
-			existingObjects: _website.content.existingContent,
-			remove: _website.content.remove,
+			dir: content.dir, 
+			ignore: content.ignore,
+			existingObjects: content.existingContent,
+			remove: content.remove,
 			noWarning: true
 		})
 		if (errors)

@@ -442,12 +442,14 @@ const bucketExists = async bucket => {
  * @param  {String}   website.redirectAllRequestsTo		
  * @param  {Object}   website.routingRules
  * @param  {Object}   website.cors	
+ * @param  {Object}   website.content	
  * 		
  * @return {String}   output.website.indexDocument
  * @return {String}   output.website.errorDocument
  * @param  {String}   output.website.redirectAllRequestsTo		
  * @return {Object}   output.website.routingRules		
  * @return {[Object]} output.corsRules			
+ * @return {Object}   output.content	
  */
 const getWebsiteProps = website => {
 	if (!website)
@@ -456,14 +458,15 @@ const getWebsiteProps = website => {
 	if (typeof(website) == 'boolean')
 		return { website:{} }
 
-	const { cors, ...web } = website
+	const { cors, content, ...web } = website
 
 	if (web.routingRules && typeof(web.routingRules) != 'string')
 		web.routingRules = JSON.stringify(web.routingRules)
 
 	return {
 		website: web,
-		corsRules: cors
+		corsRules: cors,
+		content
 	}
 }
 
