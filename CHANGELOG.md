@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.6.0](https://github.com/cloudlesslabs/pulumix/compare/v0.5.3...v0.6.0) (2021-10-11)
+
+
+### Features
+
+* Add support for syncing local files to an S3 bucket ([985d36b](https://github.com/cloudlesslabs/pulumix/commit/985d36b5dfb6ef3233f9e1bb3902686c75e43341))
+
 ### [0.5.3](https://github.com/cloudlesslabs/pulumix/compare/v0.5.2...v0.5.3) (2021-10-08)
 
 
