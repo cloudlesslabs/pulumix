@@ -63,6 +63,8 @@ npm i @cloudlesslabs/pulumix
 >		- [Lambda with Layers](#lambda-with-layers)
 >	- [Policy](#aws-policy)
 >	- [S3](#s3)
+>		- [Creating a public bucket for hosting a static website](#creating-a-public-bucket-for-hosting-a-static-website)
+>		- [Synching local files with a bucket](#synching-local-files-with-a-bucket)
 >	- [Secret](#secret)
 >		- [Getting stored secrets](#getting-stored-secrets)
 >	- [Security Group](#security-group)
@@ -1607,12 +1609,13 @@ const cloudWatchPolicy = new aws.iam.Policy(PROJECT, {
 ```
 
 ## S3
+### Creating a public bucket for hosting a static website
 
 ```js
 const { aws:{ s3 }, resolve } = require('@cloudlesslabs/pulumix')
 
 const createBucket = async name => {
-	const bucket = await s3({
+	const { bucket } = await s3.bucket({
 		name,
 		website: { // When this property is set, the bucket is public. Otherwise, the bucket is private.
 			indexDocument: 'index.html'
@@ -1631,6 +1634,61 @@ const createBucket = async name => {
 
 createBucket('my-unique-name')
 ```
+
+### Synching local files with a bucket
+
+This feature is not using native Pulumi APIs. Instead, it uses the AWS SDK to sync files via the S3 API after the bucket has been created. When the `content` property of the `s3.bucket` input is set, a new `content` property is added to the `bucket` output. The new `content` property is an array containing object similar to this:
+
+```js
+[{
+	key: "favicon.png",
+	hash: "5efd4dc4c28ef3548aec63ae88865ff9"
+},{
+	key: "global.css",
+	hash: "8ff861b6a5b09e7d5fa681d8dd31262a"
+}]
+```
+
+Because this array is stored in Pulumi, we can use this reference object to determine which file must be updated (based on its hash), which file must be added (based its key) and which file must be deleted (based on its key). This is demoed in the sample below where you can see that the `existingContent` is passed from the stack to the `s3.bucket` API.
+
+The following example syncs the files stored under the `./app/public` folder and excludes all files under the `node_modules` folder.
+
+```js
+const pulumi = require('@pulumi/pulumi')
+const { resolve, aws: { s3 } } = require('@cloudlesslabs/pulumix')
+const { join } = require('path')
+
+const ENV = pulumi.getStack()
+const PROJ = pulumi.getProject()
+const PROJECT = `${PROJ}-${ENV}`
+const thisStack = new pulumi.StackReference(`${PROJ}/${ENV}`)
+const bucketOutput = thisStack.getOutput('bucket')
+
+const main = async () => {
+	const existingContent = (await resolve(bucketOutput.content)) || []
+	
+	const { bucket } = await s3.bucket({
+		name: PROJECT,
+		website: { // When this property is set, the bucket is public. Otherwise, the bucket is private.
+			indexDocument: 'index.html',
+			content: {
+				dir:join(__dirname, './app/public'),
+				ignore: '**/node_modules/**',
+				existingContent,
+				// remove:true
+			}
+		}
+	})
+
+	return {
+		bucket
+	}
+}
+
+module.exports = main()
+```
+
+> IMPORTANT: To delete a bucket, its content must be removed first. Re-deploy the stack by uncommenting the `// remove:true` line. This will remove all the content. 
 
 ## Secret
 ### Getting stored secrets

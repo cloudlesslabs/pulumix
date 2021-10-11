@@ -89,7 +89,7 @@ const createBucket = async ({ name, acl:_acl, website:_website, versioning, tags
 		const [bucketName] = await resolve([bucket.bucket, bucket.urn])
 
 		const [errors, files] = await syncFiles({ 
-			bucket:bucketName, 
+			bucket: bucketName, 
 			dir: content.dir, 
 			ignore: content.ignore,
 			existingObjects: content.existingContent,
