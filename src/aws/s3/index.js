@@ -47,7 +47,7 @@ const { error: { mergeErrors } } = require('puffy')
  * @return {Output<[Object]>}		.content[]
  * @return {Output<String>}				.key					Object's key in S3
  * @return {Output<String>}				.hash					MD5 file hash    
- *
+ * @return {Output<CloudFront>}	output.cloudfront
  * 
  */
 // (1) For example, to ignore the content under the node_modules folder: '**/node_modules/**'
@@ -152,7 +152,7 @@ const createBucket = async ({ name, acl:_acl, website:_website, versioning, tags
 
 	return {
 		bucket,
-		cloudfrontDistro
+		cloudfront: cloudfrontDistro
 	}
 }
 
