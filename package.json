@@ -1,6 +1,6 @@
 {
   "name": "@cloudlesslabs/pulumix",
-  "version": "0.6.1",
+  "version": "1.0.0",
   "description": "NodeJS Pulumi helpers.",
   "type": "module",
   "exports": {
@@ -16,7 +16,6 @@
     "./aws/securitygroup": "./src/aws/securityGroup.js",
     "./aws/stepfunction": "./src/aws/stepFunction.js",
     "./aws/vpc": "./src/aws/vpc.js",
-    "./aws/secret": "./src/aws/secret.js",
     "./automation": "./src/automationApi.js",
     "./utils": "./src/utils.js",
     ".package.json": ".package.json"
