@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.1.0](https://github.com/cloudlesslabs/pulumix/compare/v1.0.1...v1.1.0) (2021-10-13)
+
+
+### Features
+
+* Add support for adding a cloudfront distro on a bucket ([7607c5f](https://github.com/cloudlesslabs/pulumix/commit/7607c5fff4d8bcfb423c3be0952c73e8b6d6f7ef))
+
 ### [1.0.1](https://github.com/cloudlesslabs/pulumix/compare/v0.6.1...v1.0.1) (2021-10-13)
 
 ### [0.6.1](https://github.com/cloudlesslabs/pulumix/compare/v0.6.0...v0.6.1) (2021-10-11)
