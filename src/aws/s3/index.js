@@ -33,6 +33,9 @@ const { error: { mergeErrors } } = require('puffy')
  * @param  {String}							.key				Bucket object key
  * @param  {String}							.hash				Bucket object hash
  * @param  {Boolean}					.remove					Default false. True means all files must be removed from the bucket.
+ * @param  {Object}					.cloudfront
+ * @param  {[String]}					.customDomains			e.g., ['www.example.com', 'example.com']
+ * @param  {[String]}					.allowedMethods			Default ['GET', 'HEAD', 'OPTIONS']
  * @param  {Boolean}			versioning						Default false.		
  * @param  {String}				tags				
  * 
@@ -57,7 +60,7 @@ const createBucket = async ({ name, acl:_acl, website:_website, versioning, tags
 
 	tags = tags || {}
 	const acl = _website ? 'public-read' : _acl
-	const { website, corsRules, content } = getWebsiteProps(_website)
+	const { website, corsRules, content, cloudfront } = getWebsiteProps(_website)
 
 	const policy = !website ? undefined : JSON.stringify({
 		Version: '2012-10-17',
@@ -84,6 +87,50 @@ const createBucket = async ({ name, acl:_acl, website:_website, versioning, tags
 		}
 	})
 
+	let cloudfrontDistro
+	if (cloudfront) {
+		const cloudfrontName = `${name}-distro`
+		const originId = cloudfront.customDomains && cloudfront.customDomains[0] ? cloudfront.customDomains[0] : cloudfrontName
+		cloudfrontDistro = new aws.cloudfront.Distribution(cloudfrontName, {
+			name: cloudfrontName,
+			origins: [{
+				domainName: bucket.bucketRegionalDomainName,
+				originId
+			}],
+			enabled: true,
+			isIpv6Enabled: true,
+			defaultRootObject: website.indexDocument || 'index.html',
+			aliases: cloudfront.customDomains,
+			defaultCacheBehavior: {
+				allowedMethods: cloudfront.allowedMethods && cloudfront.allowedMethods.length ? cloudfront.allowedMethods : ['GET', 'HEAD', 'OPTIONS'],
+				cachedMethods: ['GET', 'HEAD'],
+				targetOriginId: originId,
+				forwardedValues: {
+					queryString: false,
+					cookies: {
+						forward: 'none',
+					}
+				},
+				viewerProtocolPolicy: 'redirect-to-https',
+				minTtl: 0,
+				defaultTtl: 3600,
+				maxTtl: 86400
+			},
+			restrictions: {
+				geoRestriction: {
+					restrictionType: 'none'
+				}
+			},
+			tags: {
+				...tags,
+				Name: cloudfrontName
+			},
+			viewerCertificate: {
+				cloudfrontDefaultCertificate: true
+			}
+		})
+	}
+
 	// Uploading content
 	if (content && content.dir) {
 		const [bucketName] = await resolve([bucket.bucket, bucket.urn])
@@ -104,7 +151,8 @@ const createBucket = async ({ name, acl:_acl, website:_website, versioning, tags
 		bucket.content = null
 
 	return {
-		bucket
+		bucket,
+		cloudfrontDistro
 	}
 }
 
