@@ -6,11 +6,14 @@ This source code is licensed under the proprietary license found in the
 LICENSE file in the root directory of this source tree. 
 */
 
-// Version: 0.0.2
+/*
+ APIs:
+ 	- image
+ */
 
-const aws = require('@pulumi/aws')
-const docker = require('@pulumi/docker')
-const { resolve } = require('../utils')
+import aws from '@pulumi/aws'
+import docker from '@pulumi/docker'
+import { resolve } from '../utils.js'
 
 
 /**
@@ -55,7 +58,7 @@ const { resolve } = require('../utils')
  *   	- ${repositoryUrl}:1234556 where '1234556' is the SHA of the image.
  *
  */
-const createImage = async ({ name, tag, publicConfig, dir, args, scanOnPush, imageTagMutable, extraOptions, lifecyclePolicies, tags }) => {
+export const image = async ({ name, tag, publicConfig, dir, args, scanOnPush, imageTagMutable, extraOptions, lifecyclePolicies, tags }) => {
 	if (!name)
 		throw new Error('Missing required argument \'name\'.')
 
@@ -210,9 +213,6 @@ const createRepo = ({ name, scanOnPush, imageTagMutable, publicConfig, tags }) =
 	}
 }
 
-module.exports = {
-	image: createImage
-}
 
 
 

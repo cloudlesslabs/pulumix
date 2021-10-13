@@ -131,8 +131,8 @@ const endpoint = yourStack.getOutput('aurora-endpoint')
 ## Project config
 
 ```js
-const pulumi = require('@pulumi/pulumi')
-const aws = require('@pulumi/aws')
+import pulumi from '@pulumi/pulumi'
+import aws from '@pulumi/aws'
 
 const ENV = pulumi.getStack()
 const PROJ = pulumi.getProject()
@@ -147,7 +147,7 @@ const ACCOUNT_ID = aws.config.allowedAccountIds[0]
 To know more about the issue this helper fixes, please refer to this document: https://gist.github.com/nicolasdao/830fc1d1b6ce86e0d8bebbdedb2f2626#the-outputt-type-the-pulumiinterpolate-and-apply-functions
 
 ```js
-const pulumi = require('@pulumi/pulumi')
+import pulumi from '@pulumi/pulumi'
 
 /**
  * Converts an Output<T> to a Promise<T>
@@ -155,7 +155,7 @@ const pulumi = require('@pulumi/pulumi')
  * @param  {Output<T>||[Output<T>]} 	resource
  * @return {Promise<T>||Promise<[T]>}
  */
-const resolve = resource => new Promise((next, fail) => {
+export const resolve = resource => new Promise((next, fail) => {
 	if (!resource)
 		next(resource)
 	try {
@@ -172,10 +172,6 @@ const resolve = resource => new Promise((next, fail) => {
 		fail(err)
 	}
 })
-
-module.exports = {
-	resolve
-}
 ```
 
 Use this helper as follow:
@@ -206,9 +202,9 @@ Please refer to the [Google Cloud Run](#cloud-run) example.
 The previous link shows how to pass environment variables to the container, which is the best practice when it comes to create flexible and reusable Docker images. It's also better from a security standpoint as you adding secrets in an image could lead to secrets leaking. However, there are scenarios where the image might have to be configured based on specific environment variables. The following code snippet demonstrates how to leverage the native `--build-arg` option in the `docker build` command to achieve that:
 
 ```js
-const pulumi = require('@pulumi/pulumi')
-const gcp = require('@pulumi/gcp')
-const docker = require('@pulumi/docker')
+import pulumi from '@pulumi/pulumi'
+import gcp from '@pulumi/gcp'
+import docker from '@pulumi/docker'
 
 const config = new pulumi.Config()
 
@@ -363,10 +359,11 @@ const createBucketsPolicy = new aws.iam.Policy(`create-bucket`, {
 In you Lambda code, you can know use the Automation API, or call Pulumi via the `child_process` (which is actually what the automation API does):
 
 ```js
-const { automationApi, aws:{ s3 } } = require('@cloudlesslabs/pulumix')
+import { up } from '@cloudlesslabs/pulumix/automation'
+import { bucket } from '@cloudlesslabs/pulumix/aws/s3'
 
 const main = async () => {
-	const [errors, result] = await automationApi.up({ 
+	const [errors, result] = await up({ 
 		project: 'my-project-name',
 		provider: {
 			name:'aws',
@@ -380,7 +377,7 @@ const main = async () => {
 			}
 		}, 
 		program: async () => {
-			const myBucket = await s3({
+			const myBucket = await bucket({
 				name:'my-unique-website-name',
 				website: {
 					indexDocument: 'index.html'
@@ -408,24 +405,15 @@ const main = async () => {
 
 ```
 
-console.log('RESULT')
-	console.log(result)
-	console.log('RESULT OUTPUTS')
-	console.log((result||{}).outputs)
-
-	// Clean Pulumi checkpoints
-	const workspace = ((result||{}).stack||{}).workspace||{}
-	const { pulumiHome, workDir } = workspace
-
 > IMPORTANT: The `provider.version` required and is tied to the Pulumi version you're using (`3.10.0` in this example). Configuring the wrong AWS version will throw an error similar to [no resource plugin 'aws-v4.17.0' found in the workspace or on your $PATH](#no-resource-plugin-aws-v4170-found-in-the-workspace-or-on-your-path). To know which AWS version to use, set one up, deploy, and check the error message.
 
 # AWS
 ## AppSync
 ### Default AppSync settings
 ```js
-const pulumi = require('@pulumi/pulumi')
-const { resolve } = require('@cloudlesslabs/pulumix')
-const appSync = require('./src/appSync')
+import pulumi from '@pulumi/pulumi'
+import { resolve } from '@cloudlesslabs/pulumix/utils'
+import { api, resolver } from '@cloudlesslabs/pulumix/aws/appsync'
 
 const ENV = pulumi.getStack()
 const PROJ = pulumi.getProject()
@@ -443,7 +431,7 @@ const main = async () => {
 
 	const productLambda = await resolve(productApi.lambda)
 
-	const graphql = await appSync.api({
+	const graphql = await api({
 		name: PROJECT, 
 		description: `Lineup ${ENV} GraphQL API`, 
 		schema:`
@@ -468,7 +456,7 @@ const main = async () => {
 		tags
 	})
 
-	const productResolver = await appSync.resolver({
+	const productResolver = await resolver({
 		name: `${PROJECT}-resolver-product`, 
 		api:{
 			id: graphql.api.id,
@@ -493,12 +481,12 @@ const main = async () => {
 	}
 }
 
-module.exports = main()
+exports = main()
 ```
 
 > NOTE: The sample above is similar to:
 ```js
-const graphql = await appSync.api({
+const graphql = await api({
 	// ...
 	authConfig: {
 		apiKey: true
@@ -511,7 +499,7 @@ const graphql = await appSync.api({
 Use the `authConfig` property. For example, Cognito:
 
 ```js
-const graphql = await appSync.api({
+const graphql = await api({
 	name: 'my-api', 
 	description: `My GraphQL API`, 
 	schema:`
@@ -600,7 +588,7 @@ const graphql = await appSync.api({
 > WARNING: Once the `masterUsername` is set, it cannot be changed. Attempting to change it will create a delete and replace operation, which is obvioulsy not what you may want. 
 
 ```js
-const { aws:{ rds:{ aurora } } } = require('@cloudlesslabs/pulumix')
+import { aurora } from '@cloudlesslabs/pulumix/aws/rds/aurora'
 
 const auroraOutput = aurora({
 	name: 'my-db', 
@@ -640,7 +628,8 @@ ingress:[
 ```
 
 ```js
-const { aws:{ ec2, rds:{ aurora } } } = require('@cloudlesslabs/pulumix')
+import { ec2 } from '@cloudlesslabs/pulumix/aws/ec2'
+import { aurora } from '@cloudlesslabs/pulumix/aws/rds/aurora'
 
 // Bastion server
 const ec2Name = `${PROJECT}-rds-bastion`
@@ -770,7 +759,7 @@ When the `iam` flag is not turned on, you must add the additional steps in your 
 ##### Using AWS Signer to create a DB password
 
 ```js
-const AWS = require('aws-sdk')
+import AWS from 'aws-sdk'
 
 const config = {
 	region: 'ap-southeast-2', 
@@ -791,7 +780,7 @@ signer.getAuthToken({ username:config.username }, (err, password) => {
 To integrate this signer with the `mysql2` package:
 
 ```js
-const mysql = require('mysql2/promise')
+import mysql from 'mysql2/promise'
 
 const db = mysql.createPool({
 	host: 'my-project.proxy-12345.ap-southeast-2.rds.amazonaws.com', // can also be an IP
@@ -814,7 +803,8 @@ const db = mysql.createPool({
 ##### Configure a `rds-db:connect` action on the IAM role
 
 ```js
-const { aws:{ lambda:{ lambda }, rds:{ policy: { createConnectPolicy } } } } = require('@cloudlesslabs/pulumix')
+import { lambda } from '@cloudlesslabs/pulumix/aws/lambda'
+import { createConnectPolicy } from '@cloudlesslabs/pulumix/aws/rds/utils'
 
 const rdsAccessPolicy = createConnectPolicy({ name:`my-project-access-rds`, rdsArn:proxy.arn })
 
@@ -863,7 +853,7 @@ The next sample shows how to provision an EC2 bastion host secured via SSM in a 
 Also, notice that we are passing the RSA public key to this instance. This will set up the RSA key for the `ec2-user` SSH user. The RSA private key is intended to be shared to any engineer that needs to establish a secured SSH tunnel between their local machine and this bastion host. Private RSA keys are usually not supposed to be shared lightly, but in this case, the security and accesses are managed by SSM, which relaxes the restrictions around sharing the RSA private key. For more details about SSH tunneling with SSM, please refer to this document: https://gist.github.com/nicolasdao/4808f0a1e5e50fdd29ede50d2e56024d#ssh-tunnel-to-private-rds-instances.
 
 ```js
-const { aws:{ ec2 } } = require('@cloudlesslabs/pulumix')
+import { ec2 } from '@cloudlesslabs/pulumix/aws/ec2'
 
 const EC2_SHELL = `#!/bin/bash
 set -ex
@@ -894,8 +884,8 @@ const ec2Output = ec2({
 ## ECR - Container Repository
 
 ```js
-const awsx = require('@pulumi/awsx')
-const path = require('path')
+import awsx from '@pulumi/awsx'
+import path from 'path'
 
 // ECR images. Doc:
 // 	- buildAndPushImage API: https://www.pulumi.com/docs/reference/pkg/nodejs/pulumi/awsx/ecr/#buildAndPushImage
@@ -918,9 +908,9 @@ The URL for this new image is inside the `image.imageValue` property.
 ## ECR
 
 ```js
-const { aws:{ ecr } } = require('@cloudlesslabs/pulumix')
+import { image } from '@cloudlesslabs/pulumix/aws/ecr'
 
-const myImage = await ecr.image({ 
+const myImage = await image({ 
 	name: 'my-image',
 	tag: 'v2',
 	dir: path.resolve('./app')
@@ -933,7 +923,7 @@ Where `myImage` is structured as follow:
 - `lifecyclePolicy`: Output object with the lifecycle policy.
 
 ```js
-const myImage = await ecr.image({ 
+const myImage = await image({ 
 	name: 'my-image',
 	tag: 'v3',
 	dir: path.resolve('./app'),
@@ -961,7 +951,7 @@ const myImage = await ecr.image({
 By default, repositories are private. To make them public, use:
 
 ```js
-const myImage = await ecr.image({ 
+const myImage = await image({ 
 	name: 'my-image',
 	tag: 'v3',
 	dir: path.resolve('./app'),
@@ -993,9 +983,12 @@ const myImage = await ecr.image({
 ## EFS
 ### Mounting an EFS access point on a Lambda
 ```js
-const pulumi = require('@pulumi/pulumi')
-const { aws:{ securityGroup, vpc, lambda:{ lambda }, efs } } = require('@cloudlesslabs/pulumix')
-const { resolve } = require('path')
+import pulumi from '@pulumi/pulumi'
+import { securityGroup } from '@cloudlesslabs/pulumix/aws/securitygroup'
+import { vpc } from '@cloudlesslabs/pulumix/aws/vpc'
+import { lambda } from '@cloudlesslabs/pulumix/aws/lambda'
+import { efs } from '@cloudlesslabs/pulumix/aws/efs'
+import { resolve } from 'path'
 
 const ENV = pulumi.getStack()
 const PROJ = pulumi.getProject()
@@ -1097,8 +1090,8 @@ As of 29 of September 2021, [ARM-based lambdas are powered by the AWS Graviton2 
 This is why `@cloudlesslabs/pulumix` uses the `arm64` architecture as default rather than `x86_64` (which is the normal AWS SDK and Pulumi default). This configuration can be changed via the `architecture` property:
 
 ```js
-const { resolve } = require('path')
-const { aws:{ lambda:{ lambda } } } = require('@cloudlesslabs/pulumix')
+import { resolve } from 'path'
+import { lambda } from '@cloudlesslabs/pulumix/aws/lambda'
 
 lambda({
 	name: 'my-lambda',
@@ -1115,8 +1108,8 @@ __WARNING__: If you're using Docker, you must make sure that the Docker image is
 ### Basic lambda
 
 ```js
-const { resolve } = require('path')
-const { aws:{ lambda:{ lambda } } } = require('@cloudlesslabs/pulumix')
+import { resolve } from 'path'
+import { lambda } from '@cloudlesslabs/pulumix/aws/lambda'
 
 lambda({
 	name: 'my-lambda',
@@ -1143,9 +1136,9 @@ lambda({
 ### API Gateway with explicit Lambda handlers
 
 ```js
-const pulumi = require('@pulumi/pulumi')
-const aws = require('@pulumi/aws')
-const awsx = require('@pulumi/awsx')
+import pulumi from '@pulumi/pulumi'
+import aws from '@pulumi/aws'
+import awsx from '@pulumi/awsx'
 
 const ENV = pulumi.getStack()
 const PROJ = pulumi.getProject()
@@ -1191,7 +1184,7 @@ app/
 Where `./index.js` is similar to:
 
 ```js
-const { doSomething } = require('./src')
+import { doSomething } from './src/index.js'
 
 exports.handler = async ev => {
 	const message = await doSomething()
@@ -1205,10 +1198,10 @@ exports.handler = async ev => {
 ```js
 // https://www.pulumi.com/docs/reference/pkg/aws/lambda/function/
 
-const pulumi = require('@pulumi/pulumi')
-const aws = require('@pulumi/aws')
-const { resolve } = require('path')
-const { aws:{ lambda:{ lambda } } } = require('@cloudlesslabs/pulumix')
+import pulumi from '@pulumi/pulumi'
+import aws from '@pulumi/aws'
+import { resolve } from 'path'
+import { lambda } from '@cloudlesslabs/pulumix/aws/lambda'
 
 const ENV = pulumi.getStack()
 const PROJ = pulumi.getProject()
@@ -1329,7 +1322,7 @@ const lambdaOutput = lambda({
 Use the `allowedPrincipals` property. The following example allows AWS Cognito to access the Lambda:
 
 ```js
-const { aws:{ lambda:{ lambda } } } = require('@cloudlesslabs/pulumix')
+import { lambda } from '@cloudlesslabs/pulumix/aws/lambda'
 
 lambda({
 	//...
@@ -1387,9 +1380,9 @@ __WARNING__: You must make sure that the Docker image is compatible with the cho
 	> More details about these commands below (2).
 2. Create your `index.js`:
 ```js
-const pulumi = require('@pulumi/pulumi')
-const { resolve } = require('path')
-const { aws:{ lambda:{ lambda } } } = require('@cloudlesslabs/pulumix')
+import pulumi from '@pulumi/pulumi'
+import { resolve } from 'path'
+import { lambda } from '@cloudlesslabs/pulumix/aws/lambda'
 
 const ENV = pulumi.getStack()
 const PROJ = pulumi.getProject()
@@ -1484,10 +1477,10 @@ For a refresher on how Lambda Layers work, please refer to this document: https:
 Pulumi file `index.js`:
 
 ```js
-const pulumi = require('@pulumi/pulumi')
-const aws = require('@pulumi/aws')
-const { resolve } = require('path')
-const { aws:{ lambda:{ lambda, layer } } } = require('@cloudlesslabs/pulumix')
+import pulumi from '@pulumi/pulumi'
+import aws from '@pulumi/aws'
+import { resolve } from 'path'
+import { lambda, layer } from '@cloudlesslabs/pulumix/aws/lambda'
 
 const ENV = pulumi.getStack()
 const PROJ = pulumi.getProject()
@@ -1612,10 +1605,11 @@ const cloudWatchPolicy = new aws.iam.Policy(PROJECT, {
 ### Creating a public bucket for hosting a static website
 
 ```js
-const { aws:{ s3 }, resolve } = require('@cloudlesslabs/pulumix')
+import { resolve } from '@cloudlesslabs/pulumix/utils'
+import { bucket } from '@cloudlesslabs/pulumix/aws/s3'
 
 const createBucket = async name => {
-	const { bucket } = await s3.bucket({
+	const { bucket:_bucket } = await bucket({
 		name,
 		website: { // When this property is set, the bucket is public. Otherwise, the bucket is private.
 			indexDocument: 'index.html'
@@ -1623,9 +1617,9 @@ const createBucket = async name => {
 	})
 
 	const [websiteEndpoint, bucketDomainName, bucketRegionalDomainName] = await resolve([
-		bucket.websiteEndpoint, 
-		bucket.bucketDomainName,
-		bucket.bucketRegionalDomainName])
+		_bucket.websiteEndpoint, 
+		_bucket.bucketDomainName,
+		_bucket.bucketRegionalDomainName])
 
 	console.log(`Website URL: ${websiteEndpoint}`)
 	console.log(`Bucket domain name: ${bucketDomainName}`) // e.g., 'bucketname.s3.amazonaws.com'
@@ -1654,9 +1648,10 @@ Because this array is stored in Pulumi, we can use this reference object to dete
 The following example syncs the files stored under the `./app/public` folder and excludes all files under the `node_modules` folder.
 
 ```js
-const pulumi = require('@pulumi/pulumi')
-const { resolve, aws: { s3 } } = require('@cloudlesslabs/pulumix')
-const { join } = require('path')
+import pulumi from '@pulumi/pulumi'
+import { resolve } from '@cloudlesslabs/pulumix/utils'
+import { bucket } from '@cloudlesslabs/pulumix/aws/s3'
+import { join } from 'path'
 
 const ENV = pulumi.getStack()
 const PROJ = pulumi.getProject()
@@ -1667,7 +1662,7 @@ const bucketOutput = thisStack.getOutput('bucket')
 const main = async () => {
 	const existingContent = (await resolve(bucketOutput.content)) || []
 	
-	const { bucket } = await s3.bucket({
+	const { bucket:_bucket } = await bucket({
 		name: PROJECT,
 		website: { // When this property is set, the bucket is public. Otherwise, the bucket is private.
 			indexDocument: 'index.html',
@@ -1681,7 +1676,7 @@ const main = async () => {
 	})
 
 	return {
-		bucket
+		bucket:_bucket
 	}
 }
 
@@ -1694,7 +1689,7 @@ module.exports = main()
 ### Getting stored secrets
 
 ```js
-const { aws:{ secret } } = require('@cloudlesslabs/pulumix')
+import { secret } from '@cloudlesslabs/pulumix/aws/secret'
 
 secret.get('my-secret-name').then(({ version, data }) => {
 	console.log(version)
@@ -1708,7 +1703,7 @@ secret.get('my-secret-name').then(({ version, data }) => {
 > `{  protocol: '-1',  fromPort:0, toPort:65535, cidrBlocks: ['0.0.0.0/0'],  ipv6CidrBlocks: ['::/0'],  description:'Allow all traffic' }`
 
 ```js
-const { aws:{ securityGroup } } = require('@cloudlesslabs/pulumix')
+import { securityGroup } from '@cloudlesslabs/pulumix/aws/securitygroup'
 
 const { securityGroup:mySecurityGroup, securityGroupRules:myRules } = await securityGroup({
 	name: `my-special-sg`, 
@@ -1758,8 +1753,8 @@ The last thing to be aware of is that the private subnets will also provision 3 
 ## Buckets
 
 ```js
-const pulumi = require('@pulumi/pulumi')
-const gcp = require('@pulumi/gcp')
+import pulumi from '@pulumi/pulumi'
+import gcp from '@pulumi/gcp'
 
 if (!process.env.PROJECT)
 	throw new Error('Missing required environment variable \'process.env.PROJECT\'')
@@ -1814,8 +1809,7 @@ module.exports = {
 ### Standard GCP services
 
 ```js
-require('@pulumi/pulumi')
-const gcp = require('@pulumi/gcp')
+import gcp from '@pulumi/gcp'
 
 if (!process.env.PROJECT)
 	throw new Error('Missing required environment variable \'process.env.PROJECT\'')
@@ -1850,7 +1844,7 @@ module.exports = {
 Firebase is kind of a weird service. In essence, it is part of the GCP suite, but from a brand perspective, it is a separate product. Though there are a few Firebase services(1) that can be enabled in a GCP project the way it was explained in the previous section, this is not the way to enable Firebase on a Google project. The correct Pulumi API is the following:
 
 ```js
-const gcp = require('@pulumi/gcp')
+import gcp from '@pulumi/gcp'
 
 const firebase = new gcp.firebase.Project('your-firebase-project-name', {
 	project: 'your-gcp-project-id'
@@ -1918,10 +1912,10 @@ To use this sample, make sure to:
 - Add your Cloud Run source-code under the `app` folder. It does not need any `cloudbuild.yaml` since the build is automated with Pulumi, but it still needs a `Dockerfile` as per usual. 
 
 ```js
-const pulumi = require('@pulumi/pulumi')
-const gcp = require('@pulumi/gcp')
-const docker = require('@pulumi/docker')
-const { git } = require('./utils')
+import pulumi from '@pulumi/pulumi'
+import gcp from '@pulumi/gcp'
+import docker from '@pulumi/docker'
+import { git } from './utils.js'
 
 // Validates that the environment variables are set up
 const ENV_VARS = [
@@ -2124,9 +2118,9 @@ module.exports = {
 There are no Pulumi APIs to list all the project's service accounts, but it is easy to call the official Google Cloud REST API to get that information. Convert that Promise into an `Output` with `pulumi.output` so you can use it with other resources.
 
 ```js
-const pulumi = require('@pulumi/pulumi')
-const gcp = require('@pulumi/gcp')
-const fetch = require('node-fetch')
+import pulumi from '@pulumi/pulumi'
+import gcp from '@pulumi/gcp'
+import fetch from 'node-fetch'
 
 /**
  * Selects service accounts in the current project. 

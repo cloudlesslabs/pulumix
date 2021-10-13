@@ -6,7 +6,13 @@ This source code is licensed under the proprietary license found in the
 LICENSE file in the root directory of this source tree. 
 */
 
-const aws = require('@pulumi/aws')
+/*
+ APIs:
+ 	- api
+ 	- resolver
+ */
+
+import aws from '@pulumi/aws'
 
 const DATA_SOURCE = { 
 	lambda: { 
@@ -63,7 +69,7 @@ const DATA_SOURCE = {
  * 		- openidConnectConfig: https://www.pulumi.com/docs/reference/pkg/aws/appsync/graphqlapi/#graphqlapiadditionalauthenticationprovideropenidconnectconfig
  * 		- userPoolConfig: https://www.pulumi.com/docs/reference/pkg/aws/appsync/graphqlapi/#graphqlapiadditionalauthenticationprovideruserpoolconfig 		
  */
-const createApi = async ({ name, description, schema, resolver, authConfig, cloudwatch, tags }) => {
+export const api = async ({ name, description, schema, resolver, authConfig, cloudwatch, tags }) => {
 	tags = tags || {}
 	const dependsOn = []
 	
@@ -176,7 +182,7 @@ const createApi = async ({ name, description, schema, resolver, authConfig, clou
  * @param  {Object} 		tags									
  * @return {[type]}                    [description]
  */
-const createResolver = async ({ api, name, field, type, functionArn, tableName, useCallerCredentials, region, httpEndpoint, openSearchEndpoint, mappingTemplate, tags }) => {
+export const resolver = async ({ api, name, field, type, functionArn, tableName, useCallerCredentials, region, httpEndpoint, openSearchEndpoint, mappingTemplate, tags }) => {
 	tags = tags || {}
 	const dataSource = getDataSource({ functionArn, tableName, useCallerCredentials, region, httpEndpoint, openSearchEndpoint })
 
@@ -221,7 +227,7 @@ const createResolver = async ({ api, name, field, type, functionArn, tableName, 
 
 	// AppSync resolver doc: https://www.pulumi.com/docs/reference/pkg/aws/appsync/resolver/
 	const requestResponseTemplate = getRequestResponseTemplate(dataSource.type, mappingTemplate)
-	const resolver = new aws.appsync.Resolver(name, {
+	const _resolver = new aws.appsync.Resolver(name, {
 		apiId: api.id,
 		name: name,
 		field: field,
@@ -231,7 +237,7 @@ const createResolver = async ({ api, name, field, type, functionArn, tableName, 
 	})
 
 	return {
-		resolver: leanify(resolver),
+		resolver: leanify(_resolver),
 		dataSource: leanify(_dataSource)
 	}
 }
@@ -512,10 +518,6 @@ const getDataSource = ({ functionArn, tableName, useCallerCredentials, region, h
 		return null
 }
 
-module.exports = {
-	api: createApi,
-	resolver: createResolver
-}
 
 
 

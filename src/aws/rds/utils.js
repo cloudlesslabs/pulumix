@@ -6,7 +6,13 @@ This source code is licensed under the proprietary license found in the
 LICENSE file in the root directory of this source tree. 
 */
 
-const aws = require('@pulumi/aws')
+/*
+ APIs:
+	- getUserDbArn
+	- createConnectPolicy
+ */
+
+import aws from '@pulumi/aws'
 
 /**
  * Creates a new database user account arn based on an RDS's arn (RDS instance, RDS proxy or RDS Cluster).
@@ -22,7 +28,7 @@ const aws = require('@pulumi/aws')
  * 'rdsArn' is an RDS proxy. For all the other RDS resources (clusters and instances), the 'resourceId' is required. For 
  * an Aurora cluster, this resource is called 'clusterResourceId', while for an instance, it is 'dbiResourceId'.
  */
-const getUserDbArn = ({ rdsArn, resourceId, username }) => {
+export const getUserDbArn = ({ rdsArn, resourceId, username }) => {
 	const [,,,region,account,,resourceName] = rdsArn.split(':')
 	return `arn:aws:rds-db:${region}:${account}:dbuser:${resourceId||resourceName}/${username||'*'}`
 }
@@ -37,7 +43,7 @@ const getUserDbArn = ({ rdsArn, resourceId, username }) => {
  * 
  * @return {Output<Policy>}	policy	
  */
-const createConnectPolicy = ({ name, rdsArn, resourceId, username }) => {
+export const createConnectPolicy = ({ name, rdsArn, resourceId, username }) => {
 	const userArn = getUserDbArn({ rdsArn, resourceId, username })
 	// IAM policy doc: https://www.pulumi.com/docs/reference/pkg/aws/iam/policy/
 	const executeRdsQueriesPolicy = new aws.iam.Policy(name, {
@@ -57,14 +63,6 @@ const createConnectPolicy = ({ name, rdsArn, resourceId, username }) => {
 	})
 
 	return executeRdsQueriesPolicy
-}
-
-module.exports = {
-	aurora: require('./aurora'),
-	getUserDbArn,
-	policy: {
-		createConnectPolicy
-	}
 }
 
 

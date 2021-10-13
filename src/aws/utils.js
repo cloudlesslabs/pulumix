@@ -6,9 +6,12 @@ This source code is licensed under the proprietary license found in the
 LICENSE file in the root directory of this source tree. 
 */
 
-// Version: 0.0.5
+/*
+ APIs:
+ 	- getDBcreds
+ */
 
-const aws = require('@pulumi/aws')
+import aws from '@pulumi/aws'
 
 /**
  * Gets the DB creds stored in AWS Secrets Manager
@@ -19,7 +22,7 @@ const aws = require('@pulumi/aws')
  * @return {String}		output.creds.username
  * @return {String}		output.creds.password
  */
-const getDBcreds = async secretId => {
+export const getDBcreds = async secretId => {
 	if (!secretId)
 		return null
 
@@ -51,6 +54,3 @@ const getDBcreds = async secretId => {
 	}
 }
 
-module.exports = {
-	getDBcreds
-}

@@ -6,12 +6,15 @@ This source code is licensed under the proprietary license found in the
 LICENSE file in the root directory of this source tree. 
 */
 
-// Version: 0.0.1
+/*
+ APIs:
+ 	- bucket
+ */
 
-const aws = require('@pulumi/aws')
-const { resolve } = require('../../utils')
-const { getWebsiteProps, syncFiles } = require('./utils')
-const { error: { mergeErrors } } = require('puffy')
+import aws from '@pulumi/aws'
+import { resolve } from '../../utils.js'
+import { getWebsiteProps, syncFiles } from './utils.js'
+import { mergeErrors } from 'puffy-core/error'
 
 /**
  * Creates an S3 bucket. Doc: https://www.pulumi.com/docs/reference/pkg/aws/s3/bucket/
@@ -49,7 +52,7 @@ const { error: { mergeErrors } } = require('puffy')
  */
 // (1) For example, to ignore the content under the node_modules folder: '**/node_modules/**'
 // 
-const createBucket = async ({ name, acl:_acl, website:_website, versioning, tags }) => {
+export const bucket = async ({ name, acl:_acl, website:_website, versioning, tags }) => {
 	if (!name)
 		throw new Error('Missing required argument \'name\'.')
 	if (_website && !_website.indexDocument && !_website.redirectAllRequestsTo) 
@@ -71,7 +74,7 @@ const createBucket = async ({ name, acl:_acl, website:_website, versioning, tags
 	})
 
 	// S3 bucket doc: https://www.pulumi.com/docs/reference/pkg/aws/s3/bucket/
-	const bucket = new aws.s3.Bucket(name, {
+	const _bucket = new aws.s3.Bucket(name, {
 		bucket: name,
 		acl,
 		website,
@@ -86,7 +89,7 @@ const createBucket = async ({ name, acl:_acl, website:_website, versioning, tags
 
 	// Uploading content
 	if (content && content.dir) {
-		const [bucketName] = await resolve([bucket.bucket, bucket.urn])
+		const [bucketName] = await resolve([_bucket.bucket, _bucket.urn])
 
 		const [errors, files] = await syncFiles({ 
 			bucket: bucketName, 
@@ -99,17 +102,13 @@ const createBucket = async ({ name, acl:_acl, website:_website, versioning, tags
 		if (errors)
 			throw mergeErrors(errors)
 
-		bucket.content = (files||[]).map(file => ({ key:file.key, hash:file.hash }))
+		_bucket.content = (files||[]).map(file => ({ key:file.key, hash:file.hash }))
 	} else
-		bucket.content = null
+		_bucket.content = null
 
 	return {
-		bucket
+		bucket:_bucket
 	}
-}
-
-module.exports = {
-	bucket: createBucket
 }
 
 

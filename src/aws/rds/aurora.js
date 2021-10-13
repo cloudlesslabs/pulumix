@@ -6,14 +6,18 @@ This source code is licensed under the proprietary license found in the
 LICENSE file in the root directory of this source tree. 
 */
 
+/*
+ APIs:
+ 	- aurora
+ */
+
 // Version: 0.0.8
 // Full Pulumi AWS RDS API doc at https://www.pulumi.com/docs/reference/pkg/aws/rds/
 
-require('@pulumi/pulumi')
-const aws = require('@pulumi/aws')
-const securityGroup = require('../securityGroup')
-const { getDBcreds } = require('../utils')
-const { resolve } = require('../../utils')
+import aws from '@pulumi/aws'
+import { securityGroup } from '../securityGroup.js'
+import { getDBcreds } from '../utils.js'
+import { resolve } from '../../utils.js'
 
 /**
  * Create an AWS Aurora cluster. Doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/cluster/
@@ -82,7 +86,7 @@ const { resolve } = require('../../utils')
  * @return {Output<TargetGroup>}         output.proxy.targetGroup
  * @return {Output<Target>}              output.proxy.target	
  */
-const createAurora = async ({ 
+export const aurora = async ({ 
 	name, 
 	engine,
 	engineVersion,
@@ -430,7 +434,6 @@ const createSecurityGroups = async (clusterName, dbPort, vpcId, ingress, options
 	]
 }
 
-module.exports = createAurora
 
 
 

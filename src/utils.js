@@ -6,11 +6,19 @@ This source code is licensed under the proprietary license found in the
 LICENSE file in the root directory of this source tree. 
 */
 
-const pulumi = require('@pulumi/pulumi')
-const { join } = require('path')
-const fg = require('fast-glob')
-const fs = require('fs')
-const { error:{ catchErrors } } = require('puffy')
+/* APIs:
+	- resolve
+	- fileList
+	- fileRemove
+	- fileRead
+}
+ */
+
+import pulumi from '@pulumi/pulumi'
+import { join } from 'path'
+import fg from 'fast-glob'
+import fs from 'fs'
+import { catchErrors } from 'puffy-core/error'
 
 /**
  * Converts an Output<T> to a Promise<T>
@@ -18,7 +26,7 @@ const { error:{ catchErrors } } = require('puffy')
  * @param  {Output<T>||[Output<T>]}     resource
  * @return {Promise<T>||Promise<[T]>}
  */
-const resolve = resource => new Promise((next, fail) => {
+export const resolve = resource => new Promise((next, fail) => {
 	if (!resource)
 		next(resource)
 	try {
@@ -49,7 +57,7 @@ const resolve = resource => new Promise((next, fail) => {
 // @return {[String]}         						If a channel is passed via 'options.channel', than the output is null and 
 // 													the files are streamed to that channel.
 //
-const listFiles = async (folderPath, options={}) => {
+export const fileList = async (folderPath, options={}) => {
 	const pattern = options.pattern || '*.*'
 	const ignore = options.ignore
 	const patterns = (typeof(pattern) == 'string' ? [pattern] : pattern).map(p => join(folderPath, p))
@@ -64,7 +72,7 @@ const listFiles = async (folderPath, options={}) => {
  * @param  {String}  filePath 	Absolute file path on the local machine
  * @return {Void}
  */
-const deleteFile = filePath => catchErrors(new Promise((onSuccess, onFailure) => fs.unlink(filePath||'', err => err ? onFailure(err) : onSuccess())))
+export const fileRemove = filePath => catchErrors(new Promise((onSuccess, onFailure) => fs.unlink(filePath||'', err => err ? onFailure(err) : onSuccess())))
 
 /**
  * Gets a file under a Google Cloud Storage's 'filePath'.
@@ -72,13 +80,5 @@ const deleteFile = filePath => catchErrors(new Promise((onSuccess, onFailure) =>
  * @param  {String}  filePath 	Absolute file path on the local machine
  * @return {Buffer}
  */
-const readFile = filePath => catchErrors(new Promise((onSuccess, onFailure) => fs.readFile(filePath||'', (err, data) => err ? onFailure(err) : onSuccess(data))))
+export const fileRead = filePath => catchErrors(new Promise((onSuccess, onFailure) => fs.readFile(filePath||'', (err, data) => err ? onFailure(err) : onSuccess(data))))
 
-module.exports = {
-	resolve,
-	files: {
-		list: listFiles,
-		remove: deleteFile,
-		read: readFile
-	}
-}

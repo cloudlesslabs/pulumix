@@ -6,10 +6,15 @@ This source code is licensed under the proprietary license found in the
 LICENSE file in the root directory of this source tree. 
 */
 
+/*
+ APIs:
+ 	- ec2
+ */
+
 // Version: 0.0.3
 // Doc: https://www.pulumi.com/docs/reference/pkg/aws/ec2/instance/
 
-const aws = require('@pulumi/aws')
+import aws from '@pulumi/aws'
 
 /**
  * Creates a new EC2. Doc: https://www.pulumi.com/docs/reference/pkg/aws/ec2/instance/
@@ -49,7 +54,7 @@ const aws = require('@pulumi/aws')
  * @return {Output<[String]>} ec2.keyPair.name
  * @return {Output<[String]>} ec2.keyPair.keyPairId
  */
-const createEC2 = async ({ name, ami, instanceType, availabilityZone, subnetId, vpcSecurityGroupIds, userData, userDataBase64, publicKey, ssm, tags }) => {
+export const ec2 = async ({ name, ami, instanceType, availabilityZone, subnetId, vpcSecurityGroupIds, userData, userDataBase64, publicKey, ssm, tags }) => {
 	if (!name)
 		throw new Error('Missing required \'name\' argument.')
 	if (ssm) {
@@ -164,7 +169,6 @@ const createEC2 = async ({ name, ami, instanceType, availabilityZone, subnetId, 
 	}
 }
 
-module.exports = createEC2
 
 
 

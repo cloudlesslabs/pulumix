@@ -6,10 +6,13 @@ This source code is licensed under the proprietary license found in the
 LICENSE file in the root directory of this source tree. 
 */
 
-// Version: 0.0.6
+/*
+ APIs:
+ 	- stepFunction
+ */
 
-const aws = require('@pulumi/aws')
-const { resolve } = require('../utils')
+import aws from '@pulumi/aws'
+import { resolve } from '../utils.js'
 
 const VALID_CLOUDWATCH_LEVELS = ['ALL', 'ERROR', 'FATAL']
 
@@ -50,7 +53,7 @@ const VALID_CLOUDWATCH_LEVELS = ['ALL', 'ERROR', 'FATAL']
  * @param  {Object} 		   tags						
  * @return {String}						
  */
-const createStepFunction = async ({ name, description, type, states, policies, cloudWatchLevel, logsRetentionInDays, tags }) => {
+export const stepFunction = async ({ name, description, type, states, policies, cloudWatchLevel, logsRetentionInDays, tags }) => {
 	
 	if (!name)
 		throw new Error('Missing required argument \'name\'.')
@@ -144,7 +147,7 @@ const createStepFunction = async ({ name, description, type, states, policies, c
 	}
 
 	// Step function. Doc: https://www.pulumi.com/docs/reference/pkg/aws/sfn/statemachine/
-	const stepFunction = new aws.sfn.StateMachine(name, {
+	const _stepFunction = new aws.sfn.StateMachine(name, {
 		name,
 		roleArn: stepFuncRole.arn,
 		type: (type||'').trim().toLowerCase() == 'express' ? 'EXPRESS' : 'STANDARD',
@@ -162,7 +165,7 @@ const createStepFunction = async ({ name, description, type, states, policies, c
 	})
 
 	return {
-		...leanifyStepFunction(stepFunction),
+		...leanifyStepFunction(_stepFunction),
 		logGroup: leanify(logGroup)
 	}
 }
@@ -179,7 +182,6 @@ const leanifyStepFunction = resource => {
 	return { id, name, type, arn, creationDate, roleArn, status, tracingConfiguration, loggingConfiguration }
 }
 
-module.exports = createStepFunction
 
 
 

@@ -12,8 +12,8 @@ LICENSE file in the root directory of this source tree.
 // https://aws.amazon.com/developers/getting-started/nodejs/
 
 // Load the AWS SDK
-var AWS = require('aws-sdk'),
-	region = 'ap-southeast-2',
+import AWS from 'aws-sdk'
+var region = 'ap-southeast-2',
 	secretName = 'lineup-db-creds-dev',
 	secret,
 	decodedBinarySecret

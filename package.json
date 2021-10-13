@@ -2,7 +2,25 @@
   "name": "@cloudlesslabs/pulumix",
   "version": "0.6.1",
   "description": "NodeJS Pulumi helpers.",
-  "main": "src/index.js",
+  "type": "module",
+  "exports": {
+    "./aws/appsync": "./src/aws/appSync.js",
+    "./aws/ec2": "./src/aws/ec2.js",
+    "./aws/ecr": "./src/aws/ecr.js",
+    "./aws/efs": "./src/aws/efs.js",
+    "./aws/lambda": "./src/aws/lambda.js",
+    "./aws/rds/aurora": "./src/aws/rds/aurora.js",
+    "./aws/rds/utils": "./src/aws/rds/utils.js",
+    "./aws/s3": "./src/aws/s3/index.js",
+    "./aws/secret": "./src/aws/secret.js",
+    "./aws/securitygroup": "./src/aws/securityGroup.js",
+    "./aws/stepfunction": "./src/aws/stepFunction.js",
+    "./aws/vpc": "./src/aws/vpc.js",
+    "./aws/secret": "./src/aws/secret.js",
+    "./automation": "./src/automationApi.js",
+    "./utils": "./src/utils.js",
+    ".package.json": ".package.json"
+  },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com/"
   },
@@ -38,6 +56,6 @@
     "core-async": "^2.0.5",
     "fast-glob": "^3.2.7",
     "mime-types": "^2.1.33",
-    "puffy": "^1.7.0"
+    "puffy-core": "^0.1.1"
   }
 }

@@ -6,10 +6,13 @@ This source code is licensed under the proprietary license found in the
 LICENSE file in the root directory of this source tree. 
 */
 
-// Version: 0.0.5
+/*
+ APIs:
+     - vpc
+ */
 
-const awsx = require('@pulumi/awsx')
-const { resolve } = require('../utils')
+import awsx from '@pulumi/awsx'
+import { resolve } from '../utils.js'
 
 /**
  * Creates a new VPC. Doc: https://www.pulumi.com/docs/reference/pkg/nodejs/pulumi/awsx/ec2/
@@ -55,11 +58,11 @@ const { resolve } = require('../utils')
  * (2) 'numberOfNatGateways' is only configurable if there is at least one public subnet. In that case, the default value is 
  * equal to 'numberOfAvailabilityZones'.  
  */
-const createVPC = async ({ name, cidrBlock, subnets, numberOfAvailabilityZones, numberOfNatGateways, protect, tags }) => {
+export const vpc = async ({ name, cidrBlock, subnets, numberOfAvailabilityZones, numberOfNatGateways, protect, tags }) => {
 	tags = tags || {}
 
 	// VPC doc: https://www.pulumi.com/docs/reference/pkg/nodejs/pulumi/awsx/ec2/
-	const vpc = new awsx.ec2.Vpc(name, { 
+	const _vpc = new awsx.ec2.Vpc(name, { 
 		cidrBlock,
 		subnets,
 		numberOfAvailabilityZones: numberOfAvailabilityZones ? numberOfAvailabilityZones*1 : undefined,
@@ -70,23 +73,23 @@ const createVPC = async ({ name, cidrBlock, subnets, numberOfAvailabilityZones, 
 		}
 	}, { protect })
 
-	const subnetsDetails = await getSubnets(vpc)
+	const subnetsDetails = await getSubnets(_vpc)
 	const availabilityZones = await getAvailabilityZones(subnetsDetails)
-	const natGateways = await getNatGateways(vpc.natGateways, subnetsDetails)
-	const publicSubnetIds = await resolve(vpc.publicSubnetIds)
-	const privateSubnetIds = await resolve(vpc.privateSubnetIds)
-	const isolatedSubnetIds = await resolve(vpc.isolatedSubnetIds)
+	const natGateways = await getNatGateways(_vpc.natGateways, subnetsDetails)
+	const publicSubnetIds = await resolve(_vpc.publicSubnetIds)
+	const privateSubnetIds = await resolve(_vpc.privateSubnetIds)
+	const isolatedSubnetIds = await resolve(_vpc.isolatedSubnetIds)
 
 	return {
-		id: vpc.id,
-		arn: vpc.vpc.arn,
-		cidrBlock: vpc.vpc.cidrBlock,
-		ipv6CidrBlock: vpc.vpc.ipv6CidrBlock,
-		defaultNetworkAclId: vpc.vpc.defaultNetworkAclId,
-		defaultRouteTableId: vpc.vpc.defaultRouteTableId,
-		defaultSecurityGroupId: vpc.vpc.defaultSecurityGroupId,
-		dhcpOptionsId: vpc.vpc.dhcpOptionsId,
-		mainRouteTableId: vpc.vpc.mainRouteTableId,
+		id: _vpc.id,
+		arn: _vpc.vpc.arn,
+		cidrBlock: _vpc.vpc.cidrBlock,
+		ipv6CidrBlock: _vpc.vpc.ipv6CidrBlock,
+		defaultNetworkAclId: _vpc.vpc.defaultNetworkAclId,
+		defaultRouteTableId: _vpc.vpc.defaultRouteTableId,
+		defaultSecurityGroupId: _vpc.vpc.defaultSecurityGroupId,
+		dhcpOptionsId: _vpc.vpc.dhcpOptionsId,
+		mainRouteTableId: _vpc.vpc.mainRouteTableId,
 		publicSubnetIds,
 		privateSubnetIds,
 		isolatedSubnetIds,
@@ -190,7 +193,6 @@ const getAvailabilityZones = async subnets => {
 	return azs
 }
 
-module.exports = createVPC
 
 
 

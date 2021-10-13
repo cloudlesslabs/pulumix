@@ -6,11 +6,14 @@ This source code is licensed under the proprietary license found in the
 LICENSE file in the root directory of this source tree. 
 */
 
-// Version: 0.0.8
+/*
+ APIs:
+ 	- efs
+ */
 
-const aws = require('@pulumi/aws')
-const { resolve } = require('../utils')
-const securityGroup = require('./securityGroup')
+import aws from '@pulumi/aws'
+import { resolve } from '../utils.js'
+import { securityGroup } from './securityGroup.js'
 
 /**
  * Creates an EFS file system and an access point. 
@@ -49,7 +52,7 @@ const securityGroup = require('./securityGroup')
  * @return {[Output<Target>]} efs.targets												Mount targets (one per subnet)
  * @return {[Output<SG>]}     efs.securityGroup											EFS security group contaning the 'ingress' rules.
  */
-const createEFS = async ({ name, vpcId, subnetIds:_subnetIds, securityGroups, accessPointDir, ingress, performanceMode, encrypted, protect, tags }) => {
+export const efs = async ({ name, vpcId, subnetIds:_subnetIds, securityGroups, accessPointDir, ingress, performanceMode, encrypted, protect, tags }) => {
 	if (!name)
 		throw new Error('Missing required argument \'name\'.')
 	if (!_subnetIds)
@@ -136,4 +139,3 @@ const leanify = resource => {
 	return rest
 }
 
-module.exports = createEFS

@@ -6,7 +6,11 @@ This source code is licensed under the proprietary license found in the
 LICENSE file in the root directory of this source tree. 
 */
 
-// Version: 0.0.2
+/*
+ APIs:
+ 	- secret
+ 	- getSecret
+ */
 
 /*
  * To create a secret with AWS secrets manager, you need to:
@@ -15,8 +19,7 @@ LICENSE file in the root directory of this source tree.
  * 		3. (Optionally) Create a rotation lambda to rotate the secret value: https://www.pulumi.com/docs/reference/pkg/aws/secretsmanager/secretrotation/
  */
 
-require('@pulumi/pulumi')
-const aws = require('@pulumi/aws')
+import aws from '@pulumi/aws'
 
 /**
  * Create a upload a secret to AWS secrets manager. 
@@ -36,7 +39,7 @@ const aws = require('@pulumi/aws')
  * @return {Output<secretVersion>} 	output.secretVersion
  * @return {Output<SecretRotation>} output.rotation			
  */
-const createSecret = async ({ name, value, rotation, tags:_tags }) => {
+export const secret = async ({ name, value, rotation, tags:_tags }) => {
 	if (!name)
 		throw new Error('Missing required \'name\' argument.')
 
@@ -96,7 +99,7 @@ const serializeValue = value => {
  * @return {Version}	output.version
  * @return {Object}		output.data
  */
-const getSecret = async secretId => {
+export const getSecret = async secretId => {
 	if (!secretId)
 		return null
 
@@ -123,9 +126,6 @@ const getSecret = async secretId => {
 	}
 }
 
-module.exports = {
-	create: createSecret,
-	get: getSecret
-}
+
 
 

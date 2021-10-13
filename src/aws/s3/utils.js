@@ -6,16 +6,25 @@ This source code is licensed under the proprietary license found in the
 LICENSE file in the root directory of this source tree. 
 */
 
-const fs = require('fs')
-const fg = require('fast-glob')
-const { join, extname, sep, posix } = require('path')
-const { createHash } = require('crypto')
-const { utils: { throttle } } = require('core-async')
-const mime = require('mime-types')
-const { error:{ catchErrors, wrapErrors } } = require('puffy')
-const AWS = require('aws-sdk')
-const s3 = new AWS.S3({ apiVersion: '2006-03-01', computeChecksums: true })
+/*
+ APIs:
+ 	- getWebsiteProps
+	- uploadFiles
+	- syncFiles
+}
+ */
 
+import fs from 'fs'
+import fg from 'fast-glob'
+import { join, extname, sep, posix } from 'path'
+import { createHash } from 'crypto'
+import coreAsync from 'core-async'
+import mime from 'mime-types'
+import { catchErrors, wrapErrors } from 'puffy-core/error'
+import AWS from 'aws-sdk'
+
+const s3 = new AWS.S3({ apiVersion: '2006-03-01', computeChecksums: true })
+const { utils: { throttle } } = coreAsync
 
 /**
  * Syncs files with an S3 bucket. Doc: 
@@ -53,7 +62,7 @@ const s3 = new AWS.S3({ apiVersion: '2006-03-01', computeChecksums: true })
  */
 // (1) For example, to ignore the content under the node_modules folder: '**/node_modules/**'
 // 
-const syncFiles = ({ bucket, files, dir, ignore, existingObjects, remove, noWarning }) => catchErrors((async () => {
+export const syncFiles = ({ bucket, files, dir, ignore, existingObjects, remove, noWarning }) => catchErrors((async () => {
 	const errMsg = `Failed to sync files with S3 bucket '${bucket}'`
 	existingObjects = existingObjects || []
 
@@ -133,7 +142,7 @@ const syncFiles = ({ bucket, files, dir, ignore, existingObjects, remove, noWarn
  */
 // (1) For example, to ignore the content under the node_modules folder: '**/node_modules/**'
 // 
-const uploadFiles = ({ bucket, files, dir, ignore, ignoreObjects, noWarning }) => catchErrors((async () => {
+export const uploadFiles = ({ bucket, files, dir, ignore, ignoreObjects, noWarning }) => catchErrors((async () => {
 	const errMsg = `Failed to upload files to S3 bucket '${bucket}'`
 	ignoreObjects = ignoreObjects || []
 
@@ -451,7 +460,7 @@ const bucketExists = async bucket => {
  * @return {[Object]} output.corsRules			
  * @return {Object}   output.content	
  */
-const getWebsiteProps = website => {
+export const getWebsiteProps = website => {
 	if (!website)
 		return {}
 
@@ -470,11 +479,5 @@ const getWebsiteProps = website => {
 	}
 }
 
-
-module.exports = {
-	getWebsiteProps,
-	uploadFiles,
-	syncFiles
-}
 
 

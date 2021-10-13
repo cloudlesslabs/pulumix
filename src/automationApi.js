@@ -1,15 +1,30 @@
-// Version: 0.0.3
+/*
+Copyright (c) 2019-2021, Cloudless Consulting Lty Ltd
+All rights reserved.
 
-const util = require('util')
-const { join } = require('path')
-const cp = require('child_process')
-const { LocalWorkspace } = require('@pulumi/pulumi/automation')
-const { error:{ catchErrors, wrapErrors }, promise:{ delay } } = require('puffy')
-const { files } = require('./utils')
+This source code is licensed under the proprietary license found in the
+LICENSE file in the root directory of this source tree. 
+*/
+
+/*
+ APIs:
+ 	- up
+ 	- login
+ 	- getLocalFiles
+ 	- cleanLocalFiles
+ */
+
+import util from 'util'
+import { join } from 'path'
+import cp from 'child_process'
+import { LocalWorkspace } from '@pulumi/pulumi/automation/index.js'
+import { catchErrors, wrapErrors } from 'puffy-core/error'
+import { delay } from 'puffy-core/time'
+import { fileList, fileRemove } from './utils.js'
 
 const exec = util.promisify(cp.exec)
 
-const login = options => catchErrors((async () => {
+export const login = options => catchErrors((async () => {
 	const { homeDir } = options || {}
 	const loginCmd = `pulumi login file://${homeDir||'/tmp/'}`
 	const errMsg = `Command '${loginCmd}' failed.`
@@ -30,13 +45,6 @@ const login = options => catchErrors((async () => {
 	}
 })())
 
-/*
-Copyright (c) 2019-2021, Cloudless Consulting Lty Ltd
-All rights reserved.
-
-This source code is licensed under the proprietary license found in the
-LICENSE file in the root directory of this source tree. 
-*/
 
 /**
  * Executes `pulumi up`
@@ -60,7 +68,7 @@ LICENSE file in the root directory of this source tree.
  *
  * (1) Example: { 'aws:region': 'ap-southeast-2', 'aws:allowedAccountIds':[196799624576] }
  */
-const pulumiUp = ({ stack:_stack, project, program, provider, onOutput:_onOutput }) => catchErrors((async () => {
+export const up = ({ stack:_stack, project, program, provider, onOutput:_onOutput }) => catchErrors((async () => {
 	const errMsg = `Command 'pulumi up --stack ${(_stack||{}).name}' failed.`
 
 	if (!_stack)
@@ -166,7 +174,7 @@ const getFilterFn = filter => {
  * 
  * @return {[String]}		filesDeleted		
  */
-const cleanLocalFiles = (pulumiHome, options) => catchErrors((async() => {
+export const cleanLocalFiles = (pulumiHome, options) => catchErrors((async() => {
 	const errMsg = 'Failed to clean Pulumi\'s local files'
 	const [pulumiFilesErrors, pulumiFiles] = await getLocalFiles(pulumiHome, { ignore: ['**/plugins/**', 'credentials.json'] })
 	if (pulumiFilesErrors)
@@ -181,7 +189,7 @@ const cleanLocalFiles = (pulumiHome, options) => catchErrors((async() => {
 	// Deletes those files
 	for (let i=0;i<count;i++) {
 		const file = targetList[i]
-		const [deleteErrors] = await files.remove(file)
+		const [deleteErrors] = await fileRemove(file)
 		if (deleteErrors)
 			throw wrapErrors(`Failed to delete file '${file}'`, deleteErrors)
 	}
@@ -197,30 +205,22 @@ const cleanLocalFiles = (pulumiHome, options) => catchErrors((async() => {
  * 
  * @return {[String]} pulumiFiles
  */
-const getLocalFiles = (pulumiHome, options) => catchErrors((async() => {
+export const getLocalFiles = (pulumiHome, options) => catchErrors((async() => {
 	const errMsg = 'Failed to get the Pulumi local files'
 	if (!pulumiHome)
 		throw wrapErrors(errMsg, [new Error('Missing required argument \'pulumiHome\'.')])
 
-	const [filesErrors, pulumiFiles] = await files.list(pulumiHome, { ...(options||{}), pattern:'**/*.*' })
+	const [filesErrors, pulumiFiles] = await fileList(pulumiHome, { ...(options||{}), pattern:'**/*.*' })
 	if (filesErrors)
 		throw wrapErrors(errMsg, filesErrors)
 
 	const checkpointsFolder = join(pulumiHome,'.pulumi')
-	const [checkpointErrors, checkpointFiles] = await files.list(checkpointsFolder, { pattern:'**/*.*' })
+	const [checkpointErrors, checkpointFiles] = await fileList(checkpointsFolder, { pattern:'**/*.*' })
 	if (checkpointErrors)
 		throw wrapErrors(errMsg, checkpointErrors)
 
 	return [...(pulumiFiles||[]), ...(checkpointFiles||[])]
 })())
 
-module.exports = {
-	up: pulumiUp,
-	login,
-	local: {
-		getFiles: getLocalFiles,
-		cleanFiles: cleanLocalFiles
-	}
-}
 
 
