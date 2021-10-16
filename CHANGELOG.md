@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.2.0](https://github.com/cloudlesslabs/pulumix/compare/v1.1.1...v1.2.0) (2021-10-16)
+
+
+### Features
+
+* Add support for invalidating a cloudfront distribution upon S3 content changes ([040a343](https://github.com/cloudlesslabs/pulumix/commit/040a343c8a766002c85d5b6189cabf585560ee71))
+
 ### [1.1.1](https://github.com/cloudlesslabs/pulumix/compare/v1.1.0...v1.1.1) (2021-10-13)
 
 ## [1.1.0](https://github.com/cloudlesslabs/pulumix/compare/v1.0.1...v1.1.0) (2021-10-13)
