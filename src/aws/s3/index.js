@@ -9,9 +9,10 @@ LICENSE file in the root directory of this source tree.
 // Version: 0.0.1
 
 const aws = require('@pulumi/aws')
+const { error: { mergeErrors } } = require('puffy')
 const { resolve } = require('../../utils')
 const { getWebsiteProps, syncFiles } = require('./utils')
-const { error: { mergeErrors } } = require('puffy')
+const { distribution: { invalidate:invalidateDistribution, exists:distributionExists } } = require('../cloudfront/utils')
 
 /**
  * Creates an S3 bucket. Doc: https://www.pulumi.com/docs/reference/pkg/aws/s3/bucket/
@@ -36,18 +37,20 @@ const { error: { mergeErrors } } = require('puffy')
  * @param  {Object}					.cloudfront
  * @param  {[String]}					.customDomains			e.g., ['www.example.com', 'example.com']
  * @param  {[String]}					.allowedMethods			Default ['GET', 'HEAD', 'OPTIONS']
+ * @param  {Boolean}					.invalidateOnUpdate		Default false. True means that if 'website.content' is set and content updates are detected, then the distribution must be invalidated/
  * @param  {Boolean}			versioning						Default false.		
  * @param  {String}				tags				
  * 
  * @return {Output<Bucket>}		output.bucket
  * @return {Output<String>}			.websiteEndpoint			Unfriendly AWS URL where the S3 website can be accessed (only set when the 'website' property is set).
  * @return {Output<String>}			.bucketDomainName			e.g., 'bucketname.s3.amazonaws.com'
- * @return {Output<String>}			.bucketRegionalDomainName	e.g., 'https://bucketname.s3.ap-southeast-2.amazonaws.com'
+ * @return {Output<String>}			.bucketRegionalDomainName	e.g., 'http://bucketname.s3.ap-southeast-2.amazonaws.com'
  * @return {Output<String>}			.region						e.g., 'ap-southeast-2'
  * @return {Output<[Object]>}		.content[]
  * @return {Output<String>}				.key					Object's key in S3
  * @return {Output<String>}				.hash					MD5 file hash    
  * @return {Output<CloudFront>}	output.cloudfront
+ * @return {Output<String>}			.domainName					URL where the website is hosted.
  * 
  */
 // (1) For example, to ignore the content under the node_modules folder: '**/node_modules/**'
@@ -135,7 +138,7 @@ const createBucket = async ({ name, acl:_acl, website:_website, versioning, tags
 	if (content && content.dir) {
 		const [bucketName] = await resolve([bucket.bucket, bucket.urn])
 
-		const [errors, files] = await syncFiles({ 
+		const [errors, filesData] = await syncFiles({ 
 			bucket: bucketName, 
 			dir: content.dir, 
 			ignore: content.ignore,
@@ -146,7 +149,22 @@ const createBucket = async ({ name, acl:_acl, website:_website, versioning, tags
 		if (errors)
 			throw mergeErrors(errors)
 
-		bucket.content = (files||[]).map(file => ({ key:file.key, hash:file.hash }))
+		const { updated, srcFiles } = filesData || {}
+		bucket.content = (srcFiles||[]).map(file => ({ key:file.key, hash:file.hash }))
+
+		if (updated && cloudfrontDistro && cloudfront && cloudfront.invalidateOnUpdate) {
+			const distroId = await resolve(cloudfrontDistro.id)
+			if (distroId) {
+				const [distroExistsErrors, distroExists] = await distributionExists({ id:distroId })
+				if (distroExistsErrors)
+					throw mergeErrors(errors)
+				if (distroExists) {
+					const [invalidationErrors] = await invalidateDistribution(({ id:distroId, operationId:`${Date.now()}`, paths:['/*'] }))
+					if (invalidationErrors)
+						throw mergeErrors(errors)
+				}
+			}
+		}
 	} else
 		bucket.content = null
 

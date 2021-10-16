@@ -42,16 +42,21 @@ const s3 = new AWS.S3({ apiVersion: '2006-03-01', computeChecksums: true })
  * @param  {Boolean}			remove					Default false. True means all files must be removed from the bucket.
  * @param  {Boolean}			noWarning				Default false.
  * 
- * @return {String}				data[].file				Absolute file path.
- * @return {String}				data[].dir				Absolute folder path.	
- * @return {String}				data[].key				Object's key in S3
- * @return {String}				data[].path				Relative file path (relative to the folder).	
- * @return {String}				data[].hash				MD5 file hash	
- * @return {String}				data[].contentType		e.g., 'application/javascript; charset=utf-8' or 'image/png'
- * @return {Number}				data[].contentLength	File's size in bytes.	
- * @return {Buffer}				data[].content			Only set if 'includeContent' is set to true.
+ * @return {Boolean}			output.updated			True means at least one file was either uploaded or deleted.
+ * @return {Boolean}			output.srcFiles			All files(2) in the local file system.
+ * @return {Boolean}			output.uploadedFiles	Uploaded files(2) dues to being new or having changed
+ * @return {Boolean}			output.deletedFiles		Deleted files(2) are files that are in the 'existingObjects' but not in the local file system anymore.
  */
 // (1) For example, to ignore the content under the node_modules folder: '**/node_modules/**'
+// (2) A file object is structured as follow:
+//		{String} file				Absolute file path.
+//		{String} dir				Absolute folder path.	
+//		{String} key				Object's key in S3
+//		{String} path				Relative file path (relative to the folder).	
+//		{String} hash				MD5 file hash	
+//		{String} contentType		e.g., 'application/javascript; charset=utf-8' or 'image/png'
+//		{Number} contentLength		File's size in bytes.	
+//		{Buffer} content			Only set if 'includeContent' is set to true.
 // 
 const syncFiles = ({ bucket, files, dir, ignore, existingObjects, remove, noWarning }) => catchErrors((async () => {
 	const errMsg = `Failed to sync files with S3 bucket '${bucket}'`
@@ -78,7 +83,7 @@ const syncFiles = ({ bucket, files, dir, ignore, existingObjects, remove, noWarn
 	if (remove)
 		_files = []
 
-	const deleteFiles = existingObjects.reduce((acc, file) => {
+	const deletedFiles = existingObjects.reduce((acc, file) => {
 		const fileExists = _files.some(f => f.key == file.key)
 		if (!fileExists)
 			acc.push(file)
@@ -86,18 +91,27 @@ const syncFiles = ({ bucket, files, dir, ignore, existingObjects, remove, noWarn
 	}, [])
 
 	// Uploads files
-	const [uploadErrors, uploadedFiles] = await uploadFiles({ bucket, files:_files, ignoreObjects:existingObjects, noWarning })
-	if (uploadErrors)
-		throw wrapErrors(errMsg, uploadErrors)
+	const [srcFileErrors, srcFiles] = await uploadFiles({ bucket, files:_files, ignoreObjects:existingObjects, noWarning })
+	if (srcFileErrors)
+		throw wrapErrors(errMsg, srcFileErrors)
 
 	// Deletes files
-	if (deleteFiles.length) {
-		const [removeErrors] = await removeObjects({ bucket, keys:deleteFiles.map(f => f.key) })
+	if (deletedFiles.length) {
+		const [removeErrors] = await removeObjects({ bucket, keys:deletedFiles.map(f => f.key) })
 		if (removeErrors)
 			throw wrapErrors(errMsg, removeErrors)
 	}
 
-	return uploadedFiles
+	const uploadedFiles = (srcFiles||[]).filter(x => !x.ignored)
+
+	const output = {
+		updated: uploadedFiles.length > 0 || deletedFiles.length > 0,
+		srcFiles,
+		uploadedFiles,
+		deletedFiles
+	}
+
+	return output
 })())
 
 /**
@@ -123,7 +137,8 @@ const syncFiles = ({ bucket, files, dir, ignore, existingObjects, remove, noWarn
  * @param  {Boolean}			noWarning				Default false.
  * 
  * @return {String}				data[].file				Absolute file path.
- * @return {String}				data[].dir				Absolute folder path.	
+ * @return {String}				data[].dir				Absolute folder path.
+ * @return {Boolean}			data[].ignored			True means the file was not uploaded because it was in the 'ignoreObjects' list.
  * @return {String}				data[].key				Object's key in S3
  * @return {String}				data[].path				Relative file path (relative to the folder).	
  * @return {String}				data[].hash				MD5 file hash	
@@ -171,9 +186,11 @@ const uploadFiles = ({ bucket, files, dir, ignore, ignoreObjects, noWarning }) =
 		if (allErrors.length)
 			return
 
-		if (ignoreObjects.some(x => x.key == key && x.hash == hash))
+		const f = { ...file, ignored:false }
+		if (ignoreObjects.some(x => x.key == key && x.hash == hash)) {
+			f.ignored = true
 			return file
-		else {
+		} else {
 			const [errors] = await putObject({
 				Body: content, 
 				Bucket: bucket, 
@@ -187,7 +204,7 @@ const uploadFiles = ({ bucket, files, dir, ignore, ignoreObjects, noWarning }) =
 				allErrors.push(...errors)
 				return
 			} else
-				return file
+				return f
 		}
 	})), 10)
 
