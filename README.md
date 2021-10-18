@@ -65,6 +65,7 @@ npm i @cloudlesslabs/pulumix
 >	- [S3](#s3)
 >		- [Creating a public bucket for hosting a static website](#creating-a-public-bucket-for-hosting-a-static-website)
 >		- [Synching local files with a bucket](#synching-local-files-with-a-bucket)
+>		- [Adding a cloudfront distribution and enabling automatic files invalidation when content changes](#adding-a-cloudfront-distribution-and-enabling-automatic-files-invalidation-when-content-changes)
 >	- [Secret](#secret)
 >		- [Getting stored secrets](#getting-stored-secrets)
 >	- [Security Group](#security-group)
@@ -1637,7 +1638,7 @@ createBucket('my-unique-name')
 
 ### Synching local files with a bucket
 
-This feature is not using native Pulumi APIs. Instead, it uses the AWS SDK to sync files via the S3 API after the bucket has been created. When the `content` property of the `s3.bucket` input is set, a new `content` property is added to the `bucket` output. The new `content` property is an array containing object similar to this:
+This feature is not using native Pulumi APIs. Instead, it uses the AWS SDK to sync files via the S3 API after the bucket has been created. When the `content` property of the `s3.bucket` input is set, a new `files` property is added to the output. The new `files` property is an array containing object similar to this:
 
 ```js
 [{
@@ -1662,26 +1663,27 @@ const ENV = pulumi.getStack()
 const PROJ = pulumi.getProject()
 const PROJECT = `${PROJ}-${ENV}`
 const thisStack = new pulumi.StackReference(`${PROJ}/${ENV}`)
-const bucketOutput = thisStack.getOutput('bucket')
+const oldFiles = thisStack.getOutput('files')
 
 const main = async () => {
-	const existingContent = (await resolve(bucketOutput.content)) || []
+	const existingContent = (await resolve(oldFiles)) || []
 	
-	const { bucket } = await s3.bucket({
+	const { bucket, files } = await s3.bucket({
 		name: PROJECT,
 		website: { // When this property is set, the bucket is public. Otherwise, the bucket is private.
 			indexDocument: 'index.html',
 			content: {
 				dir:join(__dirname, './app/public'),
 				ignore: '**/node_modules/**',
-				existingContent,
+				existingContent, // e.g., [{key: "favicon.png",hash: "5efd4dc4c28ef3548aec63ae88865ff9" },{ key: "global.css",hash: "8ff861b6a5b09e7d5fa681d8dd31262a" }]
 				// remove:true
 			}
 		}
 	})
 
 	return {
-		bucket
+		bucket,
+		files
 	}
 }
 
@@ -1689,6 +1691,38 @@ module.exports = main()
 ```
 
 > IMPORTANT: To delete a bucket, its content must be removed first. Re-deploy the stack by uncommenting the `// remove:true` line. This will remove all the content. 
+
+### Adding a cloudfront distribution and enabling automatic files invalidation when content changes
+
+Using the exact same sample from above:
+
+```js
+const main = async () => {
+	const existingContent = (await resolve(oldFiles)) || []
+	
+	const { bucket, files, cloudfront } = await s3.bucket({
+		name: PROJECT,
+		website: { // When this property is set, the bucket is public. Otherwise, the bucket is private.
+			indexDocument: 'index.html',
+			content: {
+				dir:join(__dirname, './app/public'),
+				ignore: '**/node_modules/**',
+				existingContent, // e.g., [{key: "favicon.png",hash: "5efd4dc4c28ef3548aec63ae88865ff9" },{ key: "global.css",hash: "8ff861b6a5b09e7d5fa681d8dd31262a" }]
+				// remove:true
+			},
+			cloudfront: {
+				invalidateOnUpdate: true
+			}
+		}
+	})
+
+	return {
+		bucket,
+		files,
+		cloudfront
+	}
+}
+```
 
 ## Secret
 ### Getting stored secrets

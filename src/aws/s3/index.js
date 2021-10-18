@@ -8,10 +8,11 @@ LICENSE file in the root directory of this source tree.
 
 // Version: 0.0.1
 
+const pulumi = require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
 const { error: { mergeErrors } } = require('puffy')
 const { resolve } = require('../../utils')
-const { getWebsiteProps, syncFiles } = require('./utils')
+const { getWebsiteProps, syncFiles, getDiffFiles } = require('./utils')
 const { distribution: { invalidate:invalidateDistribution, exists:distributionExists } } = require('../cloudfront/utils')
 
 /**
@@ -41,16 +42,17 @@ const { distribution: { invalidate:invalidateDistribution, exists:distributionEx
  * @param  {Boolean}			versioning						Default false.		
  * @param  {String}				tags				
  * 
- * @return {Output<Bucket>}		output.bucket
- * @return {Output<String>}			.websiteEndpoint			Unfriendly AWS URL where the S3 website can be accessed (only set when the 'website' property is set).
- * @return {Output<String>}			.bucketDomainName			e.g., 'bucketname.s3.amazonaws.com'
- * @return {Output<String>}			.bucketRegionalDomainName	e.g., 'http://bucketname.s3.ap-southeast-2.amazonaws.com'
- * @return {Output<String>}			.region						e.g., 'ap-southeast-2'
- * @return {Output<[Object]>}		.content[]
- * @return {Output<String>}				.key					Object's key in S3
- * @return {Output<String>}				.hash					MD5 file hash    
- * @return {Output<CloudFront>}	output.cloudfront
- * @return {Output<String>}			.domainName					URL where the website is hosted.
+ * @return {Object}				output
+ * @return {Output<Bucket>}			.bucket
+ * @return {Output<String>}				.websiteEndpoint			Unfriendly AWS URL where the S3 website can be accessed (only set when the 'website' property is set).
+ * @return {Output<String>}				.bucketDomainName			e.g., 'bucketname.s3.amazonaws.com'
+ * @return {Output<String>}				.bucketRegionalDomainName	e.g., 'http://bucketname.s3.ap-southeast-2.amazonaws.com'
+ * @return {Output<String>}				.region						e.g., 'ap-southeast-2'
+ * @return {Output<CloudFront>}		.cloudfront
+ * @return {Output<String>}				.domainName					URL where the website is hosted.
+ * @return {Output<[Object]>}		.files[]
+ * @return {Output<String>}				.key						Object's key in S3
+ * @return {Output<String>}				.hash						MD5 file hash    
  * 
  */
 // (1) For example, to ignore the content under the node_modules folder: '**/node_modules/**'
@@ -134,43 +136,59 @@ const createBucket = async ({ name, acl:_acl, website:_website, versioning, tags
 		})
 	}
 
-	// Uploading content
+	// Uploading content and invalidating distribution
+	let files
 	if (content && content.dir) {
 		const [bucketName] = await resolve([bucket.bucket, bucket.urn])
 
-		const [errors, filesData] = await syncFiles({ 
-			bucket: bucketName, 
-			dir: content.dir, 
-			ignore: content.ignore,
-			existingObjects: content.existingContent,
-			remove: content.remove,
-			noWarning: true
-		})
-		if (errors)
-			throw mergeErrors(errors)
-
-		const { updated, srcFiles } = filesData || {}
-		bucket.content = (srcFiles||[]).map(file => ({ key:file.key, hash:file.hash }))
-
-		if (updated && cloudfrontDistro && cloudfront && cloudfront.invalidateOnUpdate) {
-			const distroId = await resolve(cloudfrontDistro.id)
-			if (distroId) {
-				const [distroExistsErrors, distroExists] = await distributionExists({ id:distroId })
-				if (distroExistsErrors)
+		if (pulumi.runtime.isDryRun()) { // if this is preview
+			if (!content.remove) {
+				const [errors, filesData] = await getDiffFiles({ 
+					dir: content.dir, 
+					ignore: content.ignore,
+					previousFiles: content.existingContent
+				})
+				if (errors)
 					throw mergeErrors(errors)
-				if (distroExists) {
-					const [invalidationErrors] = await invalidateDistribution(({ id:distroId, operationId:`${Date.now()}`, paths:['/*'] }))
-					if (invalidationErrors)
+
+				const { srcFiles } = filesData || {}
+				files = (srcFiles||[]).map(file => ({ key:file.key, hash:file.hash }))
+			}
+		} else {
+			const [errors, filesData] = await syncFiles({ 
+				bucket: bucketName, 
+				dir: content.dir, 
+				ignore: content.ignore,
+				existingObjects: content.existingContent,
+				remove: content.remove,
+				noWarning: true
+			})
+			if (errors)
+				throw mergeErrors(errors)
+
+			const { updated, srcFiles } = filesData || {}
+			files = (srcFiles||[]).map(file => ({ key:file.key, hash:file.hash }))
+
+			if (updated && cloudfrontDistro && cloudfront && cloudfront.invalidateOnUpdate) {
+				const distroId = await resolve(cloudfrontDistro.id)
+				if (distroId) {
+					const [distroExistsErrors, distroExists] = await distributionExists({ id:distroId })
+					if (distroExistsErrors)
 						throw mergeErrors(errors)
+					if (distroExists) {
+						const [invalidationErrors] = await invalidateDistribution(({ id:distroId, operationId:`${Date.now()}`, paths:['/*'] }))
+						if (invalidationErrors)
+							throw mergeErrors(errors)
+					}
 				}
 			}
 		}
-	} else
-		bucket.content = null
+	}
 
 	return {
 		bucket,
-		cloudfront: cloudfrontDistro
+		cloudfront: cloudfrontDistro,
+		files
 	}
 }
 

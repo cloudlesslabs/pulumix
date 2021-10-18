@@ -66,7 +66,8 @@ const syncFiles = ({ bucket, files, dir, ignore, existingObjects, remove, noWarn
 		throw wrapErrors(errMsg, [new Error('Missing required \'bucket\' argument')])
 
 	if (!(await bucketExists(bucket))) {
-		console.log(`WARNING: Bucket '${bucket}' does not exist (yet). Synching files aborted.`)
+		if (!noWarning)
+			console.log(`WARNING: Bucket '${bucket}' does not exist (yet). Synching files aborted.`)
 		return []
 	}
 
@@ -91,7 +92,7 @@ const syncFiles = ({ bucket, files, dir, ignore, existingObjects, remove, noWarn
 	}, [])
 
 	// Uploads files
-	const [srcFileErrors, srcFiles] = await uploadFiles({ bucket, files:_files, ignoreObjects:existingObjects, noWarning })
+	const [srcFileErrors, srcFiles] = await uploadFiles({ bucket, files:_files, ignoreObjects:existingObjects })
 	if (srcFileErrors)
 		throw wrapErrors(errMsg, srcFileErrors)
 
@@ -134,7 +135,6 @@ const syncFiles = ({ bucket, files, dir, ignore, existingObjects, remove, noWarn
  * @param  {[Object]}			ignoreObjects[]			Skip uploading files that match both the key AND the hash
  * @param  {String}					.key				Bucket object key
  * @param  {String}					.hash				Bucket object hash
- * @param  {Boolean}			noWarning				Default false.
  * 
  * @return {String}				data[].file				Absolute file path.
  * @return {String}				data[].dir				Absolute folder path.
@@ -148,18 +148,12 @@ const syncFiles = ({ bucket, files, dir, ignore, existingObjects, remove, noWarn
  */
 // (1) For example, to ignore the content under the node_modules folder: '**/node_modules/**'
 // 
-const uploadFiles = ({ bucket, files, dir, ignore, ignoreObjects, noWarning }) => catchErrors((async () => {
+const uploadFiles = ({ bucket, files, dir, ignore, ignoreObjects }) => catchErrors((async () => {
 	const errMsg = `Failed to upload files to S3 bucket '${bucket}'`
 	ignoreObjects = ignoreObjects || []
 
 	if (!bucket)
 		throw wrapErrors(errMsg, [new Error('Missing required \'bucket\' argument')])
-
-	if (!(await bucketExists(bucket))) {
-		if (!noWarning)
-			console.log(`WARNING: Bucket '${bucket}' does not exist (yet). Uploading files aborted.`)
-		return []
-	}
 
 	const _files = files && files.length ? [...files] : []
 
@@ -212,6 +206,85 @@ const uploadFiles = ({ bucket, files, dir, ignore, ignoreObjects, noWarning }) =
 		throw wrapErrors(errMsg, allErrors)
 
 	return objects
+})())
+
+/**
+ * Syncs files with an S3 bucket. Doc: 
+ * 		- putObject: https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#putObject-property
+ * 		- deleteObjects: https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#deleteObjects-property
+ *
+ * WARNING: This operation requires a the 's3:PutObject' permission. If the ACL is also set, then the 's3:PutObjectAcl'
+ * permission is also required.
+ * 
+ * @param  {[Object]}			files[]
+ * @param  {Buffer}					.content
+ * @param  {String}					.path		
+ * @param  {String}					.key
+ * @param  {String}					.contentType		
+ * @param  {String}					.cacheControl		
+ * @param  {String}					.hash			
+ * @param  {Number}					.contentLength	
+ * @param  {String}				dir		
+ * @param  {String|[String]}	ignore					(1) Ignore patterns for files under 'dir' 
+ * @param  {[Object]}			previousFiles[]			Skip uploading files that match both the key AND the hash
+ * @param  {String}					.key				Bucket object key
+ * @param  {String}					.hash				Bucket object hash
+ * 
+ * @return {Boolean}			output.diff				True means at least one file has either changed(or had been created) or was deleted.
+ * @return {Boolean}			output.srcFiles			All files(2) in the local file system.
+ * @return {Boolean}			output.unchangedFiles	(2)
+ * @return {Boolean}			output.changedFiles		(2)
+ * @return {Boolean}			output.deletedFiles		Deleted files(2) are files that are in the 'previousFiles' but not in the local file system anymore.
+ */
+// (1) For example, to ignore the content under the node_modules folder: '**/node_modules/**'
+// (2) A file object is structured as follow:
+//		{String} file				Absolute file path.
+//		{String} dir				Absolute folder path.	
+//		{String} key				Object's key in S3
+//		{String} path				Relative file path (relative to the folder).	
+//		{String} hash				MD5 file hash	
+//		{String} contentType		e.g., 'application/javascript; charset=utf-8' or 'image/png'
+//		{Number} contentLength		File's size in bytes.	
+//		{Buffer} content			Only set if 'includeContent' is set to true.
+// 
+const getDiffFiles = ({ files, dir, ignore, previousFiles }) => catchErrors((async () => {
+	const errMsg = 'Failed to get the difference between files'
+	previousFiles = previousFiles || []
+
+	const _files = files && files.length ? [...files] : []
+
+	if (dir) {
+		const [fileErrors, dirFiles] = await getFiles({ dir, includeContent:true, ignore })
+		if (fileErrors)
+			throw wrapErrors(errMsg, dirFiles)	
+		
+		_files.push(...dirFiles)
+	}
+
+	const deletedFiles = previousFiles.reduce((acc, file) => {
+		const fileExists = _files.some(f => f.key == file.key)
+		if (!fileExists)
+			acc.push(file)
+		return acc
+	}, [])
+
+	const { unchangedFiles, changedFiles } = _files.reduce((acc, file) => {
+		const { hash, key } = file || {}
+		const fileHasNotChanged = previousFiles.some(x => x.key == key && x.hash == hash)
+		if (fileHasNotChanged)
+			acc.unchangedFiles.push(file)
+		else
+			acc.changedFiles.push(file)
+		return acc
+	}, { unchangedFiles:[], changedFiles:[] })
+	
+	return {
+		diff: deletedFiles.length > 0 || changedFiles.length > 0,
+		srcFiles: _files,
+		unchangedFiles,
+		changedFiles,
+		deletedFiles
+	}
 })())
 
 const putObject = (...args) => new Promise(next => {
@@ -493,7 +566,8 @@ const getWebsiteProps = website => {
 module.exports = {
 	getWebsiteProps,
 	uploadFiles,
-	syncFiles
+	syncFiles,
+	getDiffFiles
 }
 
 
