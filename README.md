@@ -1764,6 +1764,35 @@ const { securityGroup:mySecurityGroup, securityGroupRules:myRules } = await secu
 
 ## Step-function
 
+By default, this uitility creates a policy that allows the step-function to invoke any lambda. 
+
+```js
+const { aws: { stepFunction } } = require('@cloudlesslabs/pulumix')
+
+const main = async () => {
+	const preProvision = await stepFunction.stateMachine({
+		name: 'my-step-function',
+		type: 'standard', // Valid values: 'standard' (default) or 'express'
+		description: 'Does something.', 
+		states: preProvisionWorkflow, 
+		// policies: [], 
+		cloudWatchLevel: 'all', // Default is 'off'. Valid values: 'all', 'error', 'fatal'
+		logsRetentionInDays: 7, // Default 0 (i.e., never expires). Only applies when 'cloudWatch' is true.
+		tags:{
+			Name: 'my-step-function'
+		}
+	})
+
+	return {
+		preProvision
+	}
+}
+
+module.exports = main()
+```
+
+The `preProvisionWorkflow` is a JSON object that you can export from the Step Function designer in the AWS console. This object is rather complex so we recommend to use the designer.
+
 ## VPC
 
 > WARNING: Once the VPC's subnets have been created, updating them will produce a replace, which can have dire consequences to your entire infrastructure. Therefore think twice when setting them up. 

@@ -19,38 +19,14 @@ const VALID_CLOUDWATCH_LEVELS = ['ALL', 'ERROR', 'FATAL']
  * @param  {String} 		   name						
  * @param  {String} 		   description		
  * @param  {String} 		   type									Valid values: 'standard' (default) or 'express'
- * @param  {String}  		   states[].name
- * @param  {Output<String>}    states[].activityArn
- * @param  {String}  		   states[].choices[]
- * @param  {[State]} 		   states[].parallel.states[]			e.g., [{ name:'task_1' },[{ name:'task_2A', next:'task_2B' },{ name:'task_2b' }]]
- * @param  {String}  		   states[].parallel.resultPath
- * @param  {String}  		   states[].parallel.resultSelector
- * @param  {Object}  		   states[].parallel.retry
- * @param  {Object}  		   states[].parallel.catch
- * @param  {String}  		   states[].map.states[]
- * @param  {String}  		   states[].map.inputPath
- * @param  {String}  		   states[].map.itemsPath
- * @param  {Number}  		   states[].map.maxConcurrency
- * @param  {String}  		   states[].map.resultPath
- * @param  {String}  		   states[].map.resultSelector
- * @param  {Object}  		   states[].map.retry
- * @param  {Object}  		   states[].map.catch
- * @param  {String}  		   states[].wait
- * @param  {String}  		   states[].waitSecondsPath
- * @param  {String}  		   states[].waitTimestampPath
- * @param  {String}  		   states[].next						
- * @param  {Boolean}  		   states[].end						
- * @param  {String}  		   states[].default						Only applied when 'choices' is set.
- * @param  {Boolean} 		   states[].succeed						If set to true, the type is 'success'
- * @param  {String}  		   states[].error.name
- * @param  {String}  		   states[].error.cause					
+ * @param  {Object}  		   states								
  * @param  {[Output<Policy>]}  policies						
  * @param  {String} 		   cloudWatchLevel						Default is 'OFF'. Valid values: 'ALL', 'ERROR', 'FATAL'
  * @param  {Number}			   logsRetentionInDays					Default 0 (i.e., never expires). Only applies when 'cloudWatch' is true.
  * @param  {Object} 		   tags						
  * @return {String}						
  */
-const createStepFunction = async ({ name, description, type, states, policies, cloudWatchLevel, logsRetentionInDays, tags }) => {
+const createStateMachine = async ({ name, description, type, states, policies, cloudWatchLevel, logsRetentionInDays, tags }) => {
 	
 	if (!name)
 		throw new Error('Missing required argument \'name\'.')
@@ -180,7 +156,7 @@ const leanifyStepFunction = resource => {
 }
 
 module.exports = {
-	stepFunction: createStepFunction
+	stateMachine: createStateMachine
 }
 
 
