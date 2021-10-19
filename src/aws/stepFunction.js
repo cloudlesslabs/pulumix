@@ -179,7 +179,9 @@ const leanifyStepFunction = resource => {
 	return { id, name, type, arn, creationDate, roleArn, status, tracingConfiguration, loggingConfiguration }
 }
 
-module.exports = createStepFunction
+module.exports = {
+	stepFunction: createStepFunction
+}
 
 
 

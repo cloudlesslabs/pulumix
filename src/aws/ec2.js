@@ -49,7 +49,7 @@ const aws = require('@pulumi/aws')
  * @return {Output<[String]>} ec2.keyPair.name
  * @return {Output<[String]>} ec2.keyPair.keyPairId
  */
-const createEC2 = async ({ name, ami, instanceType, availabilityZone, subnetId, vpcSecurityGroupIds, userData, userDataBase64, publicKey, ssm, tags }) => {
+const createInstance = async ({ name, ami, instanceType, availabilityZone, subnetId, vpcSecurityGroupIds, userData, userDataBase64, publicKey, ssm, tags }) => {
 	if (!name)
 		throw new Error('Missing required \'name\' argument.')
 	if (ssm) {
@@ -164,7 +164,9 @@ const createEC2 = async ({ name, ami, instanceType, availabilityZone, subnetId, 
 	}
 }
 
-module.exports = createEC2
+module.exports = {
+	instance: createInstance
+}
 
 
 

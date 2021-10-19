@@ -381,7 +381,7 @@ const main = async () => {
 			}
 		}, 
 		program: async () => {
-			const myBucket = await s3({
+			const myBucket = await s3.bucket({
 				name:'my-unique-website-name',
 				website: {
 					indexDocument: 'index.html'
@@ -425,8 +425,7 @@ console.log('RESULT')
 ### Default AppSync settings
 ```js
 const pulumi = require('@pulumi/pulumi')
-const { resolve } = require('@cloudlesslabs/pulumix')
-const appSync = require('./src/appSync')
+const { resolve, aws: { appSync } } = require('@cloudlesslabs/pulumix')
 
 const ENV = pulumi.getStack()
 const PROJ = pulumi.getProject()
@@ -815,11 +814,11 @@ const db = mysql.createPool({
 ##### Configure a `rds-db:connect` action on the IAM role
 
 ```js
-const { aws:{ lambda:{ lambda }, rds:{ policy: { createConnectPolicy } } } } = require('@cloudlesslabs/pulumix')
+const { aws:{ lambda, rds:{ policy: { createConnectPolicy } } } } = require('@cloudlesslabs/pulumix')
 
 const rdsAccessPolicy = createConnectPolicy({ name:`my-project-access-rds`, rdsArn:proxy.arn })
 
-const lambdaOutput = await lambda({
+const lambdaOutput = await lambda.fn({
 	//...
 	policies:[rdsAccessPolicy],
 	//...
@@ -864,7 +863,7 @@ The next sample shows how to provision an EC2 bastion host secured via SSM in a 
 Also, notice that we are passing the RSA public key to this instance. This will set up the RSA key for the `ec2-user` SSH user. The RSA private key is intended to be shared to any engineer that needs to establish a secured SSH tunnel between their local machine and this bastion host. Private RSA keys are usually not supposed to be shared lightly, but in this case, the security and accesses are managed by SSM, which relaxes the restrictions around sharing the RSA private key. For more details about SSH tunneling with SSM, please refer to this document: https://gist.github.com/nicolasdao/4808f0a1e5e50fdd29ede50d2e56024d#ssh-tunnel-to-private-rds-instances.
 
 ```js
-const { aws:{ ec2 } } = require('@cloudlesslabs/pulumix')
+const { aws: { ec2 } } = require('@cloudlesslabs/pulumix')
 
 const EC2_SHELL = `#!/bin/bash
 set -ex
@@ -873,7 +872,7 @@ sudo yum install -y telnet`
 
 const EC2_RSA_PUBLIC_KEY = 'ssh-rsa AAAA...' // You'll give the private key to your dev so they use it to connect
 
-const ec2Output = ec2({
+const ec2Output = ec2.instance({
 	name: 'my-ec2-machine',
 	ami: 'ami-02dc2e45afd1dc0db', // That's Amazon Linux 2 for 64-bits ARM which comes pre-installed with the SSM agent.
 	instanceType: 't4g.nano', // EC2 ARM graviton 2 
@@ -995,7 +994,7 @@ const myImage = await ecr.image({
 ### Mounting an EFS access point on a Lambda
 ```js
 const pulumi = require('@pulumi/pulumi')
-const { aws:{ securityGroup, vpc, lambda:{ lambda }, efs } } = require('@cloudlesslabs/pulumix')
+const { aws:{ securityGroup, vpc, lambda, efs } } = require('@cloudlesslabs/pulumix')
 const { resolve } = require('path')
 
 const ENV = pulumi.getStack()
@@ -1020,7 +1019,7 @@ const main = async () => {
 
 
 	// Security group that can access EFS
-	const { securityGroup:accessToEfsSecurityGroup } = await securityGroup({ 
+	const { securityGroup:accessToEfsSecurityGroup } = await securityGroup.sg({ 
 		name: `${PROJECT}-access-efs`,
 		description: `Access to the EFS filesystem ${PROJECT}.`, 
 		egress: [{ 
@@ -1050,7 +1049,7 @@ const main = async () => {
 	})
 
 	// Lambda
-	const lambdaOutput = await lambda({
+	const lambdaOutput = await lambda.fn({
 		name: PROJECT,
 		fn: {
 			runtime: 'nodejs12.x', 
@@ -1099,9 +1098,9 @@ This is why `@cloudlesslabs/pulumix` uses the `arm64` architecture as default ra
 
 ```js
 const { resolve } = require('path')
-const { aws:{ lambda:{ lambda } } } = require('@cloudlesslabs/pulumix')
+const { aws:{ lambda } } = require('@cloudlesslabs/pulumix')
 
-lambda({
+lambda.fn({
 	name: 'my-lambda',
 	architecture: 'x86_64', // Default is 'arm64'
 	fn: {
@@ -1117,9 +1116,9 @@ __WARNING__: If you're using Docker, you must make sure that the Docker image is
 
 ```js
 const { resolve } = require('path')
-const { aws:{ lambda:{ lambda } } } = require('@cloudlesslabs/pulumix')
+const { aws:{ lambda } } = require('@cloudlesslabs/pulumix')
 
-lambda({
+lambda.fn({
 	name: 'my-lambda',
 	fn: {
 		runtime: 'nodejs12.x', 	
@@ -1209,7 +1208,7 @@ exports.handler = async ev => {
 const pulumi = require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
 const { resolve } = require('path')
-const { aws:{ lambda:{ lambda } } } = require('@cloudlesslabs/pulumix')
+const { aws:{ lambda } } = require('@cloudlesslabs/pulumix')
 
 const ENV = pulumi.getStack()
 const PROJ = pulumi.getProject()
@@ -1223,7 +1222,7 @@ const tags = {
 }
 
 const main = async () => {
-	const lambdaOutput = await lambda({
+	const lambdaOutput = await lambda.fn({
 		name: PROJECT,
 		fn: {
 			runtime: 'nodejs12.x', 	
@@ -1256,7 +1255,7 @@ module.exports = main()
 Tl;dr:
 
 ```js
-const lambdaOutput = lambda({
+const lambdaOutput = lambda.fn({
 	// ...
 	cloudwatch: true,
 	logsRetentionInDays: 7 // This is optional. The default is 0 (i.e., never expires). 
@@ -1288,7 +1287,7 @@ const cloudWatchPolicy = new aws.iam.Policy(PROJECT, {
 	})
 })
 
-const lambdaOutput = lambda({
+const lambdaOutput = lambda.fn({
 	name: PROJECT,
 	fn: {
 		runtime: 'nodejs12.x', 
@@ -1303,7 +1302,7 @@ const lambdaOutput = lambda({
 
 > TIPS: Leverage existing AWS Managed policies instead of creating your own each time (use `npx get-policies` to find them). This example could be re-written as follow:
 > ```js
-> const lambdaOutput = lambda({
+> const lambdaOutput = lambda.fn({
 > 	name: PROJECT,
 > 	fn: {
 >		runtime: 'nodejs12.x', 
@@ -1318,7 +1317,7 @@ const lambdaOutput = lambda({
 >
 > Because enabling CloudWatch on a Lambda is so common, this policy can be automatically toggled as follow:
 >```js
-> const lambdaOutput = lambda({
+> const lambdaOutput = lambda.fn({
 > 	// ...
 > 	cloudwatch: true,
 > 	logsRetentionInDays: 7 // This is optional. The default is 0 (i.e., never expires). 
@@ -1330,9 +1329,9 @@ const lambdaOutput = lambda({
 Use the `allowedPrincipals` property. The following example allows AWS Cognito to access the Lambda:
 
 ```js
-const { aws:{ lambda:{ lambda } } } = require('@cloudlesslabs/pulumix')
+const { aws:{ lambda } } = require('@cloudlesslabs/pulumix')
 
-lambda({
+lambda.fn({
 	//...
 	allowedPrincipals:['cognito-idp.amazonaws.com']
 })
@@ -1390,13 +1389,13 @@ __WARNING__: You must make sure that the Docker image is compatible with the cho
 ```js
 const pulumi = require('@pulumi/pulumi')
 const { resolve } = require('path')
-const { aws:{ lambda:{ lambda } } } = require('@cloudlesslabs/pulumix')
+const { aws:{ lambda } } = require('@cloudlesslabs/pulumix')
 
 const ENV = pulumi.getStack()
 const PROJ = pulumi.getProject()
 const PROJECT = `${PROJ}-${ENV}`
 
-const lambdaOutput = lambda({
+const lambdaOutput = lambda.fn({
 	name: PROJECT,
 	fn: {
 		dir: resolve('./app'),
@@ -1488,7 +1487,7 @@ Pulumi file `index.js`:
 const pulumi = require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
 const { resolve } = require('path')
-const { aws:{ lambda:{ lambda, layer } } } = require('@cloudlesslabs/pulumix')
+const { aws:{ lambda } } = require('@cloudlesslabs/pulumix')
 
 const ENV = pulumi.getStack()
 const PROJ = pulumi.getProject()
@@ -1503,14 +1502,14 @@ const tags = {
 }
 
 const main = async () => {
-	const lambdaLayerOutput1 = await layer({
+	const lambdaLayerOutput1 = await lambda.layer({
 		name: `${PROJECT}-layer-01`,
 		description: 'Includes puffy',
 		runtime: RUNTIME, 	
 		dir: resolve('./layers/layer01'),
 		tags
 	})
-	const lambdaLayerOutput2 = await layer({
+	const lambdaLayerOutput2 = await lambda.layer({
 		name: `${PROJECT}-layer-02`,
 		description: 'Do something else',
 		runtime: RUNTIME, 	
@@ -1518,7 +1517,7 @@ const main = async () => {
 		tags
 	})
 
-	const lambdaOutput = await lambda({
+	const lambdaOutput = await lambda.fn({
 		name: PROJECT,
 		fn: {
 			runtime: RUNTIME, 	
@@ -1744,7 +1743,7 @@ secret.get('my-secret-name').then(({ version, data }) => {
 ```js
 const { aws:{ securityGroup } } = require('@cloudlesslabs/pulumix')
 
-const { securityGroup:mySecurityGroup, securityGroupRules:myRules } = await securityGroup({
+const { securityGroup:mySecurityGroup, securityGroupRules:myRules } = await securityGroup.sg({
 	name: `my-special-sg`, 
 	description: `Controls something special.`, 
 	vpcId: 'vpc-1234', 

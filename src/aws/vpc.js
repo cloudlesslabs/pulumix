@@ -190,7 +190,9 @@ const getAvailabilityZones = async subnets => {
 	return azs
 }
 
-module.exports = createVPC
+module.exports = {
+	vpc:createVPC
+}
 
 
 

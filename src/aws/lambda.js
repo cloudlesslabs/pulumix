@@ -78,7 +78,7 @@ const { resolve } = require('../utils')
  * (3) If the lambda uses Docker, the architecture MUST BE COMPATIBLE with the Docker image. For a list of all the 
  * lambda images with their associated OS, please refer to https://hub.docker.com/r/amazon/aws-lambda-nodejs/tags?page=1&ordering=last_updated
  */
-const createLambda = async ({ name, description, architecture, fn, layers, timeout=3, memorySize=128, handler, allowedPrincipals, policies, vpcConfig, fileSystemConfig, cloudWatch, cloudwatch, logsRetentionInDays, tags }) => {
+const createFunction = async ({ name, description, architecture, fn, layers, timeout=3, memorySize=128, handler, allowedPrincipals, policies, vpcConfig, fileSystemConfig, cloudWatch, cloudwatch, logsRetentionInDays, tags }) => {
 	tags = tags || {}
 	const dependsOn = []
 	if (cloudWatch !== undefined && cloudwatch === undefined)
@@ -348,7 +348,7 @@ const configurePolicies = (policies, prefix, config) => {
 const fileExists = filePath => new Promise(onSuccess => fs.exists(path.resolve(filePath||''), yes => onSuccess(yes ? true : false)))
 
 module.exports = {
-	lambda: createLambda,
+	fn: createFunction,
 	layer: createLayer
 }
 

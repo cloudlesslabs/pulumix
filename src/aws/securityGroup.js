@@ -54,7 +54,7 @@ const createSecurityGroup = async ({ name, description, vpcId, ingress, egress, 
 		throw new Error('Missing required \'name\' argument.')
 
 	tags = tags || {}
-    
+	
 	// Security group doc: https://www.pulumi.com/docs/reference/pkg/aws/ec2/securitygroup/
 	const securityGroup = new aws.ec2.SecurityGroup(name, {
 		name,
@@ -164,6 +164,8 @@ const resolveRules = async (rules, type, securityGroupId) => {
 	return securityGroupRules
 }
 
-module.exports = createSecurityGroup
+module.exports = {
+	sg: createSecurityGroup
+}
 
 

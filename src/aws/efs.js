@@ -136,4 +136,6 @@ const leanify = resource => {
 	return rest
 }
 
-module.exports = createEFS
+module.exports = {
+	efs: createEFS
+}
