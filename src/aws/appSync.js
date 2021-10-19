@@ -260,6 +260,7 @@ const createResolver = async ({ api, name, field, type, functionArn, tableName, 
  * @return {Number}						.iatTtl
  * @return {Object}					.userPoolConfig
  * @return {String}						.userPoolId
+ * @return {String}						.defaultAction			Allowed values: 'DENY', 'ALLOW' (default)
  * @return {String}						.appIdClientRegex
  * @return {String}						.awsRegion
  * @return {Object}					.additionalAuthenticationProviders[]
@@ -276,13 +277,14 @@ const createResolver = async ({ api, name, field, type, functionArn, tableName, 
  */
 const getAuth = authConfig => {
 	const { apiKey, iam, cognito, oidc } = authConfig || {}
-	const { userPoolId, appIdClientRegex, awsRegion } = cognito || {}
+	const { userPoolId, appIdClientRegex, awsRegion, defaultAction } = cognito || {}
 	const { issuer, clientId, authTtl, iatTtl } = oidc || {}
 
 	if (!apiKey && !iam && !cognito && !oidc)
 		return { authenticationType:'API_KEY' }
 
-	const authConfigs = []
+	let authConfigs = []
+	let userPoolAuthConfig
 	if (apiKey)
 		authConfigs.push({ authenticationType:'API_KEY' })
 	if (iam)
@@ -291,14 +293,15 @@ const getAuth = authConfig => {
 		if (!awsRegion)
 			throw new Error('Missing required \'authConfig.cognito.awsRegion\'. This property is required when the \'authConfig.cognito\' is configured.')
 		
-		authConfigs.push({ 
+		userPoolAuthConfig = { 
 			authenticationType:'AMAZON_COGNITO_USER_POOLS',
 			userPoolConfig: {
 				userPoolId, 
 				appIdClientRegex, 
-				awsRegion
+				awsRegion,
+				defaultAction: defaultAction || 'ALLOW'
 			}
-		})
+		}
 	}
 	if (issuer)
 		authConfigs.push({ 
@@ -310,6 +313,9 @@ const getAuth = authConfig => {
 				iatTtl
 			}
 		})
+
+	if (userPoolAuthConfig)
+		authConfigs = [userPoolAuthConfig, ...authConfigs]
 
 	const authConfiguration = !authConfigs || !authConfigs.length 
 		? { authenticationType:'API_KEY' }

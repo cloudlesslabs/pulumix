@@ -295,7 +295,7 @@ ARG DB_PASSWORD
 The following example shows what a `Dockerfile` for an AWS Lambda would look like:
 
 ```dockerfile
-FROM amazon/aws-lambda-nodejs:12
+FROM amazon/aws-lambda-nodejs:14.2021.09.29.20
 ARG FUNCTION_DIR="/var/task"
 
 # Pulumi setup
@@ -534,8 +534,7 @@ const graphql = await appSync.api({
 	},
 	authConfig: {
 		cognito: {
-			userPoolId: '1234'
-			appIdClientRegex: '^my-app.*',
+			userPoolId: '1234',
 			awsRegion: 'ap-southeast-2'
 		}
 	},
@@ -561,9 +560,10 @@ const graphql = await appSync.api({
 ```js
 {
 	cognito: {
-		userPoolId: '1234'
-		appIdClientRegex: '^my-app.*',
-		awsRegion: 'ap-southeast-2'
+		userPoolId: '1234' // Required
+		awsRegion: 'ap-southeast-2', // Required
+		// appIdClientRegex: '^my-app.*', // Optional
+		// defaultAction: 'DENY' // Default is 'ALLOW'. Allowed values: 'DENY', 'ALLOW'
 	}
 }
 ```
@@ -1085,6 +1085,9 @@ module.exports = main()
 ```
 
 ## Lambda
+
+> IMPORTANT: When using Docker, please make sure that your image uses the same architecture (i.e., `x86_64` vs `arm64`) then your Lambda OS. DO NOT USE something like `FROM amazon/aws-lambda-nodejs:14` as this is equivalent to the latest digest. Who knows what architecture the latest digest uses. Instead, browse the [Docker Hub registry](https://hub.docker.com/r/amazon/aws-lambda-nodejs/tags) and find the tag that explicitly supports your OS architecture. For example, `FROM amazon/aws-lambda-nodejs:14.2021.09.29.20` uses `linux/arm64` while `14.2021.10.14.13` uses `linux/amd64`.
+
 ### A few words about AWS Lambda
 #### AWS Lambda key design principles
 
@@ -1110,7 +1113,7 @@ lambda.fn({
 })
 ```
 
-__WARNING__: If you're using Docker, you must make sure that the Docker image is compatible with the choosen architecture. For a list of all the AWS lambda images with their associated OS, please refer to https://hub.docker.com/r/amazon/aws-lambda-nodejs/tags?page=1&ordering=last_updated.
+__IMPORTANT__: When using Docker, please make sure that your image uses the same architecture (i.e., `x86_64` vs `arm64`) then your Lambda OS. DO NOT USE something like `FROM amazon/aws-lambda-nodejs:14` as this is equivalent to the latest digest. Who knows what architecture the latest digest uses. Instead, browse the [Docker Hub registry](https://hub.docker.com/r/amazon/aws-lambda-nodejs/tags) and find the tag that explicitly supports your OS architecture. For example, `FROM amazon/aws-lambda-nodejs:14.2021.09.29.20` uses `linux/arm64` while `14.2021.10.14.13` uses `linux/amd64`.
 
 ### Basic lambda
 
@@ -1353,7 +1356,7 @@ __WARNING__: You must make sure that the Docker image is compatible with the cho
 	```
 	2. Paste the following in the `Dockerfile`:
 	```
-	FROM amazon/aws-lambda-nodejs:12
+	FROM amazon/aws-lambda-nodejs:14.2021.09.29.20
 	ARG FUNCTION_DIR="/var/task"
 
 	# Create function directory
@@ -1406,7 +1409,7 @@ const lambdaOutput = lambda.fn({
 })
 ```
 
-> (1) The [amazon/aws-lambda-nodejs:12](https://hub.docker.com/r/amazon/aws-lambda-nodejs) docker image hosts a node web server listening on port 8080. The CMD expects a string or array following this naming convention: "<FILE NAME CONTAINING THE HANDLER>.<HANDLER NAME>".
+> (1) The [amazon/aws-lambda-nodejs:14.2021.09.29.20](https://hub.docker.com/r/amazon/aws-lambda-nodejs) docker image hosts a node web server listening on port 8080. The CMD expects a string or array following this naming convention: "<FILE NAME CONTAINING THE HANDLER>.<HANDLER NAME>".
 > (2) Once the container is running, the only way to test it is to perform POST to this path: `2015-03-31/functions/function/invocations`. This container won't listen to anything else; no GET, no PUT, no DELETE. 
 
 #### Setting up environment variables and passing arguments
@@ -1414,7 +1417,7 @@ const lambdaOutput = lambda.fn({
 As a quick refresher, the following `Dockerfile`:
 
 ```dockerfile
-FROM amazon/aws-lambda-nodejs:12
+FROM amazon/aws-lambda-nodejs:14.2021.09.29.20
 ARG FUNCTION_DIR="/var/task"
 
 ENV HELLO Mike Davis
@@ -1443,7 +1446,7 @@ exports.handler = async event => {
 This could have been set up via the `docker build` and with an `ARG` in the `Dockerfile`:
 
 ```dockerfile
-FROM amazon/aws-lambda-nodejs:12
+FROM amazon/aws-lambda-nodejs:14.2021.09.29.20
 ARG FUNCTION_DIR="/var/task"
 ARG MSG
 ENV HELLO $MSG
@@ -2239,7 +2242,7 @@ Which version of the AWS SDK is required depends on the Pulumi version you're us
 
 ### AWS Lambda: `IMAGE Launch error: fork/exec /lambda-entrypoint.sh: exec format error`
 
-This typically happens when the image used to run Lambda containers is using an OS that is incompatible with the expected Lambda OS. For example, [amazon/aws-lambda-nodejs:12](https://hub.docker.com/layers/amazon/aws-lambda-nodejs/12/images/sha256-e94c6b08604388b12cb4c457ca2d14aff99f1e96f00179b91429807301e9db82?context=explore) uses the `arm64` architecture. This error will occur if the Lambda has been configured with its default `x86_64` architecture. 
+This typically happens when the image used to run Lambda containers is using an OS that is incompatible with the expected Lambda OS. For example, `amazon/aws-lambda-nodejs:14.2021.09.29.20` uses the `arm64` architecture. This error will occur if the Lambda has been configured with its default `x86_64` architecture. 
 
 To fix this issue, please refer to the [ARM architecture recommended](#arm-architecture-recommended) section.
 
