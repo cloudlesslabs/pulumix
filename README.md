@@ -423,6 +423,40 @@ console.log('RESULT')
 # AWS
 ## AppSync
 ### Default AppSync settings
+
+The following example:
+- Creates a new GraphQL endpoint with the schema defined below. That new endpoint only accepts authenticated requests via API key (default setup).
+- Connects a Lambda resolver to the `project` field of the `Query` type. That lambda will receive the following payload:
+```js
+/**
+ * Processes the GraphQL request.
+ * 
+ * @param  {Object} event.args			Reserved property. Arguments, e.g., { where: { id:1 , name:'jeans' }, limit:20 }
+ * @param  {Object} event.identity		Reserved property. Identity object. It depends on the authentication method. It will typically contain claims.
+ * @param  {Object} event.source		Reserved property. GraphQL response object from a parent.
+ * @param  {Object} event...rest		Depends on the the value of 'mappingTemplate.payload'
+ * 
+ * @return {Object}
+ */
+exports.handler = async event => {
+	const { field, hello, ...rest } = event
+	const { source, args, identity } = rest
+	console.log('FIELD CONTROLLED VIA THE mappingTemplate.payload')
+	console.log({
+		field, 
+		hello
+	})
+
+	console.log('RESERVED FIELDS')
+	console.log({
+		source, // GraphQL response object from a parent.
+		args, // Arguments. In the example below { id:1, name:'jeans' }
+		identity // Identity object. It depends on the authentication method. It will typically contain claims.
+	})	
+}
+```
+
+
 ```js
 const pulumi = require('@pulumi/pulumi')
 const { resolve, aws: { appSync } } = require('@cloudlesslabs/pulumix')
@@ -458,7 +492,7 @@ const main = async () => {
 				id: ID!
 			}
 			type Query {
-				products: [Product]
+				products(id: Int, name: String): [Product]
 				users: [User]
 			}`, 
 		resolver: {
@@ -479,7 +513,8 @@ const main = async () => {
 		functionArn: productLambda.arn,
 		mappingTemplate:{
 			payload: {
-				field: 'projects'
+				field: 'projects',
+				hello: 'world'
 			}
 		}, 
 		tags
