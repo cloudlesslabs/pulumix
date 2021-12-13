@@ -32,7 +32,9 @@ npm i @cloudlesslabs/pulumix
 >		- [Default AppSync settings](#default-appsync-settings)
 >		- [Auth with Cognito, OIDC and IAM](#auth-with-cognito-oidc-and-iam)
 >			- [IAM config](#iam-config)
->			- [Cognito config](#cognito-config)
+>			- [Cognito Auth](#cognito-auth)
+>				- [config](#cognito-config)
+>				- [`$context.identity` object](#cognito-contextidentity-object)
 >			- [OIDC config](#oidc-config)
 >	- [Aurora](#aurora)
 >		- [Basic usage](#aurora---basic-usage)
@@ -430,11 +432,12 @@ The following example:
 ```js
 /**
  * Processes the GraphQL request.
- * 
- * @param  {Object} event.args			Reserved property. Arguments, e.g., { where: { id:1 , name:'jeans' }, limit:20 }
- * @param  {Object} event.identity		Reserved property. Identity object. It depends on the authentication method. It will typically contain claims.
- * @param  {Object} event.source		Reserved property. GraphQL response object from a parent.
- * @param  {Object} event...rest		Depends on the the value of 'mappingTemplate.payload'
+ *
+ * @param  {Object} event
+ * @param  {Object} 	...rest		Depends on the the value of 'mappingTemplate.payload'
+ * @param  {Object} 	.args			Arguments, e.g., { where: { id:1 , name:'jeans' }, limit:20 }
+ * @param  {Object} 	.identity		Identity object. It depends on the authentication method. It will typically contain claims.
+ * @param  {Object} 	.source		GraphQL response object from parent.
  * 
  * @return {Object}
  */
@@ -456,6 +459,7 @@ exports.handler = async event => {
 }
 ```
 
+To learn more about the `identity` object, please refer to the [Cognito `$context.identity` object example](#cognito-contextidentity-object).
 
 ```js
 const pulumi = require('@pulumi/pulumi')
@@ -588,7 +592,8 @@ const graphql = await appSync.api({
 }
 ```
 
-#### Cognito config
+#### Cognito Auth
+##### Cognito config
 
 `authConfig`:
 
@@ -599,6 +604,37 @@ const graphql = await appSync.api({
 		awsRegion: 'ap-southeast-2', // Required
 		// appIdClientRegex: '^my-app.*', // Optional
 		// defaultAction: 'DENY' // Default is 'ALLOW'. Allowed values: 'DENY', 'ALLOW'
+	}
+}
+```
+
+##### Cognito `$context.identity` object
+
+This object is the one that is both accessible in the VTL mapping template and passed to the Lambda under the `event.identity` property. It is similar to this sample:
+
+```js
+{
+	claims: {
+		sub: '3c5b5034-1975-4889-a839-d43a7e0fbc48',
+		iss: 'https://cognito-idp.ap-southeast-2.amazonaws.com/ap-southeast-2_k63pzVJgQ',
+		version: 2,
+		client_id: '7n06fpr1t4ntm1hofbh8bnhp96',
+		origin_jti: '84c72cd1-eaad-40e5-a98f-9d7cd7a586cd',
+		event_id: 'c95393c0-bab7-40a8-b9e9-48e17b8d23fd',
+		token_use: 'access',
+		scope: 'phone openid profile email',
+		auth_time: 1634788385,
+		exp: 1634791985,
+		iat: 1634788385,
+		jti: 'ade2fe51-4b56-4a8f-9d9f-a9f3d03fd0aa',
+		username: '3c5b5034-1975-4889-a839-d43a7e0fbc48'
+	},
+	defaultAuthStrategy: 'ALLOW',
+	groups: null,
+	issuer: 'https://cognito-idp.ap-southeast-2.amazonaws.com/ap-southeast-2_k63pzVJgQ',
+	sourceIp: [ '49.179.157.39' ],
+	sub: '3c5b5034-1975-4889-a839-d43a7e0fbc48',
+	username: '3c5b5034-1975-4889-a839-d43a7e0fbc48'
 	}
 }
 ```

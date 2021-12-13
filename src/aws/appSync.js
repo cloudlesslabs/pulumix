@@ -446,7 +446,9 @@ const getLambdaRequestResponseTemplate = input => {
 			...payload,
 			source: '$utils.toJson($context.source)',
 			args: '$utils.toJson($context.arguments)',
-			identity: '$utils.toJson($context.identity)'
+			identity: '$utils.toJson($context.identity)',
+			info: '$utils.toJson($context.info)',
+			request: '$utils.toJson($context.request)'
 		}
 	}
 	
@@ -454,7 +456,9 @@ const getLambdaRequestResponseTemplate = input => {
 		requestTemplate: JSON.stringify(requestTemplate, null, '  ')
 			.replace('"$utils.toJson($context.source)"','$utils.toJson($context.source)')
 			.replace('"$utils.toJson($context.arguments)"','$utils.toJson($context.arguments)')
-			.replace('"$utils.toJson($context.identity)"','$utils.toJson($context.identity)'),
+			.replace('"$utils.toJson($context.identity)"','$utils.toJson($context.identity)')
+			.replace('"$utils.toJson($context.info)"','$utils.toJson($context.info)')
+			.replace('"$utils.toJson($context.request)"','$utils.toJson($context.request)')
 	}
 
 	if (responseTemplate)
