@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [2.1.1](https://github.com/cloudlesslabs/pulumix/compare/v2.1.0...v2.1.1) (2021-12-13)
+
+
+### Features
+
+* Add info and request in the payload in AppSync ([b92cd20](https://github.com/cloudlesslabs/pulumix/commit/b92cd20fe0c665640156c092483353896b1f770b))
+
 ## [2.1.0](https://github.com/cloudlesslabs/pulumix/compare/v2.0.1...v2.1.0) (2021-10-19)
 
 ### [2.0.1](https://github.com/cloudlesslabs/pulumix/compare/v2.0.0...v2.0.1) (2021-10-19)
