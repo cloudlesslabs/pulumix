@@ -1,7 +1,7 @@
 # PULUMIX - PULUMI RECIPES
 
 > __Pulumi guide__: To learn more about Pulumi, please refer to https://gist.github.com/nicolasdao/6cdd85d94b8ee992297d351c248f4092.
-> __IAM roles & policies__: Managing AWS resources almost always involves managing IAM roles and policies. For a quick recap on that topic, please refer to this document: https://gist.github.com/nicolasdao/830fc1d1b6ce86e0d8bebbdedb2f2626#iam-recap.
+> __IAM roles & policies__: Managing AWS resources almost always involves managing IAM roles and policies. For a quick recap on that topic, please refer to this document: https://gist.github.com/nicolasdao/6cdd85d94b8ee992297d351c248f4092#iam-recap.
 
 ```
 (test -f .npmrc || echo @cloudlesslabs:registry=https://npm.pkg.github.com/cloudlesslabs >> .npmrc) && \ 
@@ -147,7 +147,7 @@ const ACCOUNT_ID = aws.config.allowedAccountIds[0]
 # Helper methods
 ## Resolving `Output<T>`
 
-To know more about the issue this helper fixes, please refer to this document: https://gist.github.com/nicolasdao/830fc1d1b6ce86e0d8bebbdedb2f2626#the-outputt-type-the-pulumiinterpolate-and-apply-functions
+To know more about the issue this helper fixes, please refer to this document: https://gist.github.com/nicolasdao/6cdd85d94b8ee992297d351c248f4092#the-outputt-type-the-pulumiinterpolate-and-apply-functions
 
 ```js
 const pulumi = require('@pulumi/pulumi')
