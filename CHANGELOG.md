@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [2.1.2](https://github.com/cloudlesslabs/pulumix/compare/v2.1.1...v2.1.2) (2021-12-14)
+
+
+### Features
+
+* Add support for new 'lambdaResolvers' and 'dataSource' methods in the appSync API ([e924621](https://github.com/cloudlesslabs/pulumix/commit/e92462152289964ee13e9e1eaf855d5b3797efa3))
+
 ### [2.1.1](https://github.com/cloudlesslabs/pulumix/compare/v2.1.0...v2.1.1) (2021-12-13)
 
 
