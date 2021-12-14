@@ -63,6 +63,7 @@ npm i @cloudlesslabs/pulumix
 >			- [Setting up environment variables and passing arguments](#setting-up-environment-variables-and-passing-arguments)	
 >		- [Lambda with EFS](#lambda-with-efs)
 >		- [Lambda with Layers](#lambda-with-layers)
+>		- [Lambda versions and aliases](#lambda-versions-and-aliases)
 >	- [Policy](#aws-policy)
 >	- [S3](#s3)
 >		- [Creating a public bucket for hosting a static website](#creating-a-public-bucket-for-hosting-a-static-website)
@@ -71,6 +72,8 @@ npm i @cloudlesslabs/pulumix
 >	- [Secret](#secret)
 >		- [Getting stored secrets](#getting-stored-secrets)
 >	- [Security Group](#security-group)
+>	- [SSM](#ssm)
+>		- [Parameter Store](#parameter-store)
 >	- [Step-function](#step-function)
 >	- [VPC](#vpc)
 > * [GCP](#gcp)
@@ -1761,6 +1764,43 @@ module.exports = {
 }
 ```
 
+### Lambda versions and aliases
+
+> To learn more about what versions and aliases are and why they are useful, please refer to this document: [AWS LAMBDA/Deployment strategies](https://gist.github.com/nicolasdao/e72beb55f3550351e777a4a52d18f0be#deployment-strategies)
+
+To publish the latest deployment to a new version, use the `publish` property:
+
+```js
+const lambdaOutput = await lambda.fn({
+	name: PROJECT,
+	fn: {
+		runtime: RUNTIME, 	
+		dir: resolve('./app')
+	},
+	publish: true,
+	timeout:30, 
+	memorySize:128,  
+	tags
+})
+```
+
+To create an alias:
+
+```js
+const testLambdaAlias = new aws.lambda.Alias('testLambdaAlias', {
+	description: 'a sample description',
+	functionName: lambdaOutput.arn,
+	functionVersion: '1',
+	routingConfig: {
+		additionalVersionWeights: {
+			'2': 0.5,
+		}
+	}
+})
+```
+
+Full API doc at https://www.pulumi.com/registry/packages/aws/api-docs/lambda/alias/.
+
 ## AWS Policy
 
 ```js
@@ -1932,6 +1972,35 @@ const { securityGroup:mySecurityGroup, securityGroupRules:myRules } = await secu
 	}
 })
 ```
+
+## SSM
+### Parameter Store
+
+```js
+const aws = require('@pulumi/aws')
+
+const foo = new aws.ssm.Parameter('foo', {
+	name: 'foo',
+	type: 'String',
+	value: JSON.stringify({ hello:'world' })
+})
+```
+
+> IMPORTANT: If you wish to retrieve the value later, it is recommended to set the optional `name` property, which will become the parameter store ID. This ID is needed to retrieve the value.
+
+To retrieve a value from Parameter store:
+
+```js
+const aws = require('@pulumi/aws')
+
+const main = async () => {
+	const value = await aws.ssm.Parameter.get('foo','foo')
+}
+```
+
+> NOTICE: The 2nd argument is the parameter store ID. 
+
+Notice tha
 
 ## Step-function
 

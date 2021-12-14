@@ -44,6 +44,7 @@ const { resolve } = require('../utils')
  * @param  {Output<[String]>}	vpcConfig.securityGroupIds
  * @param  {Output<String>}		fileSystemConfig.arn				Used to mount an AWS EFS access point.
  * @param  {Output<String>}		fileSystemConfig.localMountPath		Used to mount an AWS EFS access point.
+ * @param  {Boolean}			publish								Default false. True publishes the lambda to a new version.
  * @param  {Boolean}			cloudwatch 							Default false. When true, cloudwatch is enabled.
  * @param  {Boolean}			cloudWatch 							Deprecated. Use 'cloudwatch' instead.
  * @param  {Number}				logsRetentionInDays					Default 0 (i.e., never expires). Only applies when 'cloudwatch' is true.
@@ -78,7 +79,7 @@ const { resolve } = require('../utils')
  * (3) If the lambda uses Docker, the architecture MUST BE COMPATIBLE with the Docker image. For a list of all the 
  * lambda images with their associated OS, please refer to https://hub.docker.com/r/amazon/aws-lambda-nodejs/tags?page=1&ordering=last_updated
  */
-const createFunction = async ({ name, description, architecture, fn, layers, timeout=3, memorySize=128, handler, allowedPrincipals, policies, vpcConfig, fileSystemConfig, cloudWatch, cloudwatch, logsRetentionInDays, tags }) => {
+const createFunction = async ({ name, description, architecture, fn, layers, timeout=3, memorySize=128, handler, allowedPrincipals, policies, vpcConfig, fileSystemConfig, publish, cloudWatch, cloudwatch, logsRetentionInDays, tags }) => {
 	tags = tags || {}
 	const dependsOn = []
 	if (cloudWatch !== undefined && cloudwatch === undefined)
@@ -204,6 +205,7 @@ const createFunction = async ({ name, description, architecture, fn, layers, tim
 		vpcConfig: Object.keys(vpcConfig||{}).length ? vpcConfig : undefined,
 		fileSystemConfig,
 		dependsOn,
+		publish,
 		tags: {
 			...tags,
 			Name: name
