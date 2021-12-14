@@ -37,6 +37,7 @@
     "@pulumi/pulumi": "^3.14.0",
     "core-async": "^2.0.5",
     "fast-glob": "^3.2.7",
+    "graphql": "^16.1.0",
     "mime-types": "^2.1.33",
     "puffy": "^1.7.0"
   }

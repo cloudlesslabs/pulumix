@@ -7,25 +7,7 @@ LICENSE file in the root directory of this source tree.
 */
 
 const aws = require('@pulumi/aws')
-
-const DATA_SOURCE = { 
-	lambda: { 
-		typeName: 'AWS_LAMBDA', 
-		configName: 'lambdaConfig' 
-	}, 
-	dynamodb: { 
-		typeName: 'AMAZON_DYNAMODB', 
-		configName: 'dynamodbConfig' 
-	}, 
-	opensearch: { 
-		typeName: 'AMAZON_ELASTICSEARCH', 
-		configName: 'elasticsearchConfig' 
-	}, 
-	http: { 
-		typeName: 'HTTP', 
-		configName: 'httpConfig' 
-	}
-}
+const { parse } = require('graphql')
 
 /**
  * Creates an AWS AppSync GraphQL API. Doc: https://www.pulumi.com/docs/reference/pkg/aws/appsync/graphqlapi/
@@ -37,7 +19,7 @@ const DATA_SOURCE = {
  * @param  {String}				name	
  * @param  {String}				description		
  * @param  {String}				schema							GraphQL schema	
- * @param  {[Output<String>]}	resolver.lambdaArns				Lambda ARNs. This is needed to create invoke policies
+ * @param  {[Output<String>]}	resolver.lambdaArns				Lambda ARNs. This is needed to create 'invoke' policies
  * 
  * @param  {Object}				authConfig						Default { apiKey:true }
  * @param  {Boolean}				.apiKey						Default true if none of the other methods are enabled.
@@ -135,7 +117,7 @@ const createApi = async ({ name, description, schema, resolver, authConfig, clou
 	const graphQlApi = new aws.appsync.GraphQLApi(name, {
 		name,
 		description,
-		...getAuth(authConfig),
+		..._getAuth(authConfig),
 		schema,
 		logConfig,
 		dependsOn,
@@ -146,40 +128,82 @@ const createApi = async ({ name, description, schema, resolver, authConfig, clou
 	})
 
 	return {
-		api: leanify(graphQlApi),
+		api: _leanify(graphQlApi),
 		roleArn: appSyncRole.arn
 	}
 }
 
 /**
+ * Create a new data source. Doc at https://www.pulumi.com/docs/reference/pkg/aws/appsync/datasource/
+ * 
+ * @param  {String}			name					Required
+ * @param  {Object}			api						Required
+ * @param  {Output<String>}		.id					Required
+ * @param  {Output<String>}		.roleArn			Required
+ * @param  {String}			functionArn						
+ * @param  {String}			tableName						
+ * @param  {String}			useCallerCredentials						
+ * @param  {String}			region						
+ * @param  {String}			httpEndpoint						
+ * @param  {String}			openSearchEndpoint						
+ * @param  {Object}			tags
+ * 						
+ * @return {Output<DataSource>}						
+ */
+const createDataSource = async ({ name, api, functionArn, tableName, useCallerCredentials, region, httpEndpoint, openSearchEndpoint, tags }) => {
+	tags = tags || {}
+
+	if (!name)
+		throw new Error('Missing required argument \'name\'')
+	if (!api)
+		throw new Error('Missing required argument \'api\'')
+	if (!api.id)
+		throw new Error('Missing required argument \'api.id\'')
+	if (!api.roleArn)
+		throw new Error('Missing required argument \'api.roleArn\'')
+	
+	const config = _getDataSourceConfig({ functionArn, tableName, useCallerCredentials, region, httpEndpoint, openSearchEndpoint })
+
+	// AppSync data source doc: https://www.pulumi.com/docs/reference/pkg/aws/appsync/datasource/
+	const dataSourceName = `${name}-${config.name}`.replace(/[-\s]/g,'_')
+	const dataSource = new aws.appsync.DataSource(dataSourceName, {
+		apiId: api.id,
+		name: dataSourceName,
+		description: `GraphQL '${config.name}' data source for API '${api.id}'.`,
+		serviceRoleArn: api.roleArn,
+		type: config.type,
+		...config.value,
+		tags: {
+			...tags,
+			Name: dataSourceName
+		}
+	})
+
+	return _leanify(dataSource)
+}
+
+/**
  * Creates an AppSync Resolver.
  * Resources:
- * 	1. AppSync data source.
- * 	2. AppSync resolver.
+ * 	1. AppSync resolver.
  * 
- * @param  {String} 		api.id			
- * @param  {String} 		api.roleArn		
- * @param  {String} 		name			
- * @param  {String} 		field									Query field or property field to be resolved (e.g., 'projects', 'name').	
- * @param  {String} 		type									e.g., 'Query', 'Mutation', 'Product', 'Person'.	
- * 
- * @param  {Output<String>} functionArn								(dataSource.type:'lambda')
- * @param  {Output<String>} tableName								(dataSource.type:'dynamodb')
- * @param  {Output<String>} useCallerCredentials					(dataSource.type:'dynamodb')	
- * @param  {Output<String>} region									(dataSource.type:'dynamodb','opensearch')	
- * @param  {Output<String>} endpoint								(dataSource.type:'opensearch','http')	
- * 
- * @param  {String} 		mappingTemplate.operation				(dataSource.type:'lambda') Optional. Valid values: 'Invoke' (default), 'BatchInvoke'
- * @param  {Object} 		mappingTemplate.payload					(dataSource.type:'lambda') Optional.
- * @return {String} 		mappingTemplate.responseTemplate		(dataSource.type:'lambda') Optional.
- * 
- * @param  {Object} 		tags									
- * @return {[type]}                    [description]
+ * @param  {String} 			api.id			
+ * @param  {String} 			api.roleArn		
+ * @param  {String} 			name			
+ * @param  {String} 			type					e.g., 'Query', 'Mutation', 'Product', 'Person'.	
+ * @param  {String} 			field					Query field or property field to be resolved (e.g., 'projects', 'name').	
+ * @param  {Output<DataSource>} dataSource				System that can be queried to retrieve or store data (e.g., Lambda, DynamoDB, HTTP, OpenSearch)
+ * @param  {String} 			mappingTemplate			VTL that maps a field request to a query to the data source.	
+ * @param  {String} 				.operation			(dataSource.type:'lambda') Optional. Valid values: 'Invoke' (default), 'BatchInvoke'
+ * @param  {Object} 				.payload			(dataSource.type:'lambda') Optional. Example: { field:'projects' }
+ * @param  {String} 				.responseTemplate	(dataSource.type:'lambda') Optional.
+ * @param  {Object} 			tags	
+ * 								
+ * @return {Output<Resolver>}	resolver
  */
-const createResolver = async ({ api, name, field, type, functionArn, tableName, useCallerCredentials, region, httpEndpoint, openSearchEndpoint, mappingTemplate, tags }) => {
+const createResolver = async ({ name, api, type, field, dataSource, mappingTemplate, tags }) => {
 	tags = tags || {}
-	const dataSource = getDataSource({ functionArn, tableName, useCallerCredentials, region, httpEndpoint, openSearchEndpoint })
-
+	
 	if (!api)
 		throw new Error('Missing required argument \'api\'')
 	if (!api.id)
@@ -194,46 +218,177 @@ const createResolver = async ({ api, name, field, type, functionArn, tableName, 
 		throw new Error('Missing required argument \'type\'')
 	if (!dataSource)
 		throw new Error('Missing required argument \'dataSource\'')
-	if (!dataSource.type)
-		throw new Error('Missing required argument \'dataSource.type\'')
-	if (!dataSource.config)
-		throw new Error('Missing required argument \'dataSource.config\'')
-	if (!DATA_SOURCE[dataSource.type])
-		throw new Error(`Data source type '${dataSource.type}' is not supported`)
-	if (dataSource.type != 'lambda')
-		throw new Error(`Data source type '${dataSource.type}' is not yet supported by @cloudlesslabs/pulumi-recipes`)
-
-	// AppSync data source doc: https://www.pulumi.com/docs/reference/pkg/aws/appsync/datasource/
-	const dataSourceName = `${name}-${dataSource.type}`.replace(/-/g,'_')
-	const dataSourceConfig = getDataSourceConfig(dataSource)
-	const _dataSource = new aws.appsync.DataSource(dataSourceName, {
-		apiId: api.id,
-		name: dataSourceName,
-		description: `GraphQL ${dataSource.type} data source for API '${api.id}'.`,
-		serviceRoleArn: api.roleArn,
-		type: DATA_SOURCE[dataSource.type].typeName,
-		...dataSourceConfig,
-		tags: {
-			...tags,
-			Name: dataSourceName
-		}
-	})
 
 	// AppSync resolver doc: https://www.pulumi.com/docs/reference/pkg/aws/appsync/resolver/
-	const requestResponseTemplate = getRequestResponseTemplate(dataSource.type, mappingTemplate)
+	const requestResponseTemplate = _getRequestResponseTemplate(mappingTemplate)
 	const resolver = new aws.appsync.Resolver(name, {
 		apiId: api.id,
 		name: name,
 		field: field,
 		type: type,
-		dataSource: _dataSource.name,
-		...requestResponseTemplate
+		dataSource: dataSource.name,
+		...requestResponseTemplate,
+		tags: {
+			...tags,
+			Name: name
+		}
 	})
 
+	return _leanify(resolver)
+}
+
+/**
+ * Creates a single Lambda data source and many resolvers that forward requests to that lambda.
+ * Doc:
+ * 	- AppSync resolver doc: https://www.pulumi.com/docs/reference/pkg/aws/appsync/resolver/
+ * 	- AppSync data source doc: https://www.pulumi.com/docs/reference/pkg/aws/appsync/datasource/
+ * 
+ * Resources:
+ * 	1. AppSync data source.
+ * 	2. AppSync resolvers.
+ * 
+ * @param  {String}				api.id			
+ * @param  {String}				api.roleArn		
+ * @param  {String}				name			
+ * @param  {Object}				schema					e.g., 'Query', 'Mutation', 'Product', 'Person'.	
+ * @param  {String}					.value				GraphQL schema string
+ * @param  {[String]}				.includes			Default ['Query', 'Mutation', 'Subscription'].
+ * @param  {Object}				tags	
+ * 								
+ * @return {Object}				output
+ * @return {Output<DataSource>}		.dataSource
+ * @return {[Output<Resolver>]}		.resolvers
+ */
+const createLambdaResolvers = async ({ name, api, schema, functionArn, tags }) => {
+	tags = tags || {}
+	
+	if (!api)
+		throw new Error('Missing required argument \'api\'')
+	if (!api.id)
+		throw new Error('Missing required argument \'api.id\'')
+	if (!api.roleArn)
+		throw new Error('Missing required argument \'api.roleArn\'')
+	if (!name)
+		throw new Error('Missing required argument \'name\'')
+	if (!schema)
+		throw new Error('Missing required argument \'schema\'')
+	if (!schema.value)
+		throw new Error('Missing required argument \'schema.value\'')
+	if (!functionArn)
+		throw new Error('Missing required argument \'functionArn\'')
+
+	const includes = schema.includes && schema.includes.length ? schema.includes : ['Query', 'Mutation', 'Subscription']
+	const getTypeFields = _getSchemaTypeFields(schema.value)
+	
+	const typeFields = includes.reduce((acc,type) => {
+		const fields = getTypeFields(type)
+		if (fields && fields.length) 
+			acc.push({ type, fields })
+		return acc
+	}, [])
+
+	if (!typeFields.length)
+		throw new Error(`Fields not found in schema for types ${includes}.`)
+
+	// Creates a single data source for all the resolvers
+	const dataSource = await createDataSource({ name, api, functionArn, tags })
+	
+	// Creates one resolver per field. Requests are forwarded to the Lambda
+	const resolvers = typeFields.reduce((acc, { type, fields }) => {
+		acc.push(...fields.map(field => {
+			// AppSync resolver doc: https://www.pulumi.com/docs/reference/pkg/aws/appsync/resolver/
+			const resolverName = `${name}-${type}-${field}`
+			const requestResponseTemplate = _getRequestResponseTemplate({ payload:{ field } })
+			const resolver = new aws.appsync.Resolver(resolverName, {
+				apiId: api.id,
+				name: resolverName,
+				field: field,
+				type: type,
+				dataSource: dataSource.name,
+				...requestResponseTemplate,
+				tags: {
+					...tags,
+					Name: resolverName
+				}
+			})
+
+			return _leanify(resolver)
+		}))
+		return acc
+	}, [])
+
 	return {
-		resolver: leanify(resolver),
-		dataSource: leanify(_dataSource)
+		dataSource,
+		resolvers
 	}
+}
+
+/**
+ * https://www.pulumi.com/docs/reference/pkg/aws/appsync/datasource/#inputs
+ * 
+ * @param  {String} type								Valid values: 'lambda', 'rds', 'http', 'dynamodb', 'opensearch'
+ * @param  {Output<String>} functionArn				(type:'lambda')
+ * @param  {Output<String>} tableName				(type:'dynamodb')
+ * @param  {Output<String>} useCallerCredentials	(type:'dynamodb')	
+ * @param  {Output<String>} region					(type:'dynamodb','opensearch')	
+ * @param  {Output<String>} httpEndpoint			(type:'http')	
+ * @param  {Output<String>} openSearchEndpoint		(type:'opensearch')	
+ * 
+ * @return {Object}			config
+ * @return {String}				.name				friendly name
+ * @return {String}				.type				Allowed values: 'AWS_LAMBDA', 'AMAZON_DYNAMODB', 'HTTP', 'AMAZON_ELASTICSEARCH'
+ * @return {Object}				.value				Data source config
+ */
+const _getDataSourceConfig = ({ functionArn, tableName, useCallerCredentials, region, httpEndpoint, openSearchEndpoint }) => {
+	if (functionArn)
+		// doc: https://www.pulumi.com/docs/reference/pkg/aws/appsync/datasource/#datasourcelambdaconfig
+		return {
+			name: 'lambda',
+			type: 'AWS_LAMBDA',
+			value: {
+				lambdaConfig: {
+					functionArn
+				}
+			}
+		}
+	else if (tableName) 
+		// doc: https://www.pulumi.com/docs/reference/pkg/aws/appsync/datasource/#datasourcedynamodbconfig
+		return {
+			name: 'dynamodb',
+			type: 'AMAZON_DYNAMODB',
+			value: {
+				dynamodbConfig: {
+					tableName,
+					region,
+					useCallerCredentials
+				}
+			}
+		}
+	else if (httpEndpoint)
+		// doc: https://www.pulumi.com/docs/reference/pkg/aws/appsync/datasource/#datasourcehttpconfig
+		return {
+			name: 'http',
+			type: 'HTTP',
+			value: {
+				httpConfig: {
+					endpoint: httpEndpoint
+				}
+			}
+		}
+	else if (openSearchEndpoint)
+		// doc: https://www.pulumi.com/docs/reference/pkg/aws/appsync/datasource/#datasourceelasticsearchconfig
+		return {
+			name: 'opensearch',
+			type: 'AMAZON_ELASTICSEARCH',
+			value: {
+				elasticsearchConfig: {
+					endpoint: openSearchEndpoint,
+					region
+				}
+			}
+		}
+	else
+		throw new Error('Data source type not found. Failed to create a data source based on the input arguments.')
 }
 
 /**
@@ -275,7 +430,7 @@ const createResolver = async ({ api, name, field, type, functionArn, tableName, 
  * @return {String}							.appIdClientRegex
  * @return {String}							.awsRegion
  */
-const getAuth = authConfig => {
+const _getAuth = authConfig => {
 	const { apiKey, iam, cognito, oidc } = authConfig || {}
 	const { userPoolId, appIdClientRegex, awsRegion, defaultAction } = cognito || {}
 	const { issuer, clientId, authTtl, iatTtl } = oidc || {}
@@ -332,65 +487,7 @@ const getAuth = authConfig => {
 }
 
 /**
- * https://www.pulumi.com/docs/reference/pkg/aws/appsync/datasource/#inputs
  * 
- * @param  {String} type								Valid values: 'lambda', 'rds', 'http', 'dynamodb', 'opensearch'
- * @param  {Output<String>} config.functionArn			(type:'lambda')
- * @param  {Output<String>} config.tableName			(type:'dynamodb')
- * @param  {Output<String>} config.useCallerCredentials	(type:'dynamodb')	
- * @param  {Output<String>} config.region				(type:'dynamodb','opensearch')	
- * @param  {Output<String>} config.endpoint				(type:'opensearch','http')	
- * 
- * @return {Object}
- */
-const getDataSourceConfig = ({ type, config }) => {
-	const configName = DATA_SOURCE[type].configName
-	if (type == 'lambda') {
-		// doc: https://www.pulumi.com/docs/reference/pkg/aws/appsync/datasource/#datasourcelambdaconfig
-		if (!config.functionArn)
-			throw new Error('Missing required argument. When data source type is \'lambda\', \'config.functionArn\' is required.')
-		return {
-			[configName]: {
-				functionArn: config.functionArn
-			}
-		}
-	} else if (type == 'dynamodb') {
-		// doc: https://www.pulumi.com/docs/reference/pkg/aws/appsync/datasource/#datasourcedynamodbconfig
-		if (!config.tableName)
-			throw new Error('Missing required argument. When data source type is \'dynamodb\', \'config.tableName\' is required.')
-		return {
-			[configName]: {
-				tableName: config.tableName,
-				region: config.region,
-				useCallerCredentials: config.useCallerCredentials
-			}
-		}
-	} else if (type == 'opensearch') {
-		// doc: https://www.pulumi.com/docs/reference/pkg/aws/appsync/datasource/#datasourceelasticsearchconfig
-		if (!config.endpoint)
-			throw new Error('Missing required argument. When data source type is \'opensearch\', \'config.endpoint\' is required.')
-		return {
-			[configName]: {
-				endpoint: config.endpoint,
-				region: config.region
-			}
-		}
-	} else if (type == 'http') {
-		// doc: https://www.pulumi.com/docs/reference/pkg/aws/appsync/datasource/#datasourcehttpconfig
-		if (!config.endpoint)
-			throw new Error('Missing required argument. When data source type is \'http\', \'config.endpoint\' is required.')
-		return {
-			[configName]: {
-				endpoint: config.endpoint
-			}
-		}
-	} else
-		throw new Error(`Data source type '${type}' is not supported`)
-}
-
-/**
- * 
- * @param  {String} type						Valid values: 'lambda', 'rds', 'http', 'dynamodb', 'opensearch'
  * @param  {String} template.operation			(type:'lambda') Optional. Valid values: 'Invoke' (default), 'BatchInvoke'
  * @param  {Object} template.payload			(type:'lambda') Optional.
  * @return {String} template.responseTemplate	(type:'lambda') Optional.
@@ -398,12 +495,9 @@ const getDataSourceConfig = ({ type, config }) => {
  * @return {String} requestTemplate				
  * @return {String} responseTemplate	
  */
-const getRequestResponseTemplate = (type, template) => {
-	if (type != 'lambda')
-		throw new Error(`Data source type '${type}' is not yet supported by @cloudlesslabs/pulumi-recipes`)
-
-	if (type == 'lambda')
-		return getLambdaRequestResponseTemplate(template)
+const _getRequestResponseTemplate = (template) => {
+	// Only supported template is Lambda. More coming soon...
+	return _getLambdaRequestResponseTemplate(template)
 }
 
 /**
@@ -429,7 +523,7 @@ const getRequestResponseTemplate = (type, template) => {
  *          }
  *      }
  */
-const getLambdaRequestResponseTemplate = input => {
+const _getLambdaRequestResponseTemplate = input => {
 	let { operation, payload, responseTemplate } = input || {}
 	payload = payload || {}
 	if (payload.source)
@@ -467,7 +561,7 @@ const getLambdaRequestResponseTemplate = input => {
 	return template
 }
 
-const leanify = resource => {
+const _leanify = resource => {
 	/* eslint-disable */
 	const { tags, urn, tagsAll, ...rest } = resource || {}	
 	/* eslint-enable */
@@ -475,56 +569,44 @@ const leanify = resource => {
 }
 
 /**
+ * High-order function that gets the fields of a graphql type.
  * 
- * @param  {String} functionArn					
- * @param  {String} tableName					
- * @param  {String} useCallerCredentials					
- * @param  {String} region					
- * @param  {String} httpEndpoint					
- * @param  {String} openSearchEndpoint					
- * 
- * @return {String} config.type 
- * @return {Object} config.config
+ * @param  {String} schema		GraphQL string schema
+ * @return {[type]}        [description]
  */
-const getDataSource = ({ functionArn, tableName, useCallerCredentials, region, httpEndpoint, openSearchEndpoint }) => {
-	if (functionArn)
-		return {
-			type: 'lambda',
-			config: {
-				functionArn
-			}
-		}
-	else if (tableName) 
-		return {
-			type: 'dynamodb',
-			config: {
-				tableName,
-				region,
-				useCallerCredentials
-			}
-		}
-	else if (httpEndpoint)
-		return {
-			type: 'http',
-			config: {
-				endpoint: httpEndpoint
-			}
-		}
-	else if (openSearchEndpoint)
-		return {
-			type: 'opensearch',
-			config: {
-				endpoint: openSearchEndpoint,
-				region
-			}
-		}
-	else
-		return null
+const _getSchemaTypeFields = schema => {
+	if (!schema)
+		return () => null
+
+	const astDocument = parse(schema)
+	if (!astDocument || !astDocument.definitions || !astDocument.definitions.length)
+		return () => null
+	
+	/**
+	 * Gets the fields of a type.
+	 * 
+	 * @param  {String}		type	e.g., 'Query', 'Mutation', 'Product', 'User'
+	 * 
+	 * @return {[String]}	fields	e.g., ['projects', 'folders']
+	 */
+	return type => {
+		if (!type)
+			return null
+
+		const ast = astDocument.definitions.find(d => d && d.kind == 'ObjectTypeDefinition' && d.name && d.name.kind == 'Name' && d.name.value == type)
+		if (!ast || !ast.fields)
+			return null
+		
+		const fields = ast.fields.filter(f => f && f.kind == 'FieldDefinition' && f.name && f.name.kind == 'Name' && f.name.value).map(f => f.name.value)
+		return fields
+	}
 }
 
 module.exports = {
 	api: createApi,
-	resolver: createResolver
+	resolver: createResolver,
+	lambdaResolvers: createLambdaResolvers,
+	dataSource: createDataSource
 }
 
 

@@ -481,31 +481,48 @@ const main = async () => {
 
 	const productLambda = await resolve(productApi.lambda)
 
+	const schema = `
+		type Product {
+			id: ID!
+			name: String
+		}
+		type User {
+			id: ID!
+		}
+		type Query {
+			products(id: Int, name: String): [Product]
+			users: [User]
+		}
+		schema {
+			query: Query
+		}`
+
+	// Create the GraphQL API with its Schema.
 	const graphql = await appSync.api({
 		name: PROJECT, 
 		description: `Lineup ${ENV} GraphQL API`, 
-		schema:`
-			schema {
-				query: Query
-			}
-			type Product {
-				id: ID!
-				name: String
-			}
-			type User {
-				id: ID!
-			}
-			type Query {
-				products(id: Int, name: String): [Product]
-				users: [User]
-			}`, 
+		schema, 
 		resolver: {
-			lambdaArns:[productLambda.arn]
+			// Add all the lambda that are used as data source must be listed here
+			// in order to configure access from this GraphQL API.
+			lambdaArns:[productLambda.arn] 
 		},
 		cloudwatch: true, 
 		tags
 	})
 
+	// Create a data source to retrieve and store data.
+	const dataSource = await appSync.dataSource({ 
+		name: PROJECT, 
+		api: {
+			id: graphql.api.id,
+			roleArn: graphql.roleArn
+		}, 
+		functionArn: productLambda.arn, 
+		tags 
+	})
+
+	// Create a VTL resolver that can bridge between a field and data source.
 	const productResolver = await appSync.resolver({
 		name: `${PROJECT}-resolver-product`, 
 		api:{
@@ -514,18 +531,19 @@ const main = async () => {
 		}, 
 		type: 'Query', 
 		field: 'projects', 
-		functionArn: productLambda.arn,
 		mappingTemplate:{
 			payload: {
 				field: 'projects',
 				hello: 'world'
 			}
 		}, 
+		dataSource,
 		tags
 	})
 
 	return {
 		graphql,
+		dataSource,
 		resolvers: {
 			productResolver
 		}
@@ -543,6 +561,88 @@ const graphql = await appSync.api({
 		apiKey: true
 	}
 })
+```
+
+### Lambda resolvers
+
+Because AppSync resolvers that use Lambda data source can be straightforward (most of the time, they're just a pass through to the lambda), we've created a `lambdaResolvers` helper method which created a single data source for that lambda and then uses GraphQL schema inspection to isolate the fields for which resolvers must be created to route HTTP requests to that Lambda data source.
+
+```js
+const pulumi = require('@pulumi/pulumi')
+const { resolve, aws: { appSync } } = require('@cloudlesslabs/pulumix')
+
+const ENV = pulumi.getStack()
+const PROJ = pulumi.getProject()
+const PROJECT = `${PROJ}-${ENV}`
+const PRODUCT_STACK = `your-product-stack/${ENV}`
+
+const productStack = new pulumi.StackReference(PRODUCT_STACK)
+const productApi = productStack.getOutput('lambda')
+
+const main = async () => {
+	const tags = {
+		Project: PROJ,
+		Env: ENV
+	}
+
+	const productLambda = await resolve(productApi.lambda)
+
+	const schema = `
+		type Product {
+			id: ID!
+			name: String
+		}
+		type User {
+			id: ID!
+		}
+		type Query {
+			products(id: Int, name: String): [Product]
+			users: [User]
+		}
+		schema {
+			query: Query
+		}`
+
+	// Create the GraphQL API with its Schema.
+	const graphql = await appSync.api({
+		name: PROJECT, 
+		description: `Lineup ${ENV} GraphQL API`, 
+		schema, 
+		resolver: {
+			// Add all the lambda that are used as data source must be listed here
+			// in order to configure access from this GraphQL API.
+			lambdaArns:[productLambda.arn]
+		},
+		cloudwatch: true, 
+		tags
+	})
+
+	// Create a single data source using the 'functionArn' value and then create as many resolvers as 
+	// there are fields in the 'Query' type.
+	const { dataSource, resolvers } = await appSync.lambdaResolvers({
+		name: PROJECT, 
+		api: {
+			id: graphql.api.id,
+			roleArn: graphql.roleArn
+		}, 
+		schema: {
+			value: schema,
+			includes:['Query'] // This means resolvers for all the `Query` fields will be created. 
+		}, 
+		functionArn: productLambda.arn, 
+		tags
+	})
+
+	return {
+		graphql,
+		productAPI: {
+			dataSource,
+			resolvers
+		}
+	}
+}
+
+module.exports = main()
 ```
 
 ### Auth with Cognito, OIDC and IAM
