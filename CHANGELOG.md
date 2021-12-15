@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [2.4.1](https://github.com/cloudlesslabs/pulumix/compare/v2.4.0...v2.4.1) (2021-12-15)
+
+
+### Bug Fixes
+
+* Missing region config in the AWS SDK config in the SSM module ([7431252](https://github.com/cloudlesslabs/pulumix/commit/7431252d7f386b04108a0bcc69cc80f097bba00c))
+
 ## [2.4.0](https://github.com/cloudlesslabs/pulumix/compare/v2.3.0...v2.4.0) (2021-12-15)
 
 
