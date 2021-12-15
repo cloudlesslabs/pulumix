@@ -1,6 +1,6 @@
 const AWS = require('aws-sdk')
 const aws = require('@pulumi/aws')
-const ssm = new AWS.SSM({apiVersion: '2014-11-06'})
+const ssm = new AWS.SSM({ apiVersion: '2014-11-06', region:aws.config.region })
 
 // Doc: https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/SSM.html#getParameter-property
 const ssmGetParameter = arg => new Promise((next,fail) => ssm.getParameter(arg, (err,data) => err ? fail(err) : next(data)))
