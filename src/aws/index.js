@@ -16,6 +16,7 @@ module.exports = {
 	s3: require('./s3'),
 	secret: require('./secret'),
 	securityGroup: require('./securityGroup'),
+	ssm: require('./ssm'),
 	stepFunction: require('./stepFunction'),
 	vpc: require('./vpc')
 }

@@ -74,6 +74,8 @@ npm i @cloudlesslabs/pulumix
 >	- [Security Group](#security-group)
 >	- [SSM](#ssm)
 >		- [Parameter Store](#parameter-store)
+>			- [Storing and retrieving data with Parameter Store](#storing-and-retrieving-data-with-parameter-store)
+>			- [Using versions with Parameter Store](#using-versions-with-parameter-store)
 >	- [Step-function](#step-function)
 >	- [VPC](#vpc)
 > * [GCP](#gcp)
@@ -1787,7 +1789,9 @@ const lambdaOutput = await lambda.fn({
 To create an alias:
 
 ```js
+// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/lambda/alias/
 const testLambdaAlias = new aws.lambda.Alias('testLambdaAlias', {
+	name: 'prod',
 	description: 'a sample description',
 	functionName: lambdaOutput.arn,
 	functionVersion: '1',
@@ -1975,32 +1979,51 @@ const { securityGroup:mySecurityGroup, securityGroupRules:myRules } = await secu
 
 ## SSM
 ### Parameter Store
+#### Storing and retrieving data with Parameter Store
 
 ```js
-const aws = require('@pulumi/aws')
+const { aws: { ssm } } = require('@cloudlesslabs/pulumix')
 
-const foo = new aws.ssm.Parameter('foo', {
-	name: 'foo',
-	type: 'String',
-	value: JSON.stringify({ hello:'world' })
-})
+const main = async () => {
+	// Full parameters list at https://www.pulumi.com/registry/packages/aws/api-docs/ssm/parameter/
+	const foo = await ssm.parameterStore.parameter({
+		name: 'foo',
+		value: { hello:'world' }
+	})
+
+	return foo
+}
+
+main()
 ```
-
-> IMPORTANT: If you wish to retrieve the value later, it is recommended to set the optional `name` property, which will become the parameter store ID. This ID is needed to retrieve the value.
 
 To retrieve a value from Parameter store:
 
 ```js
-const aws = require('@pulumi/aws')
+const { aws: { ssm } } = require('@cloudlesslabs/pulumix')
 
 const main = async () => {
-	const value = await aws.ssm.Parameter.get('foo','foo')
+	const { version, value } = await ssm.parameterStore.get({ name:'foo', version:2, json:true })
+	console.log({
+		version,
+		value
+	})
 }
 ```
 
-> NOTICE: The 2nd argument is the parameter store ID. 
+> NOTICE: This method does not use the Pulumi API as it creates `registered twice` issues when both a `get` and `create` operations that use the same name are put in the same script.
 
-Notice tha
+#### Using versions with Parameter Store 
+
+Parameter Store versions each update. The version uses numbers starting from 1 and are automatically incremented. The version cannot be set explicitly. 
+
+To retrieve a specific version, include the version in the parameter store's ID as follow:
+
+```js
+const param = aws.ssm.Parameter.get('foo','foo:12')
+```
+
+When the version is not used with the parameter store's ID, the latest version is returned.
 
 ## Step-function
 
