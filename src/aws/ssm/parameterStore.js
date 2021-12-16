@@ -27,7 +27,11 @@ const getParameter = async ({ name, version, json }) => {
 		throw new Error('Missing required argument \'name\'.')
 
 	const Name = version ? `${name}:${version}` : name
-	const data = await ssmGetParameter({ Name })
+	const data = await ssmGetParameter({ Name }).catch(err => {
+		if (err.code == 'ParameterNotFound')
+			return null
+		throw err
+	})
 
 	if (json && data && data.Parameter && data.Parameter.Value) {
 		try {
