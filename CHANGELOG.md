@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [2.4.2](https://github.com/cloudlesslabs/pulumix/compare/v2.4.1...v2.4.2) (2021-12-16)
+
+
+### Bug Fixes
+
+* ssm.parameterStore.get function fails when the parameter is not found. It should return NULL instead ([0471c70](https://github.com/cloudlesslabs/pulumix/commit/0471c7032c04889cbeaa1d313c385b5e9a1ca8c2))
+
 ### [2.4.1](https://github.com/cloudlesslabs/pulumix/compare/v2.4.0...v2.4.1) (2021-12-15)
 
 
