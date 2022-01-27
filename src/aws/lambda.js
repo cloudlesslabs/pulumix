@@ -222,14 +222,23 @@ const createFunction = async ({ name, description, architecture, fn, layers, tim
 		const eventRule = new aws.cloudwatch.EventRule(eventRuleName, {
 			name: eventRuleName,
 			description: `Fire lambda ${name} on a schedule`,
-			scheduleExpression
+			scheduleExpression,
+			tags: {
+				...tags,
+				Name: eventRuleName
+			}
 		})
 
 		// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/cloudwatch/eventtarget/
 		const eventTargetName = `${name}-eventtarget`
 		const eventTarget = new aws.cloudwatch.EventTarget(eventTargetName, {
 			rule: eventRule.name,
-			arn: lambda.arn
+			arn: lambda.arn,
+			tags: {
+				...tags,
+				Name: eventTargetName
+			},
+			input: 'hello man'
 		})
 
 		// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/lambda/permission/

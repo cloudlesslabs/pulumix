@@ -1545,7 +1545,25 @@ const lambdaOutput = await lambda.fn({
 })
 ```
 
-To learn more about the `scheduleExpression` syntax, please refer to the official AWS doc at https://docs.aws.amazon.com/AmazonCloudWatch/latest/events/ScheduledEvents.html.
+> To learn more about the `scheduleExpression` syntax, please refer to the official AWS doc at https://docs.aws.amazon.com/AmazonCloudWatch/latest/events/ScheduledEvents.html.
+
+The event object sent to the Lambda is similar to this:
+
+```js
+{
+	version: '0',
+	id: 'cee5b84f-57b6-c60b-2c8c-9e1867b7e9ac',
+	'detail-type': 'Scheduled Event',
+	source: 'aws.events',
+	account: '12345677',
+	time: '2022-01-27T02:18:59Z',
+	region: 'ap-southeast-2',
+	resources: [
+		'arn:aws:events:ap-southeast-2:12345677:rule/some-event-name'
+	],
+	detail: {}
+}
+```
 
 ### Lambda with container
 
