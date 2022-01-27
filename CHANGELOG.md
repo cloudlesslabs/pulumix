@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [2.6.0](https://github.com/cloudlesslabs/pulumix/compare/v2.5.0...v2.6.0) (2022-01-27)
+
+
+### Features
+
+* Add support for schedule lambdas ([f8e51b3](https://github.com/cloudlesslabs/pulumix/commit/f8e51b3423060faafd39935643da0aa40407d384))
+
 ## [2.5.0](https://github.com/cloudlesslabs/pulumix/compare/v2.4.2...v2.5.0) (2022-01-27)
 
 
