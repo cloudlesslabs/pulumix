@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [2.5.0](https://github.com/cloudlesslabs/pulumix/compare/v2.4.2...v2.5.0) (2022-01-27)
+
+
+### Features
+
+* Add support for configuring a new lambda with AWS services that can invoke it ([a778a9f](https://github.com/cloudlesslabs/pulumix/commit/a778a9ff623e98d2952d411f998e77aa1b48aa11))
+
 ### [2.4.2](https://github.com/cloudlesslabs/pulumix/compare/v2.4.1...v2.4.2) (2021-12-16)
 
 
