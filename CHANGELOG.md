@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [2.6.1](https://github.com/cloudlesslabs/pulumix/compare/v2.6.0...v2.6.1) (2022-01-27)
+
+
+### Features
+
+* Add support for passing a payload to the schedule Lambda ([3dc9f05](https://github.com/cloudlesslabs/pulumix/commit/3dc9f05b13eaccc73549cd0700e83888b2370413))
+
 ## [2.6.0](https://github.com/cloudlesslabs/pulumix/compare/v2.5.0...v2.6.0) (2022-01-27)
 
 
