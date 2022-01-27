@@ -54,11 +54,11 @@ npm i @cloudlesslabs/pulumix
 >		- [A few words about AWS Lambda](#a-few-words-about-aws-lambda)
 >			- [AWS Lambda key design principles](#aws-lambda-key-design-principles)
 >			- [ARM architecture recommended](#arm-architecture-recommended)
->			- [Configuring permissions](#configuring-permissions)
 >		- [API Gateway with explicit Lambda handlers](#api-gateway-with-explicit-lambda-handlers)
 >		- [Basic Lambda with an API Gateway](#basic-lambda-with-an-api-gateway)
 >		- [Configuring IAM policies to enable Lambda access to other resources](#configuring-iam-policies-to-enable-lambda-access-to-other-resources)
 >		- [Letting other AWS services to access a lambda](#letting-other-aws-services-to-access-a-lambda)
+>		- [Scheduling a lambda](#scheduling-a-lambda)
 >		- [Lambda with container](#lambda-with-container)
 >			- [code](#lambda-with-container-code)
 >			- [Setting up environment variables and passing arguments](#setting-up-environment-variables-and-passing-arguments)	
@@ -102,6 +102,8 @@ npm i @cloudlesslabs/pulumix
 > * [Annexes](#annexes)
 >	- [AWS recap](#aws-recap)
 >		- [IAM, Policies and co](#iam-policies-and-co)
+>			- [Identity-based policies](#identity-based-policies)
+>			- [Resource-based policies](#resource-based-policies)
 >	- [Docker files examples](#docker-files-examples)
 >		- [`Dockerfile` example](#dockerfile-example)
 >		- [`.dockerignore` example](#dockerignore-example)
@@ -1298,20 +1300,6 @@ lambda.fn({
 
 __IMPORTANT__: When using Docker, please make sure that your image uses the same architecture (i.e., `x86_64` vs `arm64`) then your Lambda OS. DO NOT USE something like `FROM amazon/aws-lambda-nodejs:14` as this is equivalent to the latest digest. Who knows what architecture the latest digest uses. Instead, browse the [Docker Hub registry](https://hub.docker.com/r/amazon/aws-lambda-nodejs/tags) and find the tag that explicitly supports your OS architecture. For example, `FROM amazon/aws-lambda-nodejs:14.2021.09.29.20` uses `linux/arm64` while `14.2021.10.14.13` uses `linux/amd64`.
 
-#### Configuring permissions
-
-The standard way to configure permissions on any resource is to create:
-1. Create a role for a 3rd party trying to access the resource.
-2. Create a policy that allows specific actions on that resource.
-3. Associate the role with the policy.
-4. Attach the new role to the resource.
-
-> More about this topic in the [Annexes](#annexes) under the [IAM, Policies and co](#iam-policies-and-co) section.
-
-However, there are cases with this workflow cannot be implemented. For those scenarios, Pulumi exposes a [`lambda.Permission` API](https://www.pulumi.com/registry/packages/aws/api-docs/lambda/permission/).
-
-In general, it is recommended to use the standard approach.
-
 ### Basic lambda
 
 ```js
@@ -1455,14 +1443,16 @@ module.exports = main()
 Tl;dr:
 
 ```js
-const lambdaOutput = lambda.fn({
+const { aws:{ lambda } } = require('@cloudlesslabs/pulumix')
+
+const lambdaOutput = await lambda.fn({
 	// ...
 	cloudwatch: true,
 	logsRetentionInDays: 7 // This is optional. The default is 0 (i.e., never expires). 
 })
 ```
 
-The rest of this section focuses on how the above configuration works under the hood.
+The rest of this section focuses on how the above configuration works under the hood. 
 
 To add CloudWatch logs to the previous Lambda, we need to create a new policy that allows the creations of log groups, log streams and log event as associate that policy to the Lambda's role.
 
@@ -1487,7 +1477,7 @@ const cloudWatchPolicy = new aws.iam.Policy(PROJECT, {
 	})
 })
 
-const lambdaOutput = lambda.fn({
+const lambdaOutput = await lambda.fn({
 	name: PROJECT,
 	fn: {
 		runtime: 'nodejs12.x', 
@@ -1502,7 +1492,7 @@ const lambdaOutput = lambda.fn({
 
 > TIPS: Leverage existing AWS Managed policies instead of creating your own each time (use `npx get-policies` to find them). This example could be re-written as follow:
 > ```js
-> const lambdaOutput = lambda.fn({
+> const lambdaOutput = await lambda.fn({
 > 	name: PROJECT,
 > 	fn: {
 >		runtime: 'nodejs12.x', 
@@ -1517,7 +1507,7 @@ const lambdaOutput = lambda.fn({
 >
 > Because enabling CloudWatch on a Lambda is so common, this policy can be automatically toggled as follow:
 >```js
-> const lambdaOutput = lambda.fn({
+> const lambdaOutput = await lambda.fn({
 > 	// ...
 > 	cloudwatch: true,
 > 	logsRetentionInDays: 7 // This is optional. The default is 0 (i.e., never expires). 
@@ -1526,16 +1516,36 @@ const lambdaOutput = lambda.fn({
 
 ### Letting other AWS services to access a lambda
 
-Use the `allowedPrincipals` property. The following example allows AWS Cognito to access the Lambda:
+For God knows what reason, not all services can invoke AWS Lambdas via the standard [Identity-based policies](#identity-based-policies) strategy. That's why it is recommended to use the [Resource-based policies](#resource-based-policies) strategy instead via the Pulumi `aws.lambda.Permission` API. For example, this is how you would allow AWS Cognito to invoke a lambda:
+
+```js
+new aws.lambda.Permission(name, {
+	action: 'lambda:InvokeFunction',
+	function: lambda.name,
+	principal: 'cognito-idp.amazonaws.com',
+	sourceArn: userPool.arn
+})
+```
+
+> To easily find the principal's name, use the the command `npx get-principals`.
+
+### Scheduling a lambda
 
 ```js
 const { aws:{ lambda } } = require('@cloudlesslabs/pulumix')
+const { resolve } = require('path')
 
-lambda.fn({
-	//...
-	allowedPrincipals:['cognito-idp.amazonaws.com']
+const lambdaOutput = await lambda.fn({
+	name: 'my-example',
+	fn: {
+		runtime: 'nodejs12.x', 
+		dir: resolve('./app')
+	},
+	scheduleExpression: 'rate(1 minute)'
 })
 ```
+
+To learn more about the `scheduleExpression` syntax, please refer to the official AWS doc at https://docs.aws.amazon.com/AmazonCloudWatch/latest/events/ScheduledEvents.html.
 
 ### Lambda with container
 
@@ -1595,7 +1605,7 @@ const ENV = pulumi.getStack()
 const PROJ = pulumi.getProject()
 const PROJECT = `${PROJ}-${ENV}`
 
-const lambdaOutput = lambda.fn({
+const lambdaOutput = await lambda.fn({
 	name: PROJECT,
 	fn: {
 		dir: resolve('./app'),
@@ -2656,13 +2666,21 @@ To fix this issue, please refer to the [ARM architecture recommended](#arm-archi
 ## AWS recap
 ### IAM, Policies and co
 
-The typical scenario when configuring IAM on a resource is:
-1. Create a role that defines who (aka the principal) can use it. In the example below, the role `lambda-role` can only be _assumed_ by the `lambda.amazonaws.com` principal.
+There are 2 main ways to grant a service access to a resource:
+- [Identity-based policies](#identity-based-policies): Attach a policy on a service's IAM role which can access the resource.
+- [Resource-based policies](#resource-based-policies): Attach a policy on a resource's IAM role which allows the service to access the resource.
+
+Choosing one strategy over the other depends on your use case. That being said, some scenarios only accept one. For example, when configuring a lambda to be triggered by a schedule CRON job (i.e., Cloudwatch event), only the resource-based policy via an AWS lambda permission works. Go figure...
+
+#### Identity-based policies
+
+The standard way to configure allow a service to access a resource is to:
+1. Create a role for the service trying to access the resource. In the example below, the role `lambda-role` can only be _assumed_ by the `lambda.amazonaws.com` principal.
 > Tip: Use `npx get-principals` to find the principal URI.
-2. Create a policy or used one of the existing [AWS Managed Policies](https://gist.github.com/gene1wood/55b358748be3c314f956). 
+2. Create a policy that allows specific actions on that resource. Alternatively, use one of the existing [AWS Managed Policies](https://gist.github.com/gene1wood/55b358748be3c314f956). 
 > Tip: Use `npx get-policies` to search AWS managed policies and get their ARN.
-3. Attach one or more policies (usually idendity-based policy) on that role to allow it to do specific actions.
-4. Reference that role on the resource. 
+3. Associate the role with the policy.
+4. Attach the new role to the service.
 
 For example:
 
@@ -2711,6 +2729,7 @@ const lambda = new aws.lambda.Function('my-lambda', {
 })
 ```
 
+#### Resource-based policies
 
 ## Docker files examples](#docker-files-examples)
 ### `Dockerfile` example](#dockerfile-example)
