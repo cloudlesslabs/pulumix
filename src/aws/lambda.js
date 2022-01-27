@@ -38,7 +38,7 @@ const { resolve } = require('../utils')
  * @param  {Number}				timeout								Unit seconds. Default is 3 and max is 900 (15 minutes).
  * @param  {Number}				memorySize							Unit is MB. Default is 128 and max is 10,240
  * @param  {String}				handler								Default is 'index.handler'.
- * @param  {[String]}			allowedPrincipals					Default is null, which means only 'lambda.amazonaws.com' can invoke the lambda.
+ * @param  {[String]}			allowedPrincipals					e.g., ['events.amazonaws.com','cognito-idp.amazonaws.com']. Principal defines in this array can invoke this Lambda (4).
  * @param  {[Output<Policy>]}	policies							Policies to attach to the lambda role.
  * @param  {Output<[String]>}	vpcConfig.subnetIds
  * @param  {Output<[String]>}	vpcConfig.securityGroupIds
@@ -78,6 +78,7 @@ const { resolve } = require('../utils')
  * means there is an extra manual step to convert the docker ARG into ENV in the Dockerfile.
  * (3) If the lambda uses Docker, the architecture MUST BE COMPATIBLE with the Docker image. For a list of all the 
  * lambda images with their associated OS, please refer to https://hub.docker.com/r/amazon/aws-lambda-nodejs/tags?page=1&ordering=last_updated
+ * (4) A role combining those principals is created and a policy for this lambda with the 'lambda:InvokeFunction' action is attached to it.
  */
 const createFunction = async ({ name, description, architecture, fn, layers, timeout=3, memorySize=128, handler, allowedPrincipals, policies, vpcConfig, fileSystemConfig, publish, cloudWatch, cloudwatch, logsRetentionInDays, tags }) => {
 	tags = tags || {}
@@ -122,22 +123,19 @@ const createFunction = async ({ name, description, architecture, fn, layers, tim
 	const imageUri = image ? image.imageValues[0] : null
 	
 	// IAM role. Doc: https://www.pulumi.com/docs/reference/pkg/aws/iam/role/
-	allowedPrincipals = allowedPrincipals || []
-	if (!allowedPrincipals.some(x => x == 'lambda.amazonaws.com'))
-		allowedPrincipals.push('lambda.amazonaws.com')
 	const lambdaRole = new aws.iam.Role(canonicalName, {
 		name: canonicalName,
 		description: `Role for lambda '${name}'`,
 		assumeRolePolicy: {
 			Version: '2012-10-17',
-			Statement: allowedPrincipals.map(Service => ({
+			Statement: [{
 				Action: 'sts:AssumeRole',
 				Principal: {
-					Service
+					Service: 'lambda.amazonaws.com'
 				},
 				Effect: 'Allow',
 				Sid: ''
-			})),
+			}],
 		},
 		tags: {
 			...tags,
@@ -212,13 +210,64 @@ const createFunction = async ({ name, description, architecture, fn, layers, tim
 		}
 	})
 
+	// Create a policy for the AWS services that must be able to invoke this lambda
+	let invokerRole = null
+	if (allowedPrincipals && allowedPrincipals.length) {
+		const lambdaArn = await resolve(lambda.arn)
+		const invokerRoleName = `${canonicalName}-invokers`
+		// IAM role. Doc: https://www.pulumi.com/docs/reference/pkg/aws/iam/role/
+		const invokerRole = new aws.iam.Role(invokerRoleName, {
+			name: invokerRoleName,
+			description: `Role for lambda ${name} invokers`,
+			assumeRolePolicy: {
+				Version: '2012-10-17',
+				Statement: [{
+					Action: 'sts:AssumeRole',
+					Principal: {
+						Service: allowedPrincipals
+					},
+					Effect: 'Allow',
+					Sid: ''
+				}],
+			},
+			tags: {
+				...tags,
+				Name: invokerRoleName
+			}
+		})
+
+		const invokePolicy = new aws.iam.Policy(`${invokerRoleName}-policy`, {
+			name: `${invokerRoleName}-policy`,
+			description: 'IAM policy for invoking a lambda',
+			path: '/',
+			policy: JSON.stringify({
+				Version: '2012-10-17',
+				Statement: [{
+					Action: [
+						'lambda:InvokeFunction'
+					],
+					Resource: lambdaArn,
+					Effect: 'Allow'
+				}]
+			})
+		})
+
+		_void(new aws.iam.RolePolicyAttachment(invokerRoleName, {
+			role: invokerRole.name,
+			policyArn: invokePolicy.arn
+		}))
+	}
+
 	return {
 		lambda: leanify(lambda),
 		image: leanifyImage(image),
 		role:leanify(lambdaRole),
+		invokerRole:leanify(invokerRole),
 		logGroup: leanify(logGroup)
 	}
 }
+
+const _void = x => x
 
 /**
  * Creates a new Lambda layer. Doc: https://www.pulumi.com/docs/reference/pkg/aws/lambda/layerversion/

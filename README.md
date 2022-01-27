@@ -54,6 +54,7 @@ npm i @cloudlesslabs/pulumix
 >		- [A few words about AWS Lambda](#a-few-words-about-aws-lambda)
 >			- [AWS Lambda key design principles](#aws-lambda-key-design-principles)
 >			- [ARM architecture recommended](#arm-architecture-recommended)
+>			- [Configuring permissions](#configuring-permissions)
 >		- [API Gateway with explicit Lambda handlers](#api-gateway-with-explicit-lambda-handlers)
 >		- [Basic Lambda with an API Gateway](#basic-lambda-with-an-api-gateway)
 >		- [Configuring IAM policies to enable Lambda access to other resources](#configuring-iam-policies-to-enable-lambda-access-to-other-resources)
@@ -65,6 +66,7 @@ npm i @cloudlesslabs/pulumix
 >		- [Lambda with Layers](#lambda-with-layers)
 >		- [Lambda versions and aliases](#lambda-versions-and-aliases)
 >	- [Policy](#aws-policy)
+>	- [Role](#aws-role)
 >	- [S3](#s3)
 >		- [Creating a public bucket for hosting a static website](#creating-a-public-bucket-for-hosting-a-static-website)
 >		- [Synching local files with a bucket](#synching-local-files-with-a-bucket)
@@ -98,6 +100,11 @@ npm i @cloudlesslabs/pulumix
 >		- [no resource plugin 'aws-v4.17.0' found in the workspace or on your $PATH](#no-resource-plugin-aws-v4170-found-in-the-workspace-or-on-your-path)
 >		- [AWS Lambda: `IMAGE Launch error: fork/exec /lambda-entrypoint.sh: exec format error`](#aws-lambda:-image-launch-error-forkexec-lambda-entrypointsh-exec-format-error)
 > * [Annexes](#annexes)
+>	- [AWS recap](#aws-recap)
+>		- [IAM, Policies and co](#iam-policies-and-co)
+>	- [Docker files examples](#docker-files-examples)
+>		- [`Dockerfile` example](#dockerfile-example)
+>		- [`.dockerignore` example](#dockerignore-example)
 > * [References](#references)
 
 # Pulumi
@@ -1291,6 +1298,20 @@ lambda.fn({
 
 __IMPORTANT__: When using Docker, please make sure that your image uses the same architecture (i.e., `x86_64` vs `arm64`) then your Lambda OS. DO NOT USE something like `FROM amazon/aws-lambda-nodejs:14` as this is equivalent to the latest digest. Who knows what architecture the latest digest uses. Instead, browse the [Docker Hub registry](https://hub.docker.com/r/amazon/aws-lambda-nodejs/tags) and find the tag that explicitly supports your OS architecture. For example, `FROM amazon/aws-lambda-nodejs:14.2021.09.29.20` uses `linux/arm64` while `14.2021.10.14.13` uses `linux/amd64`.
 
+#### Configuring permissions
+
+The standard way to configure permissions on any resource is to create:
+1. Create a role for a 3rd party trying to access the resource.
+2. Create a policy that allows specific actions on that resource.
+3. Associate the role with the policy.
+4. Attach the new role to the resource.
+
+> More about this topic in the [Annexes](#annexes) under the [IAM, Policies and co](#iam-policies-and-co) section.
+
+However, there are cases with this workflow cannot be implemented. For those scenarios, Pulumi exposes a [`lambda.Permission` API](https://www.pulumi.com/registry/packages/aws/api-docs/lambda/permission/).
+
+In general, it is recommended to use the standard approach.
+
 ### Basic lambda
 
 ```js
@@ -1518,7 +1539,7 @@ lambda.fn({
 
 ### Lambda with container
 
-__WARNING__: You must make sure that the Docker image is compatible with the choosen architecture. For a list of all the AWS lambda images with their associated OS, please refer to https://hub.docker.com/r/amazon/aws-lambda-nodejs/tags?page=1&ordering=last_updated.
+__WARNING__: You must make sure that the Docker image is compatible with the Lambda architecture (i.e., x86_64 vs arm64). For a list of all the AWS lambda images with their associated OS, please refer to https://hub.docker.com/r/amazon/aws-lambda-nodejs/tags?page=1&ordering=last_updated.
 
 #### Lambda with container code
 
@@ -1587,6 +1608,8 @@ const lambdaOutput = lambda.fn({
 
 > (1) The [amazon/aws-lambda-nodejs:14.2021.09.29.20](https://hub.docker.com/r/amazon/aws-lambda-nodejs) docker image hosts a node web server listening on port 8080. The CMD expects a string or array following this naming convention: "<FILE NAME CONTAINING THE HANDLER>.<HANDLER NAME>".
 > (2) Once the container is running, the only way to test it is to perform POST to this path: `2015-03-31/functions/function/invocations`. This container won't listen to anything else; no GET, no PUT, no DELETE. 
+
+You may also want to add a `.dockerignore`. We've added a Dockerfile and a .dockerignore example in the [Annexes](#annexes) under the [Docker files examples](#docker-files-examples) section.
 
 #### Setting up environment variables and passing arguments
 
@@ -1808,9 +1831,11 @@ Full API doc at https://www.pulumi.com/registry/packages/aws/api-docs/lambda/ali
 ## AWS Policy
 
 ```js
-const cloudWatchPolicy = new aws.iam.Policy(PROJECT, {
-	path: '/',
+// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/iam/policy/
+const cloudWatchPolicy = new aws.iam.Policy('my-custom-policy', {
+	name: 'my-custom-policy',
 	description: 'IAM policy for logging from a lambda',
+	path: '/',
 	policy: JSON.stringify({
 		Version: '2012-10-17',
 		Statement: [{
@@ -1823,6 +1848,95 @@ const cloudWatchPolicy = new aws.iam.Policy(PROJECT, {
 			Effect: 'Allow'
 		}]
 	})
+})
+```
+
+To see a concrete example that combine a role and a policy to allow multiple services to invole a Lambda, please refer to [this example](#example-configuring-multiple-aws-services-to-invoke-a-lambda) under the [AWS role](#aws-role) section.
+
+## AWS Role
+
+```js
+// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/iam/role/
+const lambdaRole = new aws.iam.Role('lambda-role', {
+	name: 'lambda-role',
+	description: 'IAM role for a Lambda',
+	assumeRolePolicy: {
+		 Version: '2012-10-17',
+		 Statement: [{
+				Action: 'sts:AssumeRole',
+				Principal: {
+					Service: 'lambda.amazonaws.com', // tip: Use the command `npx get-principals` to find any AWS principal
+				},
+				Effect: 'Allow',
+				Sid: ''
+		 }],
+	}
+})
+```
+
+> __TIPS:__ The `Service` property supports both the string type and the array string type. The `Statement` for a role with multiple services would look like this:
+> ```js
+> [{
+> 	Action: 'sts:AssumeRole',
+> 	Principal: {
+> 		Service: [
+> 			'lambda.amazonaws.com',
+> 			'cognito-idp.amazonaws.com'
+> 		]
+> 	},
+> 	Effect: 'Allow',
+> 	Sid: ''
+> }]
+> ```
+
+##### Example: Configuring multiple AWS services to invoke a lambda
+
+This example assumes we have already acquired a lambda's ARN (string):
+
+```js
+const lambdaArnString = getLambdaArn() // Just for demo. 
+
+// 1. Create a multi-services IAM role.
+const myRole = new aws.iam.Role('my-multi-services-role', {
+	name: 'my-multi-services-role',
+	description: 'IAM role for a multi-services role',
+	assumeRolePolicy: {
+		 Version: '2012-10-17',
+		 Statement: [{
+				Action: 'sts:AssumeRole',
+				Principal: {
+					Service: [// tip: Use the command `npx get-principals` to find any AWS principal
+						'events.amazonaws.com',
+						'cognito-idp.amazonaws.com'
+					]
+				},
+				Effect: 'Allow',
+				Sid: ''
+		 }],
+	}
+})
+
+// 2. Create a policy that can invoke the lambda.
+const invokePolicy = new aws.iam.Policy('my-custom-policy', {
+	name: 'my-custom-policy',
+	description: 'IAM policy for invoking a lambda',
+	path: '/',
+	policy: JSON.stringify({
+		Version: '2012-10-17',
+		Statement: [{
+			Action: [
+				'lambda:InvokeFunction'
+			],
+			Resource: lambdaArnString,
+			Effect: 'Allow'
+		}]
+	})
+})
+
+// 3. Attach the policy to the role
+const lambdaRolePolicyAttachment = new aws.iam.RolePolicyAttachment(`attached-policy`, {
+	role: myRole.name,
+	policyArn: invokePolicy.arn
 })
 ```
 
@@ -2539,6 +2653,108 @@ This typically happens when the image used to run Lambda containers is using an 
 To fix this issue, please refer to the [ARM architecture recommended](#arm-architecture-recommended) section.
 
 # Annexes
+## AWS recap
+### IAM, Policies and co
+
+The typical scenario when configuring IAM on a resource is:
+1. Create a role that defines who (aka the principal) can use it. In the example below, the role `lambda-role` can only be _assumed_ by the `lambda.amazonaws.com` principal.
+> Tip: Use `npx get-principals` to find the principal URI.
+2. Create a policy or used one of the existing [AWS Managed Policies](https://gist.github.com/gene1wood/55b358748be3c314f956). 
+> Tip: Use `npx get-policies` to search AWS managed policies and get their ARN.
+3. Attach one or more policies (usually idendity-based policy) on that role to allow it to do specific actions.
+4. Reference that role on the resource. 
+
+For example:
+
+```js
+// Step 1: Create a role that identifies the resource (mainly the principal).
+const lambdaRole = new aws.iam.Role('lambda-role', {
+	assumeRolePolicy: {
+		 Version: '2012-10-17',
+		 Statement: [{
+				Action: 'sts:AssumeRole',
+				Principal: {
+					Service: 'lambda.amazonaws.com', // tip: Use the command `npx get-principals` to find any AWS principal
+				},
+				Effect: 'Allow',
+				Sid: ''
+		 }],
+	}
+})
+// Step 2: Create a policy or use the `npx get-policies` to get a managed AWS policy ARN
+const cloudWatchPolicy = new aws.iam.Policy('cw-policy', {
+	path: '/',
+	description: 'IAM policy for logging from a lambda',
+	policy: JSON.stringify({
+		 Version: '2012-10-17',
+		 Statement: [{
+				Action: [
+					'logs:CreateLogGroup',
+					'logs:CreateLogStream',
+					'logs:PutLogEvents'
+				],
+				Resource: 'arn:aws:logs:*:*:*',
+				Effect: 'Allow'
+		 }]
+	})
+})
+// Step 3: Attach the policy to the role. You can attach more than one.
+const lambdaLogs = new aws.iam.RolePolicyAttachment(`attached-policy`, {
+	role: lambdaRole.name,
+	policyArn: cloudWatchPolicy.arn
+})
+// Step 4: Reference that role on the resource
+const lambda = new aws.lambda.Function('my-lambda', {
+	// ... other properties
+	role: lambdaRole.arn,
+	dependsOn:[lambdaLogs]
+})
+```
+
+
+## Docker files examples](#docker-files-examples)
+### `Dockerfile` example](#dockerfile-example)
+
+This example shows how you would setup two environment variables as well as setup the GitHub auth token to install private NPM packages hosted on GitHub:
+
+> WARNING: The `amazon/aws-lambda-nodejs:14.2021.09.29.20` image targets ARM architecture. Therefore, make sure your Lambda uses `arm64`. To find the tag that explicitly supports your OS architecture, browse the [official AWS Lambda Docker Hub registry](https://hub.docker.com/r/amazon/aws-lambda-nodejs/tags).
+
+```dockerfile
+FROM amazon/aws-lambda-nodejs:14.2021.09.29.20
+ARG FUNCTION_DIR="/var/task"
+ARG GITHUB_ACCESS_TOKEN
+ARG SOME_ENV_DEMO
+
+ENV SOME_ENV_DEMO $SOME_ENV_DEMO
+
+# Create function directory
+RUN mkdir -p ${FUNCTION_DIR}
+
+# Setup access to the private GitHub package
+RUN echo "//npm.pkg.github.com/:_authToken=$GITHUB_ACCESS_TOKEN" >> ~/.npmrc
+COPY .npmrc ${FUNCTION_DIR}
+
+# Install all dependencies
+COPY package*.json ${FUNCTION_DIR}
+RUN npm install --only=prod --prefix ${FUNCTION_DIR}
+
+# Copy app files
+COPY . ${FUNCTION_DIR}
+
+# Set the CMD to your handler (could also be done as a parameter override outside of the Dockerfile)
+CMD [ "index.handler" ]
+```
+
+### `.dockerignore` example
+
+```
+Dockerfile
+README.md
+LICENSE
+node_modules
+npm-debug.log
+.env
+```
 
 # References
 
