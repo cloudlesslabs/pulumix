@@ -1541,13 +1541,15 @@ const lambdaOutput = await lambda.fn({
 		runtime: 'nodejs12.x', 
 		dir: resolve('./app')
 	},
-	scheduleExpression: 'rate(1 minute)'
+	schedule: {
+		expression: 'rate(1 minute)'
+	}
 })
 ```
 
-> To learn more about the `scheduleExpression` syntax, please refer to the official AWS doc at https://docs.aws.amazon.com/AmazonCloudWatch/latest/events/ScheduledEvents.html.
+> To learn more about the `expression` syntax, please refer to the official AWS doc at https://docs.aws.amazon.com/AmazonCloudWatch/latest/events/ScheduledEvents.html.
 
-The event object sent to the Lambda is similar to this:
+By default, the event object sent to the Lambda is similar to this:
 
 ```js
 {
@@ -1563,6 +1565,24 @@ The event object sent to the Lambda is similar to this:
 	],
 	detail: {}
 }
+```
+
+This object can be fully replaced with your own via the optional `schedule.payload` property:
+
+```js
+const lambdaOutput = await lambda.fn({
+	name: 'my-example',
+	fn: {
+		runtime: 'nodejs12.x', 
+		dir: resolve('./app')
+	},
+	schedule: {
+		expression: 'rate(1 minute)',
+		payload: {
+			hello: 'World'
+		}
+	}
+})
 ```
 
 ### Lambda with container

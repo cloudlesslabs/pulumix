@@ -43,7 +43,9 @@ const { resolve } = require('../utils')
  * @param  {Output<[String]>}	vpcConfig.securityGroupIds
  * @param  {Output<String>}		fileSystemConfig.arn				Used to mount an AWS EFS access point.
  * @param  {Output<String>}		fileSystemConfig.localMountPath		Used to mount an AWS EFS access point.
- * @param  {String}				scheduleExpression					e.g., 'rate(1 minute)'. Full doc at https://docs.aws.amazon.com/AmazonCloudWatch/latest/events/ScheduledEvents.html
+ * @param  {Object}				schedule					
+ * @param  {String}					.expression						e.g., 'rate(1 minute)'. Full doc at https://docs.aws.amazon.com/AmazonCloudWatch/latest/events/ScheduledEvents.html
+ * @param  {Object}					.payload						Optional. When specified, the object is passed to the Lambda's event. Otherwise, the default object is passed as the event (4)
  * @param  {Boolean}			publish								Default false. True publishes the lambda to a new version.
  * @param  {Boolean}			cloudwatch 							Default false. When true, cloudwatch is enabled.
  * @param  {Boolean}			cloudWatch 							Deprecated. Use 'cloudwatch' instead.
@@ -83,8 +85,22 @@ const { resolve } = require('../utils')
  * means there is an extra manual step to convert the docker ARG into ENV in the Dockerfile.
  * (3) If the lambda uses Docker, the architecture MUST BE COMPATIBLE with the Docker image. For a list of all the 
  * lambda images with their associated OS, please refer to https://hub.docker.com/r/amazon/aws-lambda-nodejs/tags?page=1&ordering=last_updated
+ * (4) The default object is:
+ * {
+ * 	version: '0',
+ * 	id: 'cee5b84f-57b6-c60b-2c8c-9e1867b7e9ac',
+ * 	'detail-type': 'Scheduled Event',
+ * 	source: 'aws.events',
+ * 	account: '12345677',
+ * 	time: '2022-01-27T02:18:59Z',
+ * 	region: 'ap-southeast-2',
+ * 	resources: [
+ *  	'arn:aws:events:ap-southeast-2:12345677:rule/some-event-name'
+ * 	],
+ * 	detail: {}
+ * }
  */
-const createFunction = async ({ name, description, architecture, fn, layers, timeout=3, memorySize=128, handler, policies, vpcConfig, fileSystemConfig, scheduleExpression, publish, cloudWatch, cloudwatch, logsRetentionInDays, tags }) => {
+const createFunction = async ({ name, description, architecture, fn, layers, timeout=3, memorySize=128, handler, policies, vpcConfig, fileSystemConfig, schedule, publish, cloudWatch, cloudwatch, logsRetentionInDays, tags }) => {
 	tags = tags || {}
 	const dependsOn = []
 	if (cloudWatch !== undefined && cloudwatch === undefined)
@@ -215,14 +231,14 @@ const createFunction = async ({ name, description, architecture, fn, layers, tim
 	})
 
 	// Create schedule trigger
-	let schedule = null
-	if (scheduleExpression) {
+	let _schedule = null
+	if (schedule && schedule.expression) {
 		// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/cloudwatch/eventrule/
 		const eventRuleName = `${name}-eventrule`
 		const eventRule = new aws.cloudwatch.EventRule(eventRuleName, {
 			name: eventRuleName,
 			description: `Fire lambda ${name} on a schedule`,
-			scheduleExpression,
+			scheduleExpression: schedule.expression,
 			tags: {
 				...tags,
 				Name: eventRuleName
@@ -231,15 +247,20 @@ const createFunction = async ({ name, description, architecture, fn, layers, tim
 
 		// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/cloudwatch/eventtarget/
 		const eventTargetName = `${name}-eventtarget`
-		const eventTarget = new aws.cloudwatch.EventTarget(eventTargetName, {
+		const eventTargetConfig = {
 			rule: eventRule.name,
 			arn: lambda.arn,
 			tags: {
 				...tags,
 				Name: eventTargetName
-			},
-			input: 'hello man'
-		})
+			}
+		}
+		if (schedule.payload) {
+			if (typeof(schedule.payload) != 'object')
+				throw new Error(`Wrong argument exception. 'schedule.payload' is expecting an object. Found ${typeof(schedule.payload)} instead.`)
+			eventTargetConfig.input = JSON.stringify(schedule.payload)
+		}
+		const eventTarget = new aws.cloudwatch.EventTarget(eventTargetName, eventTargetConfig)
 
 		// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/lambda/permission/
 		const schedulePermissionName = `${name}-schedule-permission`
@@ -250,7 +271,7 @@ const createFunction = async ({ name, description, architecture, fn, layers, tim
 			sourceArn: eventRule.arn
 		})
 
-		schedule = {
+		_schedule = {
 			eventRule: leanify(eventRule),
 			eventTarget: leanify(eventTarget),
 			permission: leanify(permission)
@@ -262,7 +283,7 @@ const createFunction = async ({ name, description, architecture, fn, layers, tim
 		image: leanifyImage(image),
 		role:leanify(lambdaRole),
 		logGroup: leanify(logGroup),
-		schedule
+		schedule: _schedule
 	}
 }
 
