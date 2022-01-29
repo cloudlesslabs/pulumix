@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [2.6.3](https://github.com/cloudlesslabs/pulumix/compare/v2.6.2...v2.6.3) (2022-01-29)
+
+
+### Features
+
+* Add support for creating/overwriting AWS Parameter Store without using Pulumi ([2e064e3](https://github.com/cloudlesslabs/pulumix/commit/2e064e3c82cc2e26ed5d14c150ff3a194b611e71))
+
 ### [2.6.2](https://github.com/cloudlesslabs/pulumix/compare/v2.6.1...v2.6.2) (2022-01-27)
 
 
