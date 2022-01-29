@@ -277,6 +277,17 @@ ARG DB_PASSWORD
 }
 ```
 
+> __NOTE__: When your stack lives under a project, the stack must be prefixed with your project's name. For example, instead of using:
+> ```
+> pulumi up -s dev -y
+> ```
+>
+>
+> Use:
+> ```
+> pulumi up -s your-project-name/dev -y
+> ```
+
 - `npm run up dev`: Deploys the dev stack.
 - `npm run prev dev`: Previews the dev stack.
 - `npm run out dev`: Prints the dev stack's outputs. 
@@ -2177,9 +2188,7 @@ const main = async () => {
 
 #### Using versions with Parameter Store 
 
-Parameter Store versions each update. The version uses numbers starting from 1 and are automatically incremented. The version cannot be set explicitly. 
-
-To retrieve a specific version, include the version in the parameter store's ID as follow:
+The previous example demonstrates how to read the value of a parameter store variable. However, this API does not use Pulumi under the hood. To get a specific version using the native Pulumi API:
 
 ```js
 const param = aws.ssm.Parameter.get('foo','foo:12')
