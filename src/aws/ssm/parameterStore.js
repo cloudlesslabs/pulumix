@@ -10,7 +10,7 @@ const ssmPutParameter = arg => new Promise((next,fail) => ssm.putParameter(arg, 
 /**
  * Gets a parameter from AWS Parameter Store.
  * 
- * WARNING: Requires the 'ssm:GetParameter' permission in the policy.
+ * WARNING: Requires the 'ssm:GetParameters' (or 'ssm:GetParameter' or both) permission in the policy.
  * 
  * @param  {String}  name
  * @param  {String}  version						Optional. If null, then the latest version is returned.	
@@ -54,16 +54,19 @@ const getParameter = async ({ name, version, json }) => {
 }
 
 /**
- *
- * @param  {String}		name		Required.
- * @param  {Object}		value       Required.
- * @param  {String} 	type		Valid types are 'String' (default), 'StringList' and 'SecureString'	
+ * 
+ * 
+ * @param  {String}		name			Required.
+ * @param  {Object}		value       	Required.
+ * @param  {String} 	type			Valid types are 'String' (default), 'StringList' and 'SecureString'	
  * @param  {String}		description 
  * @param  {Boolean}	overWrite   
- * @param  {String}		tier        'Standard' (default) | 'Advanced' | 'Intelligent-Tiering'
+ * @param  {String}		tier        	'Standard' (default) | 'Advanced' | 'Intelligent-Tiering'
  * @param  {Object}		tags      
  *   
- * @return {[type]}                     [description]
+ * @return {Object}		output
+ * @return {Number}			.version		
+ * @return {String}			.tier		
  */
 const putParameter = async ({ name, type, value, description, overWrite, tags, tier }) => {
 	if (!name)
@@ -103,7 +106,9 @@ const putParameter = async ({ name, type, value, description, overWrite, tags, t
 	if (tier)
 		params.Tier = tier
 
-	return await ssmPutParameter(params)
+	const data = await ssmPutParameter(params)
+	const { Version, Tier } = data || {}
+	return { version:Version, tier:Tier }
 }
 
 /**

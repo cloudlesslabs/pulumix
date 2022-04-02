@@ -56,6 +56,7 @@ npm i @cloudlesslabs/pulumix
 >			- [ARM architecture recommended](#arm-architecture-recommended)
 >		- [API Gateway with explicit Lambda handlers](#api-gateway-with-explicit-lambda-handlers)
 >		- [Basic Lambda with an API Gateway](#basic-lambda-with-an-api-gateway)
+>		- [Configuring Cloudwatch](#configuring-cloudwatch)
 >		- [Configuring IAM policies to enable Lambda access to other resources](#configuring-iam-policies-to-enable-lambda-access-to-other-resources)
 >		- [Letting other AWS services to access a lambda](#letting-other-aws-services-to-access-a-lambda)
 >		- [Scheduling a lambda](#scheduling-a-lambda)
@@ -104,6 +105,7 @@ npm i @cloudlesslabs/pulumix
 >		- [IAM, Policies and co](#iam-policies-and-co)
 >			- [Identity-based policies](#identity-based-policies)
 >			- [Resource-based policies](#resource-based-policies)
+>	- [Policies examples](#policies-examples)
 >	- [Docker files examples](#docker-files-examples)
 >		- [`Dockerfile` example](#dockerfile-example)
 >		- [`.dockerignore` example](#dockerignore-example)
@@ -1449,9 +1451,9 @@ const main = async () => {
 module.exports = main()
 ```
 
-### Configuring IAM policies to enable Lambda access to other resources
+### Configuring Cloudwatch
 
-Tl;dr:
+Cloudwatch could be set up via policies as explained in the [next section](#configuring-iam-policies-to-enable-lambda-access-to-other-resources), but because this setup is common, we've added support for it via the Lambda API:
 
 ```js
 const { aws:{ lambda } } = require('@cloudlesslabs/pulumix')
@@ -1463,10 +1465,14 @@ const lambdaOutput = await lambda.fn({
 })
 ```
 
-The rest of this section focuses on how the above configuration works under the hood. 
+### Configuring IAM policies to enable Lambda access to other resources
 
-To add CloudWatch logs to the previous Lambda, we need to create a new policy that allows the creations of log groups, log streams and log event as associate that policy to the Lambda's role.
+> Tips:
+> - Inspect AWS managed policies to see how their statement is structured. You can easily do this with `npx get-policies`.
+> - To find the right action, use this link: https://iam.cloudonaut.io/
+> - Please refer to the [Annexes](#annexes) in the [__Policies examples__](#policies-examples) section for common examples.
 
+To illustrate this topic, let's see how we could configure CloudWatch so the Lambda can send its logs to a log group. To enable this setup, we need to create a new policy that allows the creations of log groups, log streams and log event as associate that policy to the Lambda's role.
 
 ```js
 // IAM: Allow lambda to create log groups, log streams and log events.
@@ -2186,6 +2192,27 @@ const main = async () => {
 
 > NOTICE: This method does not use the Pulumi API as it creates `registered twice` issues when both a `get` and `create` operations that use the same name are put in the same script.
 
+To store or update data in Parameter Store without using Pulumi:
+
+```js
+const { aws: { ssm } } = require('@cloudlesslabs/pulumix')
+
+const main = async () => {
+	// Full parameters list at https://www.pulumi.com/registry/packages/aws/api-docs/ssm/parameter/
+	const data = await parameterStore.create({ 
+		name: 'foo', 
+		value: {
+			hello: 'World'
+		}, 
+		overWrite:true // Default false. True means you can overwrite the value.
+	})
+
+	return data // { version: 1, tier: 'Standard' }
+}
+
+main()
+```
+
 #### Using versions with Parameter Store 
 
 The previous example demonstrates how to read the value of a parameter store variable. However, this API does not use Pulumi under the hood. To get a specific version using the native Pulumi API:
@@ -2777,6 +2804,79 @@ const lambda = new aws.lambda.Function('my-lambda', {
 ```
 
 #### Resource-based policies
+
+## Policies examples
+
+- [Read/write access to S3 objects](#readwrite-access-to-s3-objects)
+- [Read SSM Parameter Store](#read-ssm-parameter-store)
+- [Read Cloudwatch logs](#read-cloudwatch-logs)
+
+### Read/write access to S3 objects
+
+```js
+const s3ObjectPolicyName = `my-project-s3-access`
+const s3ObjectPolicy = new aws.iam.Policy(s3ObjectPolicyName, {
+	name: s3ObjectPolicyName,
+	description: `Allow to read/write objects in an S3 bucket.`,
+	path: '/',
+	policy: JSON.stringify({
+		Version: '2012-10-17',
+		Statement: [{
+			Action: [
+				's3:Get*',
+				's3:List*',
+				's3:PutObject'
+			],
+			Resource: [join(logBucketArn,'*')], // Notice that you cannot simply use the bucket's ARN. 
+			Effect: 'Allow'
+		}]
+	})
+})
+```
+
+### Read SSM Parameter Store
+
+```js
+const parameterStorePolicyName = `my-project-parameter-store`
+const parameterStorePolicy = new aws.iam.Policy(parameterStorePolicyName, {
+	name: parameterStorePolicyName,
+	description: `Allow to read Parameter Store.`,
+	path: '/',
+	policy: JSON.stringify({
+		Version: '2012-10-17',
+		Statement: [{
+			Action: [
+				'ssm:GetParameters',
+				'ssm:GetParameter'
+			],
+			Resource: ['*'],
+			Effect: 'Allow'
+		}]
+	})
+})
+```
+
+### Read Cloudwatch logs
+
+```js
+// IAM: Allow lambda to read Cloudwatch logs.
+const cloudwatchLogGroupPolicyName = `my-project-read-log-group`
+const cloudwatchLogGroupPolicy = new aws.iam.Policy(cloudwatchLogGroupPolicyName, {
+	name: cloudwatchLogGroupPolicyName,
+	description: `Allow to read Cloudwatch log group.`,
+	path: '/',
+	policy: JSON.stringify({
+		Version: '2012-10-17',
+		Statement: [{
+			Action: [
+				'logs:FilterLogEvents'
+			],
+			Resource: ['*'],
+			Effect: 'Allow'
+		}]
+	})
+})
+```
 
 ## Docker files examples](#docker-files-examples)
 ### `Dockerfile` example](#dockerfile-example)
