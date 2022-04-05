@@ -267,28 +267,19 @@ ARG DB_PASSWORD
 ```js
 {
 	"scripts": {
-		"up": "func() { pulumi up -s $1 -y; }; func",
-		"prev": "func() { pulumi preview -s $1; }; func",
-		"out": "func() { pulumi stack output -s $1; }; func",
-		"refresh": "func() { pulumi refresh -s $1 -y; }; func",
-		"blast": "func() { pulumi destroy -s $1; }; func",
-		"clean": "func() { pulumi stack rm $1; }; func",
-		"import": "func() { pulumi stack export -s $1 > stack.json; }; func",
-		"export": "func() { pulumi stack import -s $1 --file stack.json; }; func"
+		"up": "func() { pulumi up -s YOUR_ORG/$1 -y; }; func",
+		"prev": "func() { pulumi preview -s YOUR_ORG/$1; }; func",
+		"out": "func() { pulumi stack output -s YOUR_ORG/$1; }; func",
+		"refresh": "func() { pulumi refresh -s YOUR_ORG/$1 -y; }; func",
+		"blast": "func() { pulumi destroy -s YOUR_ORG/$1; }; func",
+		"clean": "func() { pulumi stack rm YOUR_ORG/$1; }; func",
+		"import": "func() { pulumi stack export -s YOUR_ORG/$1 > stack.json; }; func",
+		"export": "func() { pulumi stack import -s YOUR_ORG/$1 --file stack.json; }; func"
 	}
 }
 ```
 
-> __NOTE__: When your stack lives under a project, the stack must be prefixed with your project's name. For example, instead of using:
-> ```
-> pulumi up -s dev -y
-> ```
->
->
-> Use:
-> ```
-> pulumi up -s your-project-name/dev -y
-> ```
+> __NOTE__: When your stack lives under an organization, the stack must be prefixed with your organization's name. In the samples above, replace `YOUR_ORG` with your organization's name. If you wish to use your default Pulumi account, then delete the `YOUR_ORG/` prefix.
 
 - `npm run up dev`: Deploys the dev stack.
 - `npm run prev dev`: Previews the dev stack.
