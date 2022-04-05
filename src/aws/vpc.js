@@ -8,8 +8,9 @@ LICENSE file in the root directory of this source tree.
 
 // Version: 0.0.5
 
+const pulumi = require('@pulumi/pulumi')
 const awsx = require('@pulumi/awsx')
-const { resolve } = require('../utils')
+const { unwrap } = require('../utils')
 
 /**
  * Creates a new VPC. Doc: https://www.pulumi.com/docs/reference/pkg/nodejs/pulumi/awsx/ec2/
@@ -20,28 +21,37 @@ const { resolve } = require('../utils')
  *    4. (Optional) Isolated subnets is 'subnets' contains { type: 'isolated' }
  *    4. (Optional) NAT gateways if 'subnets' contains both { type: 'public' } and { type: 'private' }
  * 
- * @param  {String}                name                        
- * @param  {String}                cidrBlock                    Optional. Default is '10.0.0.0/16'.
- * @param  {Number}                numberOfAvailabilityZones    Optional. Default is 2.                
- * @param  {[Object]}              subnets                        Optional. WARNING(1): Default is [{ type: 'public' }, { type: 'private' }]
- * @param  {Number}                numberOfNatGateways            Optional (2).    
- * @param  {Boolean}               protect                        
- * @param  {Object}                tags        
+ * @param  {String}					name                        
+ * @param  {String}					cidrBlock							Optional. Default is '10.0.0.0/16'.
+ * @param  {Number}					numberOfAvailabilityZones			Optional. Default is 2.                
+ * @param  {[Object]}				subnets								Optional. WARNING(1): Default is [{ type: 'public' }, { type: 'private' }]
+ * @param  {Number}					numberOfNatGateways					Optional (2).    
+ * @param  {Boolean}				protect                        
+ * @param  {Object}					tags        
  *                 
- * @return {Output<String>}        id
- * @return {Output<String>}        arn
- * @return {Output<String>}        cidrBlock
- * @return {Output<String>}        ipv6CidrBlock
- * @return {Output<String>}        defaultNetworkAclId
- * @return {Output<String>}        defaultRouteTableId
- * @return {Output<String>}        defaultSecurityGroupId
- * @return {Output<String>}        dhcpOptionsId
- * @return {Output<String>}        mainRouteTableId
- * @return {[String]}              publicSubnetIds
- * @return {[String]}              privateSubnetIds
- * @return {[String]}              isolatedSubnetIds
- * @return {[String]}              natGatewayIds
- * @return {Promise<[String]>}     availabilityZones            WARNING: This is a promise, not an output.
+ * @return {Output<Object>}			vpc
+ * @return {String}						.id
+ * @return {String}						.arn
+ * @return {String}						.cidrBlock
+ * @return {String}						.ipv6CidrBlock
+ * @return {String}						.defaultNetworkAclId
+ * @return {String}						.defaultRouteTableId
+ * @return {String}						.defaultSecurityGroupId
+ * @return {String}						.dhcpOptionsId
+ * @return {String}						.mainRouteTableId
+ * @return {[String]}					.publicSubnetIds[]
+ * @return {[String]}					.privateSubnetIds[]
+ * @return {[String]}					.isolatedSubnetIds[]
+ * @return {[String]}					.availabilityZones				WARNING: This is a promise, not an output.
+ * @return {[Object]}					.natGateways[]
+ * @return {String}							.id							e.g., 'nat-1234567'
+ * @return {String}							.name						e.g., 'my-app-dev-0'
+ * @return {String}							.privateIp					e.g., '10.0.26.107'
+ * @return {String}							.publicIp					e.g., '13.147.192.140'
+ * @return {Object}							.subnet
+ * @return {String}								.id						e.g., 'subnet-1234566'
+ * @return {String}								.name					e.g., 'my-app-dev-public-0'
+ * @return {String}								.availabilityZone		e.g., 'ap-southeast-2a'
  *
  * (1) The reason the default subnets is a warning is because it provisions a "Pulumi private subnet" in each AZ. Standard 
  * private subnets are just subnets with no internet gateway, meaning the public internet cannot initiate a connection to them. 
@@ -55,7 +65,7 @@ const { resolve } = require('../utils')
  * (2) 'numberOfNatGateways' is only configurable if there is at least one public subnet. In that case, the default value is 
  * equal to 'numberOfAvailabilityZones'.  
  */
-const createVPC = async ({ name, cidrBlock, subnets, numberOfAvailabilityZones, numberOfNatGateways, protect, tags }) => {
+const vpcObject = function ({ name, cidrBlock, subnets, numberOfAvailabilityZones, numberOfNatGateways, protect, tags }) {
 	tags = tags || {}
 
 	// VPC doc: https://www.pulumi.com/docs/reference/pkg/nodejs/pulumi/awsx/ec2/
@@ -70,128 +80,89 @@ const createVPC = async ({ name, cidrBlock, subnets, numberOfAvailabilityZones, 
 		}
 	}, { protect })
 
-	const subnetsDetails = await getSubnets(vpc)
-	const availabilityZones = await getAvailabilityZones(subnetsDetails)
-	const natGateways = await getNatGateways(vpc.natGateways, subnetsDetails)
-	const publicSubnetIds = await resolve(vpc.publicSubnetIds)
-	const privateSubnetIds = await resolve(vpc.privateSubnetIds)
-	const isolatedSubnetIds = await resolve(vpc.isolatedSubnetIds)
+	const getSubnet = type => x => ({ 
+		id: x.subnet.id, 
+		name: x.subnetName, 
+		availabilityZone: x.subnet.availabilityZone,
+		type
+	})
 
-	return {
-		id: vpc.id,
-		arn: vpc.vpc.arn,
-		cidrBlock: vpc.vpc.cidrBlock,
-		ipv6CidrBlock: vpc.vpc.ipv6CidrBlock,
-		defaultNetworkAclId: vpc.vpc.defaultNetworkAclId,
-		defaultRouteTableId: vpc.vpc.defaultRouteTableId,
-		defaultSecurityGroupId: vpc.vpc.defaultSecurityGroupId,
-		dhcpOptionsId: vpc.vpc.dhcpOptionsId,
-		mainRouteTableId: vpc.vpc.mainRouteTableId,
-		publicSubnetIds,
-		privateSubnetIds,
-		isolatedSubnetIds,
-		natGateways,
-		availabilityZones
-	}
+	const subnetsAndAZs = pulumi.all([
+		unwrap(vpc.publicSubnets, getSubnet('public')),
+		unwrap(vpc.privateSubnets, getSubnet('private')),
+		unwrap(vpc.isolatedSubnets, getSubnet('isolated'))
+	]).apply(([publicSubnets, privateSubnets, isolatedSubnets]) => {
+		const _subnets = [
+			...(publicSubnets||[]),
+			...(privateSubnets||[]),
+			...(isolatedSubnets||[])
+		]
+		const availabilityZones = Array.from(new Set(_subnets.map(s => s.availabilityZone).filter(x => x)))
+			
+		return {
+			subnets: _subnets,
+			availabilityZones
+		}
+	})
+
+	this.id = vpc.id
+	this.arn = vpc.vpc.arn
+	this.cidrBlock = vpc.vpc.cidrBlock
+	this.ipv6CidrBlock = vpc.vpc.ipv6CidrBlock
+	this.defaultNetworkAclId = vpc.vpc.defaultNetworkAclId
+	this.defaultRouteTableId = vpc.vpc.defaultRouteTableId
+	this.defaultSecurityGroupId = vpc.vpc.defaultSecurityGroupId
+	this.dhcpOptionsId = vpc.vpc.dhcpOptionsId
+	this.mainRouteTableId = vpc.vpc.mainRouteTableId
+	this.publicSubnetIds = vpc.publicSubnetIds
+	this.privateSubnetIds = vpc.privateSubnetIds
+	this.isolatedSubnetIds = vpc.isolatedSubnetIds
+	this.availabilityZones = subnetsAndAZs.availabilityZones
+	this.natGateways = getNatGateways(vpc.natGateways, subnetsAndAZs.subnets)
+
+	return this
 }
 
 /**
  * Resolves the NAT gateways details. 
  * 
- * @param  {[Output<NAT>]}	unresolvedNatGateways		
- * @param  {[Output<NAT>]}	
- * @param  {String}			subnets[].id							e.g., 'subnet-1234566'
- * @param  {String}			subnets[].name							e.g., 'my-app-dev-public-1'
- * @param  {String}			subnets[].availabilityZone				e.g., 'ap-southeast-2c'
+ * @param  {Output<[NAT]>}		outputNatGateways		
+ * @param  {Output<[Subnet]>}	outputSubnets[]
+ * @param  {String}					.id							e.g., 'subnet-0fb5a6a53c701836a'
+ * @param  {String}					.name						e.g., 'lineup-network-dev-public-1'
+ * @param  {String}					.availabilityZone			e.g., 'ap-southeast-2c'
  * 
- * @return {String}			natGateways[].id						e.g., 'nat-1234567'
- * @return {String}			natGateways[].name						e.g., 'my-app-dev-0'
- * @return {String}			natGateways[].privateIp					e.g., '10.0.26.107'
- * @return {String}			natGateways[].publicIp					e.g., '13.147.192.140'
- * @return {String}			natGateways[].subnet.id					e.g., 'subnet-1234566'
- * @return {String}			natGateways[].subnet.name				e.g., 'my-app-dev-public-0'
- * @return {String}			natGateways[].subnet.availabilityZone	e.g., 'ap-southeast-2a'
+ * @return {Output<[Object]>}	natGateways[]					
+ * @return {String}					.id							e.g., 'nat-1234567'
+ * @return {String}					.name						e.g., 'my-app-dev-0'
+ * @return {String}					.privateIp					e.g., '10.0.26.107'
+ * @return {String}					.publicIp					e.g., '13.147.192.140'
+ * @return {String}					.subnet.id					e.g., 'subnet-1234566'
+ * @return {String}					.subnet.name				e.g., 'my-app-dev-public-0'
+ * @return {String}					.subnet.availabilityZone	e.g., 'ap-southeast-2a'
  */
-const getNatGateways = async (unresolvedNatGateways, subnets) => {
-	if (!unresolvedNatGateways)
-		return null
+const getNatGateways = (outputNatGateways, outputSubnets) =>
+	pulumi.all([
+		unwrap(outputNatGateways, x => ({
+			id: x.natGateway.id,
+			name: x.natGatewayName,
+			subnetId: x.natGateway.subnetId,
+			privateIp: x.natGateway.privateIp,
+			publicIp: x.natGateway.publicIp
+		})), 
+		unwrap(outputSubnets)
+	]).apply(([natGateways, subnets]) => {
+		if (!natGateways || !natGateways.length)
+			return null
 
-	const natGateways = await resolve(unresolvedNatGateways)
-	if (!natGateways || !natGateways.length)
-		return null
-
-	subnets = subnets || []
-
-	const resolvedNatGateways = []
-	for (let i=0;i<natGateways.length;i++) {
-		const natGateway = natGateways[i]//await resolve()
-		const [natGatewayId, subnetId, privateIp, publicIp] = await resolve([
-			natGateway.natGateway.id,
-			natGateway.natGateway.subnetId,
-			natGateway.natGateway.privateIp,
-			natGateway.natGateway.publicIp
-		])
-
-		const subnet = subnets.find(s => s.id == subnetId)
-
-		resolvedNatGateways.push({
-			id: natGatewayId,
-			name: natGateway.natGatewayName,
-			privateIp,
-			publicIp,
-			subnet
+		return natGateways.map(n => {
+			n.subnet = subnets.find(s => s.id == n.subnetId)
+			return n
 		})
-	}
-
-	return resolvedNatGateways
-}
-
-/**
- * Aggregates all subnets in a single array. 
- * 
- * @param  {[Output<Subnet>]}	vpc.publicSubnets
- * @param  {[Output<Subnet>]}	vpc.privateSubnets
- * @param  {[Output<Subnet>]}	vpc.isolatedSubnets
- * 
- * @return {String}				subnets[].id				e.g., 'subnet-0fb5a6a53c701836a'
- * @return {String}				subnets[].name				e.g., 'lineup-network-dev-public-1'
- * @return {String}				subnets[].availabilityZone	e.g., 'ap-southeast-2c'
- */
-const getSubnets = async vpc => {
-	const [subnetsA, subnetsB, subnetsC] = await resolve([vpc.publicSubnets, vpc.privateSubnets, vpc.isolatedSubnets])
-	const subnets = [...(subnetsA||[]), ...(subnetsB||[]), ...(subnetsC||[])]
-	const resolvedSubnets = []
-	for (let i=0;i<subnets.length;i++) {
-		const { subnetName, subnet } = subnets[i] || {}
-		const [id, availabilityZone] = await resolve([subnet.id, subnet.availabilityZone])
-		resolvedSubnets.push({ id, name:subnetName, availabilityZone })
-	}
-	return resolvedSubnets
-}
-
-/**
- * Gets a VPC's AZs.
- * 
- * @param  {[Subnet]}    		subnets
- * 
- * @return {Promise<[String]>}	availabilityZones
- */
-const getAvailabilityZones = async subnets => {
-	const azs = []
-	for (let i=0;i<subnets.length;i++) {
-		const subnet = subnets[i]||{}
-		if (subnet && subnet.availabilityZone) {
-			const az = await resolve(subnet.availabilityZone)
-			if (azs.indexOf(az) < 0)
-				azs.push(az)
-		}
-	}
-
-	return azs
-}
+	})
 
 module.exports = {
-	vpc:createVPC
+	VPC: vpcObject
 }
 
 

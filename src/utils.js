@@ -74,8 +74,53 @@ const deleteFile = filePath => catchErrors(new Promise((onSuccess, onFailure) =>
  */
 const readFile = filePath => catchErrors(new Promise((onSuccess, onFailure) => fs.readFile(filePath||'', (err, data) => err ? onFailure(err) : onSuccess(data))))
 
+const unwrap = (output, props) => {
+	const _output = !output || !output.apply || typeof(output.apply) != 'function' 
+		? pulumi.output(output)
+		: output
+
+	const _getProps = props && props.length ? () => props : v => Object.keys(v)
+	
+	const _mapValuesToOutputs = typeof(props) == 'function'
+		? (idx=0) => v => {
+			const _v = !v || !v.apply || typeof(v.apply) != 'function' ? pulumi.output(v) : v
+			return Object.entries(props(_v)).map(([p,vv]) => ([p,(vv instanceof Promise) ? pulumi.output(vv) : vv, idx++]))
+		}
+		: (idx=0) => v => {
+			const _props = _getProps(v)
+			return _props.map(p => {
+				const _val = v[p]
+				return [p, (_val instanceof Promise) ? pulumi.output(_val) : _val, idx++]
+			})
+		}
+
+	return _output.apply(val => {
+		if (!val)
+			return null
+
+		const isArray = Array.isArray(val)
+		const values = isArray ? val : [val]
+		const outputs = values.map(_mapValuesToOutputs())
+
+		return pulumi
+			.all(outputs.reduce((acc, outs) => {
+				acc.push(...outs.map(o => o[1]))
+				return acc
+			}, []))
+			.apply(vals => {
+				const unwrappedValues = outputs.map(outs => outs.reduce((acc, [prop,,i]) => {
+					acc[prop] = vals[i]
+					return acc
+				}, {}))
+
+				return isArray ? unwrappedValues : unwrappedValues[0]
+			})
+	})
+}
+
 module.exports = {
 	resolve,
+	unwrap,
 	files: {
 		list: listFiles,
 		remove: deleteFile,
