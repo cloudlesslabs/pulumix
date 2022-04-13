@@ -272,7 +272,7 @@ ARG DB_PASSWORD
 		"out": "func() { pulumi stack output -s YOUR_ORG/$1; }; func",
 		"refresh": "func() { pulumi refresh -s YOUR_ORG/$1 -y; }; func",
 		"blast": "func() { pulumi destroy -s YOUR_ORG/$1; }; func",
-		"clean": "func() { pulumi stack rm YOUR_ORG/$1; }; func",
+		"clean": "func() { cp Pulumi.$1.yaml Pulumi.$1.backup.yaml; pulumi stack rm YOUR_ORG/$1; cp Pulumi.$1.backup.yaml Pulumi.$1.yaml; rm -rf Pulumi.$1.backup.yaml; }; func",
 		"import": "func() { pulumi stack export -s YOUR_ORG/$1 > stack.json; }; func",
 		"export": "func() { pulumi stack import -s YOUR_ORG/$1 --file stack.json; }; func"
 	}
