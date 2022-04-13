@@ -1,11 +1,8 @@
 {
-  "name": "@cloudlesslabs/pulumix",
-  "version": "3.0.1-rc.0",
+  "name": "@cloudlessopenlabs/pulumix",
+  "version": "0.0.0",
   "description": "NodeJS Pulumi helpers.",
   "main": "src/index.js",
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com/"
-  },
   "repository": {
     "type": "git",
     "url": "https://github.com/cloudlesslabs/pulumix.git"
