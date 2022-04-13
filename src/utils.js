@@ -74,6 +74,20 @@ const deleteFile = filePath => catchErrors(new Promise((onSuccess, onFailure) =>
  */
 const readFile = filePath => catchErrors(new Promise((onSuccess, onFailure) => fs.readFile(filePath||'', (err, data) => err ? onFailure(err) : onSuccess(data))))
 
+
+/**
+ * Unwrap an output AND its properties. Example: 
+ * 
+ * 	unwrap(o, x => ({ id: x.id })).apply(v => console.log(`ID is ${v.id}`))
+ * 	unwrap(arrayOutput, x => ({ id: x.id })).apply(v => v.forEach(x => console.log(`ID is ${x.id}`)))
+ * 
+ * @param  {Output<T>|Output<[T]>}	output			Could also be an object of type T or [T] or a promise Promise<T> or Promise<[T]>
+ * @param  {Func}					props			(1) Mapping function from (T => U) (e.g., x => ({ id:x.id, name:x.name }))
+ * 
+ * @return {Output<U>|Output<[U]>}	unwrappedOut	Each property of U is unwrapped and ready to be read.	
+ *
+ * (1) U must be an object.
+ */
 const unwrap = (output, props) => {
 	const _output = !output || !output.apply || typeof(output.apply) != 'function' 
 		? pulumi.output(output)
