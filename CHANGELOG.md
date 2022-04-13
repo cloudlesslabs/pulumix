@@ -2,6 +2,8 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [3.0.0](https://github.com/cloudlesslabs/pulumix/compare/v2.6.4-rc.0...v3.0.0) (2022-04-13)
+
 ### [2.6.3](https://github.com/cloudlesslabs/pulumix/compare/v2.6.2...v2.6.3) (2022-01-29)
 
 
