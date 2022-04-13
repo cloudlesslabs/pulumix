@@ -46,8 +46,12 @@ const { unwrap } = require('../utils')
  * @param  {Output<Boolean>}					egress[].self            
  * @param  {Object}								tags        
  *         
- * @return {Output<SecurityGroup>}				securityGroup
- * @return {Output<[SecurityGroupRule]>}		securityGroupRules
+ * @return {Output<Object>}						securityGroup
+ * @return {Output<String>}							.id
+ * @return {Output<String>}							.arn
+ * @return {Output<String>}							.name
+ * @return {Output<String>}							.description
+ * @return {Output<[SecurityGroupRule]>}			.rules
  */
 const SecurityGroup = function ({ name, description, vpcId, ingress, egress, tags }) {
 	if (!name)
@@ -66,15 +70,18 @@ const SecurityGroup = function ({ name, description, vpcId, ingress, egress, tag
 		}
 	})
 
-	this.securityGroup = leanifySecurityGroup(securityGroup)
-	this.securityGroupRules = unwrap(securityGroup, x => ({ id:x.id })).apply(sg => {
+	this.id = securityGroup.id
+	this.arn = securityGroup.arn
+	this.name = securityGroup.name
+	this.description = securityGroup.description
+	this.rules = unwrap(securityGroup, x => ({ id:x.id })).apply(sg => {
 		return pulumi
 			.all([
 				resolveRules(ingress, 'ingress', sg.id),
 				resolveRules(egress, 'egress', sg.id)
 			])
 			.apply(([ingressRules, egressRules]) => {
-				return [...ingressRules, ...egressRules].map(rule => {
+				return [...(ingressRules||[]), ...(egressRules||[])].map(rule => {
 					const { hash, ...raw } = rule
 					const ruleName = `${name}-sgr-${hash}`
 					// Security group rule doc: https://www.pulumi.com/docs/reference/pkg/aws/ec2/securitygrouprule/
@@ -93,11 +100,6 @@ const SecurityGroup = function ({ name, description, vpcId, ingress, egress, tag
 }
 
 const hashRule = rule => crypto.createHash('md5').update(JSON.stringify(rule)).digest('hex').slice(0,8)
-
-const leanifySecurityGroup = sg => {
-	const { id, arn, name, description } = sg || {}
-	return { id, arn, name, description }
-}
 
 /**
  * Map inline security group rules to explicit SecurityGroupRule objects
