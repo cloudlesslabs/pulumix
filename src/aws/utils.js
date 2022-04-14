@@ -8,6 +8,7 @@ LICENSE file in the root directory of this source tree.
 
 // Version: 0.0.5
 
+const pulumi = require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
 
 /**
@@ -19,38 +20,52 @@ const aws = require('@pulumi/aws')
  * @return {String}		output.creds.username
  * @return {String}		output.creds.password
  */
-const getDBcreds = async secretId => {
-	if (!secretId)
-		return null
+const DatabaseCredentials = function (secretId) {
+	const _secretId = secretId && secretId.apply && typeof(secretId.apply) == 'function'
+		? secretId
+		: pulumi.output(secretId)
 
-	const secretVersion = await aws.secretsmanager.getSecretVersion({ secretId }).catch(err => {
-		throw new Error(`Fail to retrieve secret ID '${secretId}'. Details: ${err.message}`)
+	const o = _secretId.apply(id => {
+		if (!id)
+			return null
+		else
+			return pulumi.output(aws.secretsmanager.getSecretVersion({ secretId:id }).catch(err => {
+				throw new Error(`Fail to retrieve secret ID '${id}'. Details: ${err.message}`)
+			})).apply(secretVersion => {
+				if (!secretVersion)
+					throw new Error(`Secret ID ${id} not found.`)
+
+				const secretString = secretVersion.secretString
+				if (!secretString)
+					throw new Error(`Secret value not found in secret ID '${id}'.`)
+				
+				let creds = {}
+				try {
+					creds = JSON.parse(secretString)
+				} catch(err) {
+					throw new Error(`Faile to parse to JSON the secret string stored in secret ID '${id}'. Corrupted secret string: ${secretString}`)
+				}
+
+				if (!creds.username)
+					throw new Error(`Missing required property 'username' in secret ID '${id}'.`)
+				if (!creds.password)
+					throw new Error(`Missing required property 'password' in secret ID '${id}'.`)
+
+				return {
+					username: creds.username,
+					password: creds.password,
+					version: secretVersion
+				}
+			})
 	})
-	if (!secretVersion)
-		throw new Error(`Secret ID ${secretId} not found.`)
 
-	const secretString = secretVersion.secretString
-	if (!secretString)
-		throw new Error(`Secret value not found in secret ID '${secretId}'.`)
-	
-	let creds = {}
-	try {
-		creds = JSON.parse(secretString)
-	} catch(err) {
-		throw new Error(`Faile to parse to JSON the secret string stored in secret ID '${secretId}'. Corrupted secret string: ${secretString}`)
-	}
+	this.username = o.username
+	this.password = o.password
+	this.version = o.version
 
-	if (!creds.username)
-		throw new Error(`Missing required property 'username' in secret ID '${secretId}'.`)
-	if (!creds.password)
-		throw new Error(`Missing required property 'password' in secret ID '${secretId}'.`)
-
-	return {
-		version: secretVersion,
-		creds
-	}
+	return this
 }
 
 module.exports = {
-	getDBcreds
+	DatabaseCredentials
 }

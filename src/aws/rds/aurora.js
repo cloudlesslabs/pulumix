@@ -9,11 +9,10 @@ LICENSE file in the root directory of this source tree.
 // Version: 0.0.8
 // Full Pulumi AWS RDS API doc at https://www.pulumi.com/docs/reference/pkg/aws/rds/
 
-require('@pulumi/pulumi')
+const pulumi = require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
-const securityGroup = require('../securityGroup')
-const { getDBcreds } = require('../utils')
-const { resolve } = require('../../utils')
+const { SecurityGroup } = require('../securityGroup')
+const { DatabaseCredentials } = require('../utils')
 
 /**
  * Create an AWS Aurora cluster. Doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/cluster/
@@ -82,7 +81,7 @@ const { resolve } = require('../../utils')
  * @return {Output<TargetGroup>}         output.proxy.targetGroup
  * @return {Output<Target>}              output.proxy.target	
  */
-const createAurora = async ({ 
+const Aurora = function ({ 
 	name, 
 	engine,
 	engineVersion,
@@ -99,7 +98,7 @@ const createAurora = async ({
 	cloudWatch,
 	proxy,
 	tags
-}) => {
+}) {
 
 	if (!name)
 		throw new Error('Missing required \'name\' argument.')
@@ -126,21 +125,6 @@ const createAurora = async ({
 			throw new Error('Invalid configuration. When IAM authentication is enabled on RDS proxy, the \'requireTls\' cannot be false.')
 	}
 
-	const subnetIds = !_subnetIds ? null : await resolve(_subnetIds)
-
-	let { masterUsername, masterPassword } = auth
-	const secretId = auth.secretId ? await resolve(auth.secretId) : null
-
-	// Extract username and password from AWS secret manager and get the secret's ARN for the RDS proxy
-	let secretArn
-	if (secretId) {
-		const { version, creds } = await getDBcreds(secretId)
-		
-		secretArn = version.arn
-		masterUsername = creds.username
-		masterPassword = creds.password
-	}
-
 	const dbEngine = `aurora-${engine}`
 	const isMySql = engine == 'mysql'
 	const dbPort = isMySql ? 3306 : 5432
@@ -153,198 +137,206 @@ const createAurora = async ({
 	const dbName = name.toLowerCase().replace(/-/g,'_').replace(/[^a-z0-9_]/g,'') // removing invalid characters
 	const clusterName = name.toLowerCase().replace(/[^a-z0-9-]/g,'') // removing invalid characters
 
-	// Creates the RDS SG and optional the RDS Proxy SG
-	const [rdsSecurityGroup, proxySecurityGroup] = await createSecurityGroups(clusterName, dbPort, vpcId, ingress, { publicAccess, proxyEnabled, tags })
+	const dbCreds = new DatabaseCredentials(auth.secretId)
 
-	// Creates a subnet group (optional). Doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/subnetgroup/
-	const subnetGroupName = `${clusterName}-subnet-group`
-	const subnetGroup = !subnetIds || !subnetIds.length ? undefined : new aws.rds.SubnetGroup(subnetGroupName, {
-		subnetIds,
-		tags: {
-			...tags,
-			Name: subnetGroupName
-		}
-	})
+	return pulumi.all([_subnetIds, dbCreds.username, dbCreds.password, dbCreds.version.arn]).apply(([subnetIds, username, password, secretArn]) => {
+		// Extract username and password from AWS secret manager and get the secret's ARN for the RDS proxy
+		const masterUsername = username || auth.masterUsername
+		const masterPassword = password || auth.masterPassword
 
-	// Creates the Aurora Cluster (doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/cluster/)
-	// MySQL engine versions: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraMySQL.Updates.Versions.html
-	// PostgreSQL engine versions: aws rds describe-db-engine-versions --engine aurora-postgresql --query '*[].[EngineVersion]' --output text --region your-AWS-Region
-	const dbCluster = new aws.rds.Cluster(clusterName, {
-		availabilityZones,
-		backupRetentionPeriod,
-		clusterIdentifier: clusterName,
-		databaseName: dbName, // DatabaseName must begin with a letter and contain only alphanumeric characters
-		engine: dbEngine,
-		engineVersion, // For PostgreSQL, the engineVersion is easier. It's simply the real version (e.g., 12.6)
-		masterUsername,
-		masterPassword,
-		skipFinalSnapshot: true,
-		enabledCloudwatchLogsExports: cloudWatch ? logs : undefined,
-		preferredBackupWindow: '15:00-17:00', // time is UTC
-		applyImmediately: true,
-		vpcSecurityGroupIds: [rdsSecurityGroup.securityGroup.id], // Must be set to allow traffic based on the security group
-		dbSubnetGroupName: subnetGroup ? subnetGroup.name : undefined,
-		tags: {
-			...tags,
-			Name: clusterName
-		}
-	}, {
-		protect
-	})
+		// Creates the RDS SG and optional the RDS Proxy SG
+		const [rdsSecurityGroup, proxySecurityGroup] = createSecurityGroups(clusterName, dbPort, vpcId, ingress, { publicAccess, proxyEnabled, tags })
 
-	// Add instances to that cluster (doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/clusterinstance/)
-	const clusterInstances = []
-	const clusterInstanceEndpoints = {}
-	instanceNbr = !instanceNbr || instanceNbr < 0 ? 1 : instanceNbr
-	for (let i = 0; i < instanceNbr; i++) {
-		const idx = i+1
-		const instanceName = `${clusterName}-instance-${idx}`
-		const clusterInstance = new aws.rds.ClusterInstance(instanceName, {
-			clusterIdentifier: dbCluster.id,
-			engine: dbCluster.engine,
-			engineVersion: dbCluster.engineVersion,
-			identifier: instanceName,
-			instanceClass: instanceSize,
-			publiclyAccessible: publicAccess, // Allow the instance to be accessible outside of its associated VPC
-			dbSubnetGroupName: subnetGroup ? subnetGroup.name : undefined,
-			applyImmediately: true,
+		// Creates a subnet group (optional). Doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/subnetgroup/
+		const subnetGroupName = `${clusterName}-subnet-group`
+		const subnetGroup = !subnetIds || !subnetIds.length ? undefined : new aws.rds.SubnetGroup(subnetGroupName, {
+			subnetIds,
 			tags: {
 				...tags,
-				Name: instanceName
+				Name: subnetGroupName
+			}
+		})
+
+		// Creates the Aurora Cluster (doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/cluster/)
+		// MySQL engine versions: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraMySQL.Updates.Versions.html
+		// PostgreSQL engine versions: aws rds describe-db-engine-versions --engine aurora-postgresql --query '*[].[EngineVersion]' --output text --region your-AWS-Region
+		const dbCluster = new aws.rds.Cluster(clusterName, {
+			availabilityZones,
+			backupRetentionPeriod,
+			clusterIdentifier: clusterName,
+			databaseName: dbName, // DatabaseName must begin with a letter and contain only alphanumeric characters
+			engine: dbEngine,
+			engineVersion, // For PostgreSQL, the engineVersion is easier. It's simply the real version (e.g., 12.6)
+			masterUsername,
+			masterPassword,
+			skipFinalSnapshot: true,
+			enabledCloudwatchLogsExports: cloudWatch ? logs : undefined,
+			preferredBackupWindow: '15:00-17:00', // time is UTC
+			applyImmediately: true,
+			vpcSecurityGroupIds: [rdsSecurityGroup.id], // Must be set to allow traffic based on the security group
+			dbSubnetGroupName: subnetGroup ? subnetGroup.name : undefined,
+			tags: {
+				...tags,
+				Name: clusterName
 			}
 		}, {
-			protect,
-			parent: dbCluster
+			protect
 		})
 
-		clusterInstanceEndpoints[`instance-${idx}-endpoint`] = clusterInstance.endpoint
-		clusterInstances.push(clusterInstance)
-	}
+		// Add instances to that cluster (doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/clusterinstance/)
+		const clusterInstances = []
+		const clusterInstanceEndpoints = {}
+		instanceNbr = !instanceNbr || instanceNbr < 0 ? 1 : instanceNbr
+		for (let i = 0; i < instanceNbr; i++) {
+			const idx = i+1
+			const instanceName = `${clusterName}-instance-${idx}`
+			const clusterInstance = new aws.rds.ClusterInstance(instanceName, {
+				clusterIdentifier: dbCluster.id,
+				engine: dbCluster.engine,
+				engineVersion: dbCluster.engineVersion,
+				identifier: instanceName,
+				instanceClass: instanceSize,
+				publiclyAccessible: publicAccess, // Allow the instance to be accessible outside of its associated VPC
+				dbSubnetGroupName: subnetGroup ? subnetGroup.name : undefined,
+				applyImmediately: true,
+				tags: {
+					...tags,
+					Name: instanceName
+				}
+			}, {
+				protect,
+				parent: dbCluster
+			})
 
-	// RDS Proxy:
-	// 	- Proxy doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/proxy/
-	// 	- Proxy target group doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/proxydefaulttargetgroup/
-	// 	- Proxy target doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/proxytarget/
-	// 	- Proxy endpoint doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/proxyendpoint/
-	const proxyOutput = !proxyEnabled ? null : await (async () => {
-		// IAM role. Doc: https://www.pulumi.com/docs/reference/pkg/aws/iam/role/
-		const proxyRoleName = `${name}-rds-proxy`
-		const proxyRole = new aws.iam.Role(proxyRoleName, {
-			path: '/',
-			assumeRolePolicy: JSON.stringify({
-				Version: '2012-10-17',
-				Statement: [{
-					Action: 'sts:AssumeRole',
-					Principal: {
-						Service: 'rds.amazonaws.com'
-					},
-					Effect: 'Allow',
-					Sid: ''
-				}]
-			}),
-			tags: {
-				...tags,
-				Name: proxyRoleName
+			clusterInstanceEndpoints[`instance-${idx}-endpoint`] = clusterInstance.endpoint
+			clusterInstances.push(clusterInstance)
+		}
+
+		// RDS Proxy:
+		// 	- Proxy doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/proxy/
+		// 	- Proxy target group doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/proxydefaulttargetgroup/
+		// 	- Proxy target doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/proxytarget/
+		// 	- Proxy endpoint doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/proxyendpoint/
+		const proxyOutput = !proxyEnabled ? null : (() => {
+			// IAM role. Doc: https://www.pulumi.com/docs/reference/pkg/aws/iam/role/
+			const proxyRoleName = `${name}-rds-proxy`
+			const proxyRole = new aws.iam.Role(proxyRoleName, {
+				path: '/',
+				assumeRolePolicy: JSON.stringify({
+					Version: '2012-10-17',
+					Statement: [{
+						Action: 'sts:AssumeRole',
+						Principal: {
+							Service: 'rds.amazonaws.com'
+						},
+						Effect: 'Allow',
+						Sid: ''
+					}]
+				}),
+				tags: {
+					...tags,
+					Name: proxyRoleName
+				}
+			})
+			// IAM policy doc: https://www.pulumi.com/docs/reference/pkg/aws/iam/policy/
+			const secretsManagerPolicy = new aws.iam.Policy(proxyRoleName, {
+				path: '/',
+				description: 'IAM policy to allow the RDS proxy to get secrets from AWS Secret Manager',
+				policy: JSON.stringify({
+					Version: '2012-10-17',
+					Statement: [{
+						Action: [
+							'secretsmanager:GetSecretValue'
+						],
+						Resource: secretArn,
+						Effect: 'Allow'
+					}]
+				}),
+				tags: {
+					...tags,
+					Name: proxyRoleName
+				}
+			})
+
+			// Attach policy
+			new aws.iam.RolePolicyAttachment(proxyRoleName, {
+				role: proxyRole.name,
+				policyArn: secretsManagerPolicy.arn
+			})
+			
+			const proxySubnetIds = proxy.subnetIds || subnetIds || []
+			if (!proxySubnetIds.length)
+				throw new Error('Missing required \'proxy.subnetIds\'.')
+
+			// RDS Proxy doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/proxy/
+			const rdsProxy = new aws.rds.Proxy(name, {
+				name,
+				roleArn: proxyRole.arn,
+				engineFamily: isMySql ? 'MYSQL' : 'POSTGRESQL',
+				vpcSubnetIds: proxySubnetIds,
+				auths: [{
+					authScheme: 'SECRETS',
+					description: `Authentication method used to connect the RDS proxy ${name} to the Aurora cluster ${clusterName}`,
+					iamAuth: proxy.iam ? 'REQUIRED' : 'DISABLED',
+					secretArn
+				}],
+				debugLogging: proxy.logSQLqueries,
+				idleClientTimeout: proxy.idleClientTimeout || 1800,
+				requireTls: proxy.requireTls === false ? false : true,
+				vpcSecurityGroupIds: [proxySecurityGroup.id], // Must be set to allow traffic based on the security group
+				tags: {
+					...tags,
+					Name: name
+				}
+			})
+
+			// RDS Proxy target group doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/proxydefaulttargetgroup/
+			const proxyTargetGroup = new aws.rds.ProxyDefaultTargetGroup(name, {
+				dbProxyName: rdsProxy.name,
+				connectionPoolConfig: {
+					connectionBorrowTimeout: 120,
+					maxConnectionsPercent: 100,
+					maxIdleConnectionsPercent: 50
+				},
+				tags: {
+					...tags,
+					Name: name
+				}
+			})
+
+			// RDS Proxy target doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/proxytarget/
+			const proxyTarget = new aws.rds.ProxyTarget(name, {
+				dbClusterIdentifier: dbCluster.id,
+				dbProxyName: rdsProxy.name,
+				targetGroupName: proxyTargetGroup.name,
+				tags: {
+					...tags,
+					Name: name
+				}
+			})
+
+			return {
+				proxy: leanifyProxy(rdsProxy),
+				targetGroup: proxyTargetGroup,
+				target: proxyTarget
 			}
-		})
-		// IAM policy doc: https://www.pulumi.com/docs/reference/pkg/aws/iam/policy/
-		const secretsManagerPolicy = new aws.iam.Policy(proxyRoleName, {
-			path: '/',
-			description: 'IAM policy to allow the RDS proxy to get secrets from AWS Secret Manager',
-			policy: JSON.stringify({
-				Version: '2012-10-17',
-				Statement: [{
-					Action: [
-						'secretsmanager:GetSecretValue'
-					],
-					Resource: secretArn,
-					Effect: 'Allow'
-				}]
-			}),
-			tags: {
-				...tags,
-				Name: proxyRoleName
-			}
-		})
-
-		// Attach policy
-		new aws.iam.RolePolicyAttachment(proxyRoleName, {
-			role: proxyRole.name,
-			policyArn: secretsManagerPolicy.arn
-		})
-		
-		const proxySubnetIds = proxy.subnetIds || subnetIds || []
-		if (!proxySubnetIds.length)
-			throw new Error('Missing required \'proxy.subnetIds\'.')
-
-		// RDS Proxy doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/proxy/
-		const rdsProxy = new aws.rds.Proxy(name, {
-			name,
-			roleArn: proxyRole.arn,
-			engineFamily: isMySql ? 'MYSQL' : 'POSTGRESQL',
-			vpcSubnetIds: proxySubnetIds,
-			auths: [{
-				authScheme: 'SECRETS',
-				description: `Authentication method used to connect the RDS proxy ${name} to the Aurora cluster ${clusterName}`,
-				iamAuth: proxy.iam ? 'REQUIRED' : 'DISABLED',
-				secretArn
-			}],
-			debugLogging: proxy.logSQLqueries,
-			idleClientTimeout: proxy.idleClientTimeout || 1800,
-			requireTls: proxy.requireTls === false ? false : true,
-			vpcSecurityGroupIds: [proxySecurityGroup.securityGroup.id], // Must be set to allow traffic based on the security group
-			tags: {
-				...tags,
-				Name: name
-			}
-		})
-
-		// RDS Proxy target group doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/proxydefaulttargetgroup/
-		const proxyTargetGroup = new aws.rds.ProxyDefaultTargetGroup(name, {
-			dbProxyName: rdsProxy.name,
-			connectionPoolConfig: {
-				connectionBorrowTimeout: 120,
-				maxConnectionsPercent: 100,
-				maxIdleConnectionsPercent: 50
-			},
-			tags: {
-				...tags,
-				Name: name
-			}
-		})
-
-		// RDS Proxy target doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/proxytarget/
-		const proxyTarget = new aws.rds.ProxyTarget(name, {
-			dbClusterIdentifier: dbCluster.id,
-			dbProxyName: rdsProxy.name,
-			targetGroupName: proxyTargetGroup.name,
-			tags: {
-				...tags,
-				Name: name
-			}
-		})
+		})()
 
 		return {
-			proxy: leanifyProxy(rdsProxy),
-			targetGroup: proxyTargetGroup,
-			target: proxyTarget
+			endpoint: dbCluster.endpoint, // used for read-write connection string
+			readerEndpoint: dbCluster.readerEndpoint, // used for read-only connection string
+			proxyEnpoint: proxyOutput ? proxyOutput.proxy.endpoint : null,
+			port: dbPort,
+			instanceEndpoints: clusterInstanceEndpoints,
+			dbCluster: leanifyDbCluster(dbCluster),
+			subnetGroup,
+			securityGroups: {
+				rds: rdsSecurityGroup,
+				proxy: proxySecurityGroup
+			},
+			proxy: proxyOutput
 		}
-	})()
-
-	return {
-		endpoint: dbCluster.endpoint, // used for read-write connection string
-		readerEndpoint: dbCluster.readerEndpoint, // used for read-only connection string
-		proxyEnpoint: proxyOutput ? proxyOutput.proxy.endpoint : null,
-		port: dbPort,
-		instanceEndpoints: clusterInstanceEndpoints,
-		dbCluster: leanifyDbCluster(dbCluster),
-		subnetGroup,
-		securityGroups: {
-			rds: rdsSecurityGroup,
-			proxy: proxySecurityGroup
-		},
-		proxy: proxyOutput
-	}
+	})
 }
 
 const leanifyDbCluster = dbCluster => {
@@ -371,13 +363,21 @@ const leanifyProxy = proxy => {
  * @param  {Boolean}						options.publicAccess					
  * @param  {Boolean}						options.proxyEnabled	
  * @param  {Object}							options.tags		
- * 
- * @return {Output<SecurityGroup>}			securityGroups[0].securityGroup			RDS security group		
- * @return {[Output<SecurityGroupRule>]}	securityGroups[0].securityGroupRules	RDS security group rules	
- * @return {Output<SecurityGroup>}			securityGroups[1].securityGroup			RDS proxy security group
- * @return {[Output<SecurityGroupRule>]}	securityGroups[1].securityGroupRules	RDS proxy security group rules		
+ *
+ * @return {Output<SecurityGroup>}			securityGroups[0]	RDS security group
+ * @return {Output<String>}						.id
+ * @return {Output<String>}						.arn
+ * @return {Output<String>}						.name
+ * @return {Output<String>}						.description
+ * @return {Output<[SecurityGroupRule]>}		.rules
+ * @return {Output<SecurityGroup>}			securityGroups[1]	RDS proxy security group
+ * @return {Output<String>}						.id
+ * @return {Output<String>}						.arn
+ * @return {Output<String>}						.name
+ * @return {Output<String>}						.description
+ * @return {Output<[SecurityGroupRule]>}		.rules	
  */
-const createSecurityGroups = async (clusterName, dbPort, vpcId, ingress, options) => {
+const createSecurityGroups = (clusterName, dbPort, vpcId, ingress, options) => {
 	const rdsIngress = (ingress||[]).filter(i => i.rds !== false )
 	const proxyIngress = (ingress||[]).filter(i => i.proxy !== false )
 	const { publicAccess, proxyEnabled, tags } = options
@@ -402,7 +402,7 @@ const createSecurityGroups = async (clusterName, dbPort, vpcId, ingress, options
 	}
 
 	// Security group doc: https://www.pulumi.com/docs/reference/pkg/aws/ec2/securitygroup/
-	const proxySecurityGroup = !proxyEnabled ? null : await securityGroup({
+	const proxySecurityGroup = !proxyEnabled ? null : new SecurityGroup({
 		name: `${clusterName}-rdsproxy-sg`, 
 		description: `Controls the RDS proxy access for the Aurora cluster ${clusterName}.`, 
 		vpcId, 
@@ -412,10 +412,10 @@ const createSecurityGroups = async (clusterName, dbPort, vpcId, ingress, options
 	})
 
 	if (proxyEnabled) // Allows the proxy to access the RDS cluster and vice-versa
-		rdsIngress.push({ protocol: 'tcp', fromPort, toPort, securityGroups:[proxySecurityGroup.securityGroup.id], description: 'Allow RDS proxy access to Aurora cluster' })
+		rdsIngress.push({ protocol: 'tcp', fromPort, toPort, securityGroups:[proxySecurityGroup.id], description: 'Allow RDS proxy access to Aurora cluster' })
 	
 	// Security group doc: https://www.pulumi.com/docs/reference/pkg/aws/ec2/securitygroup/
-	const rdsSecurityGroup = await securityGroup({ 
+	const rdsSecurityGroup = new SecurityGroup({ 
 		name: `${clusterName}-rds-sg`,
 		description: `Controls the Aurora cluster ${clusterName} access.`, 
 		vpcId, 
@@ -430,7 +430,9 @@ const createSecurityGroups = async (clusterName, dbPort, vpcId, ingress, options
 	]
 }
 
-module.exports = createAurora
+module.exports = {
+	Aurora
+}
 
 
 

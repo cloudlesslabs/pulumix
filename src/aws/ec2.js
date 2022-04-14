@@ -33,6 +33,7 @@ const aws = require('@pulumi/aws')
  * @param  {Object}				ssm								Default null. When set, the AWS managed policy 'AmazonSSMManagedInstanceCore' is attached to the instance to allow SSM to connect.
  * @param  {string}					.vpcId							
  * @param  {string}					.vpcDefaultSecurityGroupId	The EC2 instance needs to be configured with a security group that can talk to this SG.
+ * @param  {Boolean}			protect
  * @param  {Object}				tags
  * 
  * @return {Object}   			ec2
@@ -51,7 +52,7 @@ const aws = require('@pulumi/aws')
  * @return {Output<[String]>}			.name
  * @return {Output<[String]>}			.keyPairId
  */
-const EC2 = function ({ name, ami, instanceType, availabilityZone, subnetId, vpcSecurityGroupIds, userData, userDataBase64, publicKey, ssm, tags }) {
+const EC2 = function ({ name, ami, instanceType, availabilityZone, subnetId, vpcSecurityGroupIds, userData, userDataBase64, publicKey, ssm, protect, tags }) {
 	if (!name)
 		throw new Error('Missing required \'name\' argument.')
 	if (ssm) {
@@ -81,18 +82,24 @@ const EC2 = function ({ name, ami, instanceType, availabilityZone, subnetId, vpc
 			...tags,
 			Name: roleName
 		}
+	}, {
+		protect
 	})
 
 	// IAM policy: Enables SSM to access this instance. Doc: https://www.pulumi.com/docs/reference/pkg/aws/iam/rolepolicyattachment/
 	const ssmAttachedPolicy = !ssm ? null : new aws.iam.RolePolicyAttachment(`${name}-amazonssmmanagedinstancecore`, {
 		role: role.name,
 		policyArn: 'arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore' // AWS managed policies
+	}, {
+		protect
 	})
 
 	// IAM instance profile. We need this to associated an IAM role to an EC2 instance.
 	// Doc: https://www.pulumi.com/docs/reference/pkg/aws/iam/instanceprofile/
 	const iamInstanceProfile = new aws.iam.InstanceProfile(`${name}-instanceprofile`, {
 		role: role.name
+	}, {
+		protect
 	})
 
 	// Security Group to enable SSM access (making sure that HTTPS on all traffic is enabled)
@@ -108,6 +115,8 @@ const EC2 = function ({ name, ami, instanceType, availabilityZone, subnetId, vpc
 				...tags,
 				Name: ec2SgName
 			}
+		}, {
+			protect
 		})
 
 		if (!vpcSecurityGroupIds)
@@ -125,6 +134,8 @@ const EC2 = function ({ name, ami, instanceType, availabilityZone, subnetId, vpc
 			...tags,
 			Name: keyName
 		}
+	}, {
+		protect
 	})
 
 	// EC2. Doc: https://www.pulumi.com/docs/reference/pkg/aws/ec2/instance/
@@ -145,6 +156,8 @@ const EC2 = function ({ name, ami, instanceType, availabilityZone, subnetId, vpc
 		dependsOn: [
 			ssmAttachedPolicy
 		]
+	}, {
+		protect
 	})
 
 	this.id = server.id

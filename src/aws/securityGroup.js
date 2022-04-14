@@ -44,6 +44,7 @@ const { unwrap } = require('../utils')
  * @param  {[Output<String>]}					egress[].ipv6CidrBlocks        e.g., ['::/0']
  * @param  {[Output<String>]}					egress[].securityGroups        e.g., ['sg-1234522', 'sg-76322']
  * @param  {Output<Boolean>}					egress[].self            
+ * @param  {Boolean}							protect
  * @param  {Object}								tags        
  *         
  * @return {Object}								securityGroup
@@ -53,7 +54,7 @@ const { unwrap } = require('../utils')
  * @return {Output<String>}							.description
  * @return {Output<[SecurityGroupRule]>}			.rules
  */
-const SecurityGroup = function ({ name, description, vpcId, ingress, egress, tags }) {
+const SecurityGroup = function ({ name, description, vpcId, ingress, egress, protect, tags }) {
 	if (!name)
 		throw new Error('Missing required \'name\' argument.')
 
@@ -68,6 +69,8 @@ const SecurityGroup = function ({ name, description, vpcId, ingress, egress, tag
 			...tags,
 			Name: name
 		}
+	}, {
+		protect
 	})
 
 	this.id = securityGroup.id
@@ -91,6 +94,8 @@ const SecurityGroup = function ({ name, description, vpcId, ingress, egress, tag
 							...tags,
 							Name: ruleName
 						}
+					}, {
+						protect
 					})
 				})
 			})
