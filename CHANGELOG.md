@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.0.5](https://github.com/cloudlesslabs/pulumix/compare/v0.0.4...v0.0.5) (2022-04-14)
+
+
+### Bug Fixes
+
+* VPC fails ([9dda2bd](https://github.com/cloudlesslabs/pulumix/commit/9dda2bd03f20736b2579caa30971362df6be9ad8))
+
 ### [0.0.4](https://github.com/cloudlesslabs/pulumix/compare/v0.0.3...v0.0.4) (2022-04-14)
 
 
