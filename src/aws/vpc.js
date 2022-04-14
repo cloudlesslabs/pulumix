@@ -112,6 +112,7 @@ const VPC = function ({ name, cidrBlock, subnets, numberOfAvailabilityZones, num
 		const availabilityZones = Array.from(new Set(_subnets.map(s => s.availabilityZone).filter(x => x)))
 
 		return {
+			subnets: _subnets,
 			publicSubnets,
 			privateSubnets,
 			isolatedSubnets,
