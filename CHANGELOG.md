@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.0.4](https://github.com/cloudlesslabs/pulumix/compare/v0.0.3...v0.0.4) (2022-04-14)
+
+
+### Features
+
+* Add more subnet details in the VPC object ([8ab0d5f](https://github.com/cloudlesslabs/pulumix/commit/8ab0d5f20ed952bb758afabc70667cfbb4fb4357))
+
 ### [0.0.3](https://github.com/cloudlesslabs/pulumix/compare/v0.0.2...v0.0.3) (2022-04-14)
 
 ### 0.0.2 (2022-04-13)
