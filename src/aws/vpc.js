@@ -29,29 +29,29 @@ const { unwrap } = require('../utils')
  * @param  {Boolean}				protect                        
  * @param  {Object}					tags        
  *                 
- * @return {Output<Object>}			vpc
- * @return {String}						.id
- * @return {String}						.arn
- * @return {String}						.cidrBlock
- * @return {String}						.ipv6CidrBlock
- * @return {String}						.defaultNetworkAclId
- * @return {String}						.defaultRouteTableId
- * @return {String}						.defaultSecurityGroupId
- * @return {String}						.dhcpOptionsId
- * @return {String}						.mainRouteTableId
- * @return {[String]}					.publicSubnetIds[]
- * @return {[String]}					.privateSubnetIds[]
- * @return {[String]}					.isolatedSubnetIds[]
- * @return {[String]}					.availabilityZones				WARNING: This is a promise, not an output.
- * @return {[Object]}					.natGateways[]
- * @return {String}							.id							e.g., 'nat-1234567'
- * @return {String}							.name						e.g., 'my-app-dev-0'
- * @return {String}							.privateIp					e.g., '10.0.26.107'
- * @return {String}							.publicIp					e.g., '13.147.192.140'
- * @return {Object}							.subnet
- * @return {String}								.id						e.g., 'subnet-1234566'
- * @return {String}								.name					e.g., 'my-app-dev-public-0'
- * @return {String}								.availabilityZone		e.g., 'ap-southeast-2a'
+ * @return {Object}					vpc
+ * @return {Output<String>}				.id
+ * @return {Output<String>}				.arn
+ * @return {Output<String>}				.cidrBlock
+ * @return {Output<String>}				.ipv6CidrBlock
+ * @return {Output<String>}				.defaultNetworkAclId
+ * @return {Output<String>}				.defaultRouteTableId
+ * @return {Output<String>}				.defaultSecurityGroupId
+ * @return {Output<String>}				.dhcpOptionsId
+ * @return {Output<String>}				.mainRouteTableId
+ * @return {Output<[String]>}			.publicSubnetIds[]
+ * @return {Output<[String]>}			.privateSubnetIds[]
+ * @return {Output<[String]>}			.isolatedSubnetIds[]
+ * @return {Output<[String]>}			.availabilityZones				
+ * @return {Output<[Object]>}			.natGateways[]
+ * @return {Output<String>}					.id							e.g., 'nat-1234567'
+ * @return {Output<String>}					.name						e.g., 'my-app-dev-0'
+ * @return {Output<String>}					.privateIp					e.g., '10.0.26.107'
+ * @return {Output<String>}					.publicIp					e.g., '13.147.192.140'
+ * @return {Output<Object>}					.subnet
+ * @return {Output<String>}						.id						e.g., 'subnet-1234566'
+ * @return {Output<String>}						.name					e.g., 'my-app-dev-public-0'
+ * @return {Output<String>}						.availabilityZone		e.g., 'ap-southeast-2a'
  *
  * (1) The reason the default subnets is a warning is because it provisions a "Pulumi private subnet" in each AZ. Standard 
  * private subnets are just subnets with no internet gateway, meaning the public internet cannot initiate a connection to them. 
@@ -65,7 +65,7 @@ const { unwrap } = require('../utils')
  * (2) 'numberOfNatGateways' is only configurable if there is at least one public subnet. In that case, the default value is 
  * equal to 'numberOfAvailabilityZones'.  
  */
-const vpcObject = function ({ name, cidrBlock, subnets, numberOfAvailabilityZones, numberOfNatGateways, protect, tags }) {
+const VPC = function ({ name, cidrBlock, subnets, numberOfAvailabilityZones, numberOfNatGateways, protect, tags }) {
 	tags = tags || {}
 
 	// VPC doc: https://www.pulumi.com/docs/reference/pkg/nodejs/pulumi/awsx/ec2/
@@ -162,7 +162,7 @@ const getNatGateways = (outputNatGateways, outputSubnets) =>
 	})
 
 module.exports = {
-	VPC: vpcObject
+	VPC
 }
 
 

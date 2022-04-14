@@ -21,35 +21,37 @@ const aws = require('@pulumi/aws')
  * 	5. (Optional) KeyPair is 'publicKey' is provided.
  * 	6. EC2 instance.
  * 
- * @param  {String}   name			
- * @param  {String}   ami								e.g., 'ami-02dc2e45afd1dc0db' (Amazon Linux 2 for 64-bits ARM)
- * @param  {String}   instanceType						e.g., 't4g.nano' (cheapest ~$3/month)
- * @param  {String}   availabilityZone					(optional) If not specified, launches the EC2 a random AZ in the VPC.
- * @param  {String}   subnetId							(optional) If not specified, launches the EC2 a random subnet in the VPC.
- * @param  {[String]} vpcSecurityGroupIds				(optional) If not defined, the EC2 is associated with the default VPC security group.
- * @param  {String}   userData							e.g., `#!/bin/bash\ncd /tmp\nsudo yum install...`
- * @param  {String}   userDataBase64					e.g., Same as 'userData' but base64 encoded (to support gzip for example).
- * @param  {String}   publicKey							Public key for EC2 keypair.
- * @param  {Object}   ssm								Default null. When set, the AWS managed policy 'AmazonSSMManagedInstanceCore' is attached to the instance to allow SSM to connect.
- * @param  {string}   ssm.vpcId							
- * @param  {string}   ssm.vpcDefaultSecurityGroupId		The EC2 instance needs to be configured with a security group that can talk to this SG.
- * @param  {Object}   tags
+ * @param  {String}				name			
+ * @param  {String}				ami								e.g., 'ami-02dc2e45afd1dc0db' (Amazon Linux 2 for 64-bits ARM)
+ * @param  {String}				instanceType					e.g., 't4g.nano' (cheapest ~$3/month)
+ * @param  {String}				availabilityZone				(optional) If not specified, launches the EC2 a random AZ in the VPC.
+ * @param  {String}				subnetId						(optional) If not specified, launches the EC2 a random subnet in the VPC.
+ * @param  {[String]}			vpcSecurityGroupIds				(optional) If not defined, the EC2 is associated with the default VPC security group.
+ * @param  {String}				userData						e.g., `#!/bin/bash\ncd /tmp\nsudo yum install...`
+ * @param  {String}				userDataBase64					e.g., Same as 'userData' but base64 encoded (to support gzip for example).
+ * @param  {String}				publicKey						Public key for EC2 keypair.
+ * @param  {Object}				ssm								Default null. When set, the AWS managed policy 'AmazonSSMManagedInstanceCore' is attached to the instance to allow SSM to connect.
+ * @param  {string}					.vpcId							
+ * @param  {string}					.vpcDefaultSecurityGroupId	The EC2 instance needs to be configured with a security group that can talk to this SG.
+ * @param  {Object}				tags
  * 
- * @return {Output<String>}   ec2.id
- * @return {Output<String>}   ec2.arn		
- * @return {Output<String>}   ec2.instanceState			e.g., 'pending', 'running', 'shutting-down', 'terminated', 'stopping', 'stopped'	
- * @return {Output<String>}   ec2.instanceType		
- * @return {Output<String>}   ec2.availabilityZone		
- * @return {Output<String>}   ec2.ami		
- * @return {Output<String>}   ec2.subnetId		
- * @return {Output<[String]>} ec2.vpcSecurityGroupIds		
- * @return {Output<[String]>} ec2.privateIp		
- * @return {Output<[String]>} ec2.keyPair.id			Only returned if 'publicKey' was provided.
- * @return {Output<[String]>} ec2.keyPair.arn
- * @return {Output<[String]>} ec2.keyPair.name
- * @return {Output<[String]>} ec2.keyPair.keyPairId
+ * @return {Object}   			ec2
+ * @return {Output<String>}			.id
+ * @return {Output<String>}			.arn		
+ * @return {Output<String>}			.instanceState				e.g., 'pending', 'running', 'shutting-down', 'terminated', 'stopping', 'stopped'	
+ * @return {Output<String>}			.instanceType		
+ * @return {Output<String>}			.availabilityZone		
+ * @return {Output<String>}			.ami		
+ * @return {Output<String>}			.subnetId		
+ * @return {Output<[String]>}		.vpcSecurityGroupIds		
+ * @return {Output<String>}			.privateIp
+ * @return {Output<Object>}			.keyPair		
+ * @return {Output<[String]>}			.id						Only returned if 'publicKey' was provided.
+ * @return {Output<[String]>}			.arn
+ * @return {Output<[String]>}			.name
+ * @return {Output<[String]>}			.keyPairId
  */
-const createInstance = async ({ name, ami, instanceType, availabilityZone, subnetId, vpcSecurityGroupIds, userData, userDataBase64, publicKey, ssm, tags }) => {
+const EC2 = function ({ name, ami, instanceType, availabilityZone, subnetId, vpcSecurityGroupIds, userData, userDataBase64, publicKey, ssm, tags }) {
 	if (!name)
 		throw new Error('Missing required \'name\' argument.')
 	if (ssm) {
@@ -145,27 +147,27 @@ const createInstance = async ({ name, ami, instanceType, availabilityZone, subne
 		]
 	})
 
-	return {
-		id: server.id,
-		arn: server.arn,
-		instanceState: server.instanceState,
-		instanceType,
-		availabilityZone: availabilityZone||null,
-		ami,
-		subnetId:subnetId||null,
-		vpcSecurityGroupIds:vpcSecurityGroupIds||null,
-		privateIp: server.privateIp,
-		keyPair: !keyPair ? null : {
-			id: keyPair.id,
-			arn: keyPair.arn,
-			name: keyPair.name,
-			keyPairId: keyPair.keyPairId
-		}
+	this.id = server.id
+	this.arn = server.arn
+	this.instanceState = server.instanceState
+	this.instanceType = instanceType
+	this.availabilityZone = availabilityZone||null
+	this.ami = ami
+	this.subnetId = subnetId||null
+	this.vpcSecurityGroupIds = vpcSecurityGroupIds||null
+	this.privateIp = server.privateIp
+	this.keyPair = !keyPair ? null : {
+		id: keyPair.id,
+		arn: keyPair.arn,
+		name: keyPair.name,
+		keyPairId: keyPair.keyPairId
 	}
+
+	return this
 }
 
 module.exports = {
-	instance: createInstance
+	EC2
 }
 
 

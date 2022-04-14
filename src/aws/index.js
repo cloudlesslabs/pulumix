@@ -8,7 +8,7 @@ LICENSE file in the root directory of this source tree.
 
 module.exports = {
 	appSync: require('./appSync'),
-	ec2: require('./ec2'),
+	...require('./ec2'),
 	ecr: require('./ecr'),
 	efs: require('./efs'),
 	lambda: require('./lambda'),

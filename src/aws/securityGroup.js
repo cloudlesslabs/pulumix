@@ -46,7 +46,7 @@ const { unwrap } = require('../utils')
  * @param  {Output<Boolean>}					egress[].self            
  * @param  {Object}								tags        
  *         
- * @return {Output<Object>}						securityGroup
+ * @return {Object}								securityGroup
  * @return {Output<String>}							.id
  * @return {Output<String>}							.arn
  * @return {Output<String>}							.name
