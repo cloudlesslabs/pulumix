@@ -39,9 +39,21 @@ const { unwrap } = require('../utils')
  * @return {Output<String>}				.defaultSecurityGroupId
  * @return {Output<String>}				.dhcpOptionsId
  * @return {Output<String>}				.mainRouteTableId
- * @return {Output<[String]>}			.publicSubnetIds[]
- * @return {Output<[String]>}			.privateSubnetIds[]
- * @return {Output<[String]>}			.isolatedSubnetIds[]
+ * @return {Output<[Object]>}			.publicSubnets[]
+ * @return {Output<String>}					.id
+ * @return {Output<String>}					.name
+ * @return {Output<String>}					.availabilityZone
+ * @return {Output<String>}					.type
+ * @return {Output<[Object]>}			.privateSubnets[]
+ * @return {Output<String>}					.id
+ * @return {Output<String>}					.name
+ * @return {Output<String>}					.availabilityZone
+ * @return {Output<String>}					.type
+ * @return {Output<[Object]>}			.isolatedSubnets[]
+ * @return {Output<String>}					.id
+ * @return {Output<String>}					.name
+ * @return {Output<String>}					.availabilityZone
+ * @return {Output<String>}					.type
  * @return {Output<[String]>}			.availabilityZones				
  * @return {Output<[Object]>}			.natGateways[]
  * @return {Output<String>}					.id							e.g., 'nat-1234567'
@@ -98,9 +110,11 @@ const VPC = function ({ name, cidrBlock, subnets, numberOfAvailabilityZones, num
 			...(isolatedSubnets||[])
 		]
 		const availabilityZones = Array.from(new Set(_subnets.map(s => s.availabilityZone).filter(x => x)))
-			
+
 		return {
-			subnets: _subnets,
+			publicSubnets,
+			privateSubnets,
+			isolatedSubnets,
 			availabilityZones
 		}
 	})
@@ -114,9 +128,9 @@ const VPC = function ({ name, cidrBlock, subnets, numberOfAvailabilityZones, num
 	this.defaultSecurityGroupId = vpc.vpc.defaultSecurityGroupId
 	this.dhcpOptionsId = vpc.vpc.dhcpOptionsId
 	this.mainRouteTableId = vpc.vpc.mainRouteTableId
-	this.publicSubnetIds = vpc.publicSubnetIds
-	this.privateSubnetIds = vpc.privateSubnetIds
-	this.isolatedSubnetIds = vpc.isolatedSubnetIds
+	this.publicSubnets = subnetsAndAZs.publicSubnets
+	this.privateSubnets = subnetsAndAZs.privateSubnets
+	this.isolatedSubnets = subnetsAndAZs.isolatedSubnets
 	this.availabilityZones = subnetsAndAZs.availabilityZones
 	this.natGateways = getNatGateways(vpc.natGateways, subnetsAndAZs.subnets)
 
