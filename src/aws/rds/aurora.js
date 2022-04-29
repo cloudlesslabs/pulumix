@@ -36,55 +36,73 @@ const { DatabaseCredentials } = require('../utils')
  * the DB instance won't be running by the time the RDS target creation process starts. There is no other option to wait and run
  * `pulumi up` again later.
  * 
- * @param  {String}   		             name							DB name must begin with a letter and contain only alphanumeric characters						
- * @param  {String}   		             engine							Valid values: 'postgresql' or 'mysql'
- * @param  {String}   		             engineVersion					Optional. Default depends on the 'engine'
- * @param  {[String]} 		             availabilityZones				e.g., ['ap-southeast-2a', 'ap-southeast-2b', 'ap-southeast-2c']
- * @param  {String}   		             backupRetentionPeriod			Unit days. Default is 1 day.
- * @param  {String}   		             auth.masterUsername			Alphanumeric character and underscore.
- * @param  {String}   		             auth.masterPassword			Max length is 41 characters.
- * @param  {Output<String>}              auth.secretId					ARN of the secret in AWS secrets manager that contains the masterUsername and masterPassword
- * @param  {Number}   		             instanceNbr					Default 1.
- * @param  {String}   		             instanceSize					Default 'db.t2.small'.
- * @param  {String}  		             vpcId							Default null (i.e., default VPC).
- * @param  {[String]}  		             subnetIds						Default null. If exists, it is used to create a subnet group for the cluster.
- * @param  {String}  		             ingress[].protocol				e.g., 'tcp'
- * @param  {Number}  		             ingress[].fromPort				e.g., 3306
- * @param  {Number}  		             ingress[].toPort				e.g., 3306
- * @param  {[String]}  		             ingress[].cidrBlocks			e.g., ['0.0.0.0/0']
- * @param  {[String]}  		             ingress[].ipv6CidrBlocks		e.g., ['::/0']
- * @param  {[String]}  		             ingress[].securityGroups		e.g., ['sg-123455', 'sg-7654211']
- * @param  {[String]}  		             ingress[].rds					Default true. Determines whether this rule affects the RDS security group
- * @param  {[String]}  		             ingress[].proxy				Default true. Determines whether this rule affects the RDS security group
- * @param  {Boolean}  		             protect						Default false.
- * @param  {Boolean}  		             publicAccess					Default false.
- * @param  {Boolean}  		             cloudWatch						Default false.
- * @param  {Object|Boolean}  	         proxy							Default false. If true, the proxy uses the default settings.
- * @param  {Boolean}  		             proxy.enabled					Default true. 
- * @param  {Boolean}  		             proxy.subnetIds				Default 'subnetIds'.
- * @param  {Boolean}  		             proxy.logSQLqueries			Default false. Only turn this to true temporarily to debug as logging SQL queries could create security holes.
- * @param  {Number}  		             proxy.idleClientTimeout		Unit seconds. Default 1800 (30 min.)
- * @param  {Boolean}  		             proxy.requireTls				Default true.
- * @param  {Boolean}  		             proxy.iam						Default false. If true, the only way to connect to the proxy is via IAM (Creds are disabled)
- * @param  {Object}  		             tags
+ * @param  {String}							name						DB name must begin with a letter and contain only alphanumeric characters						
+ * @param  {String}							engine						Valid values: 'postgresql' or 'mysql'
+ * @param  {String}							engineVersion				(1) Required. 
+ * @param  {String}							auroraMySqlVersion			(2) Required. 
+ * @param  {[String]}						availabilityZones			e.g., ['ap-southeast-2a', 'ap-southeast-2b', 'ap-southeast-2c']
+ * @param  {String}							backupRetentionPeriod		Unit days. Default is 1 day.
+ * @param  {String}							auth.masterUsername			Alphanumeric character and underscore.
+ * @param  {String}							auth.masterPassword			Max length is 41 characters.
+ * @param  {Output<String>}					auth.secretId				ARN of the secret in AWS secrets manager that contains the masterUsername and masterPassword
+ * @param  {Number}							instanceNbr					Default 1.
+ * @param  {String}							instanceSize				Default 'db.t2.small'.
+ * @param  {String}							vpcId						Default null (i.e., default VPC).
+ * @param  {[String]}						subnetIds					Default null. If exists, it is used to create a subnet group for the cluster.
+ * @param  {String}							ingress[].protocol			e.g., 'tcp'
+ * @param  {Number}							ingress[].fromPort			e.g., 3306
+ * @param  {Number}							ingress[].toPort			e.g., 3306
+ * @param  {[String]}						ingress[].cidrBlocks		e.g., ['0.0.0.0/0']
+ * @param  {[String]}						ingress[].ipv6CidrBlocks	e.g., ['::/0']
+ * @param  {[String]}						ingress[].securityGroups	e.g., ['sg-123455', 'sg-7654211']
+ * @param  {[String]}						ingress[].rds				Default true. Determines whether this rule affects the RDS security group
+ * @param  {[String]}						ingress[].proxy				Default true. Determines whether this rule affects the RDS security group
+ * @param  {Boolean}						protect						Default false.
+ * @param  {Boolean}						publicAccess				Default false.
+ * @param  {Boolean}						cloudWatch					Default false.
+ * @param  {Object|Boolean}					proxy						Default false. If true, the proxy uses the default settings.
+ * @param  {Boolean}						proxy.enabled				Default true. 
+ * @param  {Boolean}						proxy.subnetIds				Default 'subnetIds'.
+ * @param  {Boolean}						proxy.logSQLqueries			Default false. Only turn this to true temporarily to debug as logging SQL queries could create security holes.
+ * @param  {Number}							proxy.idleClientTimeout		Unit seconds. Default 1800 (30 min.)
+ * @param  {Boolean}						proxy.requireTls			Default true.
+ * @param  {Boolean}						proxy.iam					Default false. If true, the only way to connect to the proxy is via IAM (Creds are disabled)
+ * @param  {Object}							tags
  * 
- * @return {Output<String>}              output.endpoint			
- * @return {Output<String>}              output.readerEndpoint		
- * @return {Output<String>}              output.proxyEnpoint		
- * @return {Number}              		 output.port	
- * @return {[Output<String>]}            output.instanceEndpoints		
- * @return {Output<Cluster>}             output.dbCluster	
- * @return {Output<SubnetGroup>}         output.subnetGroup
- * @return {Output<SecurityGroup>} 		 output.securityGroup
- * @return {[Output<SecurityGroupRule>]} output.securityGroupRules
- * @return {Output<Proxy>}     	         output.proxy.proxy
- * @return {Output<TargetGroup>}         output.proxy.targetGroup
- * @return {Output<Target>}              output.proxy.target	
+ * @return {Output<String>}					output.endpoint			
+ * @return {Output<String>}					output.readerEndpoint		
+ * @return {Output<String>}					output.proxyEnpoint		
+ * @return {Number}							output.port	
+ * @return {[Output<String>]}				output.instanceEndpoints		
+ * @return {Output<Cluster>}				output.dbCluster	
+ * @return {Output<SubnetGroup>}			output.subnetGroup
+ * @return {Output<SecurityGroup>}			output.securityGroup
+ * @return {[Output<SecurityGroupRule>]}	output.securityGroupRules
+ * @return {Output<Proxy>}					output.proxy.proxy
+ * @return {Output<TargetGroup>}			output.proxy.targetGroup
+ * @return {Output<Target>}					output.proxy.target	
+ *
+ *	(1) engineVersion: For example, '8.0' (for 'mysql') or '13.6' (for 'postgresql')
+ * 		- PostgreSQL: This straighforward, simply use the standard PostgreSQL version. You can list them via this command:
+ * 		
+ * 			aws rds describe-db-engine-versions --engine aurora-postgresql --query '*[].[EngineVersion]' --output text --region your-AWS-Region
+ * 			
+ * 		- MySQL: As of 2022, only 3 versions are supported: '5.6', '5.7', and '8.0'
+ * 		
+ *	(2) auroraMySqlVersion: For example, '2.10.2' (for '5.6' or '5.7') or '3.02.0' (for '8.0')
+ *		Aurora created its own MySQL versions compatible with the community versions. 
+ *		As of 2022, 3 major versions exist: 1,2, and 3. The exact mapping between those 
+ *		Aurora specific version and the community versions are listed here:
+ *			- Aurora version 1: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraMySQLReleaseNotes/AuroraMySQL.Updates.11Updates.html
+ *			- Aurora version 2: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraMySQLReleaseNotes/AuroraMySQL.Updates.20Updates.html
+ *			- Aurora version 3: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraMySQLReleaseNotes/AuroraMySQL.Updates.30Updates.html
+ * 
  */
 const Aurora = function ({ 
 	name, 
 	engine,
 	engineVersion,
+	auroraMySqlVersion,
 	availabilityZones, 
 	backupRetentionPeriod, 
 	auth,
@@ -110,6 +128,13 @@ const Aurora = function ({
 	
 	if (engine != 'mysql' && engine != 'postgresql')
 		throw new Error(`Wrong argument exception. 'engine' valid values are 'mysql' and 'postgresql'. Found '${engine}' instead.`)
+	if (!engineVersion)
+		throw new Error('Missing required \'engineVersion\' argument.')
+	
+	const isMySql = engine == 'mysql'
+	
+	if (isMySql && !auroraMySqlVersion)
+		throw new Error('Missing required \'auroraMySqlVersion\' argument. This argument is required when \'engine\' is \'mysql\'.')
 	if (!availabilityZones || !availabilityZones.length)
 		throw new Error('Missing required \'availabilityZones\' argument.')
 	if (!auth)
@@ -126,10 +151,10 @@ const Aurora = function ({
 	}
 
 	const dbEngine = `aurora-${engine}`
-	const isMySql = engine == 'mysql'
 	const dbPort = isMySql ? 3306 : 5432
 	const logs = isMySql ? ['error', 'general', 'slowquery'] : ['postgresql'] 
-	engineVersion = engineVersion || (isMySql ? '5.7.mysql_aurora.2.10.0' : '12.6')
+	const dbVersion = isMySql ? `${engineVersion}.mysql_aurora.${auroraMySqlVersion}` : engineVersion
+
 	ingress = ingress || []
 	tags = tags || {}
 
@@ -166,7 +191,7 @@ const Aurora = function ({
 			clusterIdentifier: clusterName,
 			databaseName: dbName, // DatabaseName must begin with a letter and contain only alphanumeric characters
 			engine: dbEngine,
-			engineVersion, // For PostgreSQL, the engineVersion is easier. It's simply the real version (e.g., 12.6)
+			engineVersion: dbVersion, // For PostgreSQL, the engineVersion is easier. It's simply the real version (e.g., 12.6)
 			masterUsername,
 			masterPassword,
 			skipFinalSnapshot: true,
