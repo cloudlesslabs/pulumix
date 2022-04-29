@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.1](https://github.com/cloudlesslabs/pulumix/compare/v0.1.0...v0.1.1) (2022-04-29)
+
+
+### Features
+
+* add support for Aurora's cluster 'allowMajorVersionUpgrade' and 'applyImmediately' properties ([053013b](https://github.com/cloudlesslabs/pulumix/commit/053013bd86597f93340df50dfff624108fcdde86))
+
 ## [0.1.0](https://github.com/cloudlesslabs/pulumix/compare/v0.0.6...v0.1.0) (2022-04-29)
 
 
