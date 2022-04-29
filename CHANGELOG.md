@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.1.0](https://github.com/cloudlesslabs/pulumix/compare/v0.0.6...v0.1.0) (2022-04-29)
+
+
+### Features
+
+* Add explicit DB engine version set up on the Aurora object ([ce5b0d9](https://github.com/cloudlesslabs/pulumix/commit/ce5b0d903ca1737d6bdac86df72e49c3d3f024c2))
+
 ### [0.0.6](https://github.com/cloudlesslabs/pulumix/compare/v0.0.5...v0.0.6) (2022-04-14)
 
 ### [0.0.5](https://github.com/cloudlesslabs/pulumix/compare/v0.0.4...v0.0.5) (2022-04-14)
