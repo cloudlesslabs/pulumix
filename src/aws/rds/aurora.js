@@ -68,19 +68,23 @@ const { DatabaseCredentials } = require('../utils')
  * @param  {Boolean}						proxy.requireTls			Default true.
  * @param  {Boolean}						proxy.iam					Default false. If true, the only way to connect to the proxy is via IAM (Creds are disabled)
  * @param  {Object}							tags
+ * @param  {Boolean}						applyImmediately			Default true.
+ * @param  {Boolean}						allowMajorVersionUpgrade	Default false.
  * 
- * @return {Output<String>}					output.endpoint			
- * @return {Output<String>}					output.readerEndpoint		
- * @return {Output<String>}					output.proxyEnpoint		
- * @return {Number}							output.port	
- * @return {[Output<String>]}				output.instanceEndpoints		
- * @return {Output<Cluster>}				output.dbCluster	
- * @return {Output<SubnetGroup>}			output.subnetGroup
- * @return {Output<SecurityGroup>}			output.securityGroup
- * @return {[Output<SecurityGroupRule>]}	output.securityGroupRules
- * @return {Output<Proxy>}					output.proxy.proxy
- * @return {Output<TargetGroup>}			output.proxy.targetGroup
- * @return {Output<Target>}					output.proxy.target	
+ * @return {Output<Object>}					output
+ * @return {Output<String>}						.endpoint			
+ * @return {Output<String>}						.readerEndpoint		
+ * @return {Output<String>}						.proxyEnpoint		
+ * @return {Number}								.port	
+ * @return {[Output<String>]}					.instanceEndpoints		
+ * @return {Output<Cluster>}					.dbCluster	
+ * @return {Output<SubnetGroup>}				.subnetGroup
+ * @return {Output<SecurityGroup>}				.securityGroup
+ * @return {[Output<SecurityGroupRule>]}		.securityGroupRules
+ * @return {Output<Object>}						.proxy
+ * @return {Output<Proxy>}							.proxy
+ * @return {Output<TargetGroup>}					.targetGroup
+ * @return {Output<Target>}							.target	
  *
  *	(1) engineVersion: For example, '8.0' (for 'mysql') or '13.6' (for 'postgresql')
  * 		- PostgreSQL: This straighforward, simply use the standard PostgreSQL version. You can list them via this command:
@@ -115,9 +119,10 @@ const Aurora = function ({
 	publicAccess=false,
 	cloudWatch,
 	proxy,
+	allowMajorVersionUpgrade,
+	applyImmediately,
 	tags
 }) {
-
 	if (!name)
 		throw new Error('Missing required \'name\' argument.')
 	if (!engine)
@@ -150,6 +155,7 @@ const Aurora = function ({
 			throw new Error('Invalid configuration. When IAM authentication is enabled on RDS proxy, the \'requireTls\' cannot be false.')
 	}
 
+	applyImmediately = applyImmediately === undefined || applyImmediately === null ? true : false
 	const dbEngine = `aurora-${engine}`
 	const dbPort = isMySql ? 3306 : 5432
 	const logs = isMySql ? ['error', 'general', 'slowquery'] : ['postgresql'] 
@@ -197,7 +203,8 @@ const Aurora = function ({
 			skipFinalSnapshot: true,
 			enabledCloudwatchLogsExports: cloudWatch ? logs : undefined,
 			preferredBackupWindow: '15:00-17:00', // time is UTC
-			applyImmediately: true,
+			applyImmediately,
+			allowMajorVersionUpgrade,
 			vpcSecurityGroupIds: [rdsSecurityGroup.id], // Must be set to allow traffic based on the security group
 			dbSubnetGroupName: subnetGroup ? subnetGroup.name : undefined,
 			tags: {
@@ -223,7 +230,7 @@ const Aurora = function ({
 				instanceClass: instanceSize,
 				publiclyAccessible: publicAccess, // Allow the instance to be accessible outside of its associated VPC
 				dbSubnetGroupName: subnetGroup ? subnetGroup.name : undefined,
-				applyImmediately: true,
+				applyImmediately,
 				tags: {
 					...tags,
 					Name: instanceName
