@@ -12,8 +12,8 @@ const pulumi = require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
 const fs = require('fs')
 const path = require('path')
-const ecr = require('./ecr')
-const { resolve } = require('../utils')
+const { Image } = require('./ecr')
+const { unwrap } = require('../utils')
 
 /**
  * Creates an AWS Lambda. Doc: https://www.pulumi.com/docs/reference/pkg/aws/lambda/function/
@@ -52,7 +52,7 @@ const { resolve } = require('../utils')
  * @param  {Number}				logsRetentionInDays					Default 0 (i.e., never expires). Only applies when 'cloudwatch' is true.
  * @param  {String}				tags		
  * 				
- * @return {Object}				output
+ * @return {Object}				lambda
  * @return {Output<Lambda>}			.lambda						
  * @return {Output<Role>}			.role
  * @return {Output<LogGroup>}		.logGroup
@@ -100,7 +100,7 @@ const { resolve } = require('../utils')
  * 	detail: {}
  * }
  */
-const createFunction = async ({ name, description, architecture, fn, layers, timeout=3, memorySize=128, handler, policies, vpcConfig, fileSystemConfig, schedule, publish, cloudWatch, cloudwatch, logsRetentionInDays, tags }) => {
+const Lambda = function ({ name, description, architecture, fn, layers, timeout=3, memorySize=128, handler, policies, vpcConfig, fileSystemConfig, schedule, publish, cloudWatch, cloudwatch, logsRetentionInDays, tags }) {
 	tags = tags || {}
 	const dependsOn = []
 	if (cloudWatch !== undefined && cloudwatch === undefined)
@@ -115,13 +115,10 @@ const createFunction = async ({ name, description, architecture, fn, layers, tim
 	
 	const canonicalName = `${name}-lambda`
 
-	if (!(await fileExists(fn.dir)))
-		throw new Error(`Function folder '${fn.dir}' not found.`)	
+	const output = pulumi.all([fileExists(fn.dir), fileExists(path.join(fn.dir, 'Dockerfile'))]).apply(([fnDirFound, dockerFileFound]) => {
+		if (!fnDirFound)
+			throw new Error(`Function folder '${fn.dir}' not found.`)	
 
-	const dockerFileFound = await fileExists(path.join(fn.dir, 'Dockerfile'))
-	let image
-	if (fn.type == 'image' || dockerFileFound) {
-		const args = fn.args || fn.env ? { ...(fn.args||{}), ...(fn.env||{}) } : undefined
 		// ECR images. Doc:
 		// 	- buildAndPushImage API: https://www.pulumi.com/docs/reference/pkg/nodejs/pulumi/awsx/ecr/#buildAndPushImage
 		// 	- 2nd argument is a DockerBuild object: https://www.pulumi.com/docs/reference/pkg/docker/image/#dockerbuild
@@ -133,158 +130,172 @@ const createFunction = async ({ name, description, architecture, fn, layers, tim
 		// 		Name: canonicalName
 		// 	}
 		// })
-		image = await ecr.image({ 
-			name: canonicalName,
-			dir: fn.dir,
-			args,
-			tags
-		})
-	}
-	const imageUri = image ? image.imageValues[0] : null
-	
-	// IAM role. Doc: https://www.pulumi.com/docs/reference/pkg/aws/iam/role/
-	const lambdaRole = new aws.iam.Role(canonicalName, {
-		name: canonicalName,
-		description: `Role for lambda '${name}'`,
-		assumeRolePolicy: {
-			Version: '2012-10-17',
-			Statement: [{
-				Action: 'sts:AssumeRole',
-				Principal: {
-					Service: 'lambda.amazonaws.com'
-				},
-				Effect: 'Allow',
-				Sid: ''
-			}],
-		},
-		tags: {
-			...tags,
-			Name: canonicalName
-		}
-	})
+		const image = fn.type == 'image' || dockerFileFound 
+			? new Image({ 
+				name: canonicalName,
+				dir: fn.dir,
+				args: fn.args || fn.env ? { ...(fn.args||{}), ...(fn.env||{}) } : undefined,
+				tags
+			})
+			: null
 
-	// Configure cloudwatch
-	let logGroup = null
-	if (cloudwatch) {
-		// Creates the log group where the logs are sent. Doc: https://www.pulumi.com/docs/reference/pkg/aws/cloudwatch/loggroup/
-		const logGroupId = `/aws/lambda/${name}`
-		logGroup = new aws.cloudwatch.LogGroup(logGroupId, { 
-			name: logGroupId,
-			retentionInDays: logsRetentionInDays || 0,
-			tags: {
-				...tags,
-				Name: name
-			}
-		})
-	}
-
-	// Attach policies
-	const updatedPolicies = configurePolicies(policies, canonicalName, { cloudwatch, vpcConfig, fileSystemConfig })
-	for (let i=0;i<updatedPolicies.length;i++) {
-		const policy = updatedPolicies[i]
-		if (!policy.name)
-			throw new Error(`Invalid argument exception. Some policies in lambda ${name} don't have a name.`)	
-		if (!policy.arn)
-			throw new Error(`Invalid argument exception. Some policies in lambda ${name} don't have an arn.`)	
+		const imageUri = image ? image.imageValues[0] : null
 		
-		const policyName = await resolve(policy.name)
-		dependsOn.push(new aws.iam.RolePolicyAttachment(`${canonicalName}-${policyName}`, {
-			role: lambdaRole.name,
-			policyArn: policy.arn
-		}))
-	}
+		// IAM role. Doc: https://www.pulumi.com/docs/reference/pkg/aws/iam/role/
+		const lambdaRole = new aws.iam.Role(canonicalName, {
+			name: canonicalName,
+			description: `Role for lambda '${name}'`,
+			assumeRolePolicy: {
+				Version: '2012-10-17',
+				Statement: [{
+					Action: 'sts:AssumeRole',
+					Principal: {
+						Service: 'lambda.amazonaws.com'
+					},
+					Effect: 'Allow',
+					Sid: ''
+				}],
+			},
+			tags: {
+				...tags,
+				Name: canonicalName
+			}
+		})
 
-	// Configure the function code used for that lambda
-	if (!imageUri && !fn.runtime)
-		throw new Error('Missing required argument \'fn.runtime\'. Please select one amongst the list at https://docs.aws.amazon.com/lambda/latest/dg/API_CreateFunction.html#SSS-CreateFunction-request-Runtime')
-	
-	const functionCode = imageUri 
-		? {
-			packageType: 'Image',
-			imageUri
-		} : {
-			runtime: fn.runtime,
-			code: new pulumi.asset.AssetArchive({
-				'.': new pulumi.asset.FileArchive(fn.dir),
-			}),
-			handler: handler || 'index.handler'
+		// Configure cloudwatch
+		let logGroup = null
+		if (cloudwatch) {
+			// Creates the log group where the logs are sent. Doc: https://www.pulumi.com/docs/reference/pkg/aws/cloudwatch/loggroup/
+			const logGroupId = `/aws/lambda/${name}`
+			logGroup = new aws.cloudwatch.LogGroup(logGroupId, { 
+				name: logGroupId,
+				retentionInDays: logsRetentionInDays || 0,
+				tags: {
+					...tags,
+					Name: name
+				}
+			})
 		}
 
-	// Create tha Lambda. Doc: https://www.pulumi.com/docs/reference/pkg/aws/lambda/function/ 
-	const lambda = new aws.lambda.Function(name, {
-		name,
-		description,
-		architectures: [architecture == 'x86_64' ? 'x86_64' : 'arm64'],
-		...functionCode,
-		timeout,
-		memorySize,
-		layers: layers && layers.length ? layers : undefined,
-		role: lambdaRole.arn,
-		vpcConfig: Object.keys(vpcConfig||{}).length ? vpcConfig : undefined,
-		fileSystemConfig,
-		dependsOn,
-		publish,
-		tags: {
-			...tags,
-			Name: name
-		}
+		// Attach policies
+		const updatedPolicies = configurePolicies(policies, canonicalName, { cloudwatch, vpcConfig, fileSystemConfig })
+
+		return pulumi.all([imageUri, ...updatedPolicies.map(p => unwrap(p))]).apply(([_imageUri, ..._policies]) => {
+
+			for (let i=0;i<_policies.length;i++) {
+				const policy = _policies[i]
+				if (!policy.name)
+					throw new Error(`Invalid argument exception. Some policies in lambda ${name} don't have a name.`)	
+				if (!policy.arn)
+					throw new Error(`Invalid argument exception. Some policies in lambda ${name} don't have an arn.`)	
+				
+				dependsOn.push(new aws.iam.RolePolicyAttachment(`${canonicalName}-${policy.name}`, {
+					role: lambdaRole.name,
+					policyArn: policy.arn
+				}))
+			}
+
+			// Configure the function code used for that lambda
+			if (!_imageUri && !fn.runtime)
+				throw new Error('Missing required argument \'fn.runtime\'. Please select one amongst the list at https://docs.aws.amazon.com/lambda/latest/dg/API_CreateFunction.html#SSS-CreateFunction-request-Runtime')
+			
+			const functionCode = _imageUri 
+				? {
+					packageType: 'Image',
+					imageUri: _imageUri
+				} : {
+					runtime: fn.runtime,
+					code: new pulumi.asset.AssetArchive({
+						'.': new pulumi.asset.FileArchive(fn.dir),
+					}),
+					handler: handler || 'index.handler'
+				}
+
+			// Create tha Lambda. Doc: https://www.pulumi.com/docs/reference/pkg/aws/lambda/function/ 
+			const lambda = new aws.lambda.Function(name, {
+				name,
+				description,
+				architectures: [architecture == 'x86_64' ? 'x86_64' : 'arm64'],
+				...functionCode,
+				timeout,
+				memorySize,
+				layers: layers && layers.length ? layers : undefined,
+				role: lambdaRole.arn,
+				vpcConfig: Object.keys(vpcConfig||{}).length ? vpcConfig : undefined,
+				fileSystemConfig,
+				dependsOn,
+				publish,
+				tags: {
+					...tags,
+					Name: name
+				}
+			})
+
+			// Create schedule trigger
+			let _schedule = null
+			if (schedule && schedule.expression) {
+				// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/cloudwatch/eventrule/
+				const eventRuleName = `${name}-eventrule`
+				const eventRule = new aws.cloudwatch.EventRule(eventRuleName, {
+					name: eventRuleName,
+					description: `Fire lambda ${name} on a schedule`,
+					scheduleExpression: schedule.expression,
+					tags: {
+						...tags,
+						Name: eventRuleName
+					}
+				})
+
+				// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/cloudwatch/eventtarget/
+				const eventTargetName = `${name}-eventtarget`
+				const eventTargetConfig = {
+					rule: eventRule.name,
+					arn: lambda.arn,
+					tags: {
+						...tags,
+						Name: eventTargetName
+					}
+				}
+				if (schedule.payload) {
+					if (typeof(schedule.payload) != 'object')
+						throw new Error(`Wrong argument exception. 'schedule.payload' is expecting an object. Found ${typeof(schedule.payload)} instead.`)
+					eventTargetConfig.input = JSON.stringify(schedule.payload)
+				}
+				const eventTarget = new aws.cloudwatch.EventTarget(eventTargetName, eventTargetConfig)
+
+				// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/lambda/permission/
+				const schedulePermissionName = `${name}-schedule-permission`
+				const permission = new aws.lambda.Permission(schedulePermissionName, {
+					action: 'lambda:invokeFunction',
+					function: lambda.name,
+					principal: 'events.amazonaws.com',
+					sourceArn: eventRule.arn
+				})
+
+				_schedule = {
+					eventRule: leanify(eventRule),
+					eventTarget: leanify(eventTarget),
+					permission: leanify(permission)
+				}
+			}
+
+			return {
+				lambda: leanify(lambda),
+				image: leanifyImage(image),
+				role:leanify(lambdaRole),
+				logGroup: leanify(logGroup),
+				schedule: _schedule
+			}
+		})
 	})
 
-	// Create schedule trigger
-	let _schedule = null
-	if (schedule && schedule.expression) {
-		// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/cloudwatch/eventrule/
-		const eventRuleName = `${name}-eventrule`
-		const eventRule = new aws.cloudwatch.EventRule(eventRuleName, {
-			name: eventRuleName,
-			description: `Fire lambda ${name} on a schedule`,
-			scheduleExpression: schedule.expression,
-			tags: {
-				...tags,
-				Name: eventRuleName
-			}
-		})
+	this.lambda = output.lambda
+	this.image = output.image
+	this.role = output.role
+	this.logGroup = output.logGroup
+	this.schedule = output.schedule
 
-		// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/cloudwatch/eventtarget/
-		const eventTargetName = `${name}-eventtarget`
-		const eventTargetConfig = {
-			rule: eventRule.name,
-			arn: lambda.arn,
-			tags: {
-				...tags,
-				Name: eventTargetName
-			}
-		}
-		if (schedule.payload) {
-			if (typeof(schedule.payload) != 'object')
-				throw new Error(`Wrong argument exception. 'schedule.payload' is expecting an object. Found ${typeof(schedule.payload)} instead.`)
-			eventTargetConfig.input = JSON.stringify(schedule.payload)
-		}
-		const eventTarget = new aws.cloudwatch.EventTarget(eventTargetName, eventTargetConfig)
-
-		// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/lambda/permission/
-		const schedulePermissionName = `${name}-schedule-permission`
-		const permission = new aws.lambda.Permission(schedulePermissionName, {
-			action: 'lambda:invokeFunction',
-			function: lambda.name,
-			principal: 'events.amazonaws.com',
-			sourceArn: eventRule.arn
-		})
-
-		_schedule = {
-			eventRule: leanify(eventRule),
-			eventTarget: leanify(eventTarget),
-			permission: leanify(permission)
-		}
-	}
-
-	return {
-		lambda: leanify(lambda),
-		image: leanifyImage(image),
-		role:leanify(lambdaRole),
-		logGroup: leanify(logGroup),
-		schedule: _schedule
-	}
+	return this
 }
 
 /**
@@ -297,44 +308,55 @@ const createFunction = async ({ name, description, architecture, fn, layers, tim
  * @param  {String}					licenseInfo 			e.g., 'BSD-3-Clause' (or 'https://opensource.org/licenses/BSD-3-Clause'), 'MIT' (or 'https://opensource.org/licenses/MIT') doc: https://docs.aws.amazon.com/lambda/latest/dg/API_PublishLayerVersion.html#SSS-PublishLayerVersion-request-LicenseInfo
  * @param  {Object}					tags
  * 
- * @return {Output<LayerVersion>}	LayerVersion
- * @return {Output<LayerVersion>}	LayerVersion...			All the usuals (id, arn, ...)
- * @return {Output<String>}			LayerVersion.version	e.g., '1', '2'
- * @return {Output<LayerVersion>}	LayerVersion.layerArn	Different from the 'arn'. The 'arn' includes the version (1). 
+ * @return {Object}					layer
+ * @return {Output<String>}				.id
+ * @return {Output<String>}				.arn
+ * @return {Output<String>}				.version			e.g., '1', '2'
+ * @return {Output<String>}				.layerArn			Different from the 'arn'. The 'arn' includes the version (1). 
  *
  * (1) 'arn' vs 'layerArn': 
  * 		- arn: 		'arn:aws:lambda:ap-southeast-2:1234:layer:aws-layer-dev-layer-01:1' 
  * 		- layerArn: 'arn:aws:lambda:ap-southeast-2:1234:layer:aws-layer-dev-layer-01' 
  */
-const createLayer = async ({ name, runtime, dir, description, licenseInfo, tags }) => {
+const Layer = function ({ name, runtime, dir, description, licenseInfo, tags }) {
 	if (!name)
 		throw new Error('Missing required \'name\' argument .')
 	if (!runtime)
 		throw new Error('Missing required \'runtime\' argument .')
 	if (!dir)
 		throw new Error('Missing required \'dir\' argument .')
-	if (!(await fileExists(dir)))
-		throw new Error(`Directory '${dir}' not found.`)
 
 	tags = tags || {}
 
-	// Lambda layer doc: https://www.pulumi.com/docs/reference/pkg/aws/lambda/layerversion/
-	const lambdaLayer = new aws.lambda.LayerVersion(name, {
-		layerName: name,
-		compatibleRuntimes: [runtime],
-		description,
-		licenseInfo,
-		code: new pulumi.asset.AssetArchive({
-			'.': new pulumi.asset.FileArchive(dir),
-		}),
-		// code: new pulumi.asset.FileArchive("lambda_layer_payload.zip"),
-		tags: {
-			...tags,
-			Name: name
-		}
+	const output = pulumi.output(fileExists(dir)).apply(dirFound => {
+		if (!dirFound)
+			throw new Error(`Directory '${dir}' not found.`)
+		
+		// Lambda layer doc: https://www.pulumi.com/docs/reference/pkg/aws/lambda/layerversion/
+		const lambdaLayer = new aws.lambda.LayerVersion(name, {
+			layerName: name,
+			compatibleRuntimes: [runtime],
+			description,
+			licenseInfo,
+			code: new pulumi.asset.AssetArchive({
+				'.': new pulumi.asset.FileArchive(dir),
+			}),
+			// code: new pulumi.asset.FileArchive("lambda_layer_payload.zip"),
+			tags: {
+				...tags,
+				Name: name
+			}
+		})
+
+		return lambdaLayer
 	})
 
-	return lambdaLayer
+	this.id = output.id
+	this.arn = output.arn
+	this.version = output.version
+	this.layerArn = output.layerArn
+
+	return this
 }
 
 
@@ -417,8 +439,8 @@ const configurePolicies = (policies, prefix, config) => {
 const fileExists = filePath => new Promise(onSuccess => fs.exists(path.resolve(filePath||''), yes => onSuccess(yes ? true : false)))
 
 module.exports = {
-	fn: createFunction,
-	layer: createLayer
+	Lambda,
+	Layer
 }
 
 

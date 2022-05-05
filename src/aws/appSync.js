@@ -45,7 +45,7 @@ const { parse } = require('graphql')
  * 		- openidConnectConfig: https://www.pulumi.com/docs/reference/pkg/aws/appsync/graphqlapi/#graphqlapiadditionalauthenticationprovideropenidconnectconfig
  * 		- userPoolConfig: https://www.pulumi.com/docs/reference/pkg/aws/appsync/graphqlapi/#graphqlapiadditionalauthenticationprovideruserpoolconfig 		
  */
-const createApi = async ({ name, description, schema, resolver, authConfig, cloudwatch, tags }) => {
+const Api = function ({ name, description, schema, resolver, authConfig, cloudwatch, tags }) {
 	tags = tags || {}
 	const dependsOn = []
 	
@@ -127,30 +127,34 @@ const createApi = async ({ name, description, schema, resolver, authConfig, clou
 		}
 	})
 
-	return {
-		api: _leanify(graphQlApi),
-		roleArn: appSyncRole.arn
-	}
+	this.api = _leanify(graphQlApi)
+	this.roleArn = appSyncRole.arn
+
+	return this
 }
 
 /**
  * Create a new data source. Doc at https://www.pulumi.com/docs/reference/pkg/aws/appsync/datasource/
  * 
- * @param  {String}			name					Required
- * @param  {Object}			api						Required
- * @param  {Output<String>}		.id					Required
- * @param  {Output<String>}		.roleArn			Required
- * @param  {String}			functionArn						
- * @param  {String}			tableName						
- * @param  {String}			useCallerCredentials						
- * @param  {String}			region						
- * @param  {String}			httpEndpoint						
- * @param  {String}			openSearchEndpoint						
- * @param  {Object}			tags
+ * @param  {String}					name					Required
+ * @param  {Object}					api						Required
+ * @param  {Output<String>}				.id					Required
+ * @param  {Output<String>}				.roleArn			Required
+ * @param  {String}					functionArn						
+ * @param  {String}					tableName						
+ * @param  {String}					useCallerCredentials						
+ * @param  {String}					region						
+ * @param  {String}					httpEndpoint						
+ * @param  {String}					openSearchEndpoint						
+ * @param  {Object}					tags
  * 						
- * @return {Output<DataSource>}						
+ * @return {Object}					dataSource
+ * @return {Output<String>}				.id
+ * @return {Output<String>}				.arn
+ * @return {Output<String>}				.name
+ * @return {Output<Object>}				.tags
  */
-const createDataSource = async ({ name, api, functionArn, tableName, useCallerCredentials, region, httpEndpoint, openSearchEndpoint, tags }) => {
+const DataSource = function ({ name, api, functionArn, tableName, useCallerCredentials, region, httpEndpoint, openSearchEndpoint, tags }) {
 	tags = tags || {}
 
 	if (!name)
@@ -179,7 +183,12 @@ const createDataSource = async ({ name, api, functionArn, tableName, useCallerCr
 		}
 	})
 
-	return _leanify(dataSource)
+	this.id = dataSource.id
+	this.arn = dataSource.arn
+	this.name = dataSource.name
+	this.tags = dataSource.tags
+
+	return this
 }
 
 /**
@@ -199,9 +208,13 @@ const createDataSource = async ({ name, api, functionArn, tableName, useCallerCr
  * @param  {String} 				.responseTemplate	(dataSource.type:'lambda') Optional.
  * @param  {Object} 			tags	
  * 								
- * @return {Output<Resolver>}	resolver
+ * @return {Object}				resolver
+ * @return {Output<String>}			.id
+ * @return {Output<String>}			.arn
+ * @return {Output<String>}			.name
+ * @return {Output<Object>}			.tags
  */
-const createResolver = async ({ name, api, type, field, dataSource, mappingTemplate, tags }) => {
+const Resolver = function ({ name, api, type, field, dataSource, mappingTemplate, tags }) {
 	tags = tags || {}
 	
 	if (!api)
@@ -234,7 +247,12 @@ const createResolver = async ({ name, api, type, field, dataSource, mappingTempl
 		}
 	})
 
-	return _leanify(resolver)
+	this.id = resolver.id
+	this.arn = resolver.arn
+	this.name = resolver.name
+	this.tags = resolver.tags
+
+	return this
 }
 
 /**
@@ -259,7 +277,7 @@ const createResolver = async ({ name, api, type, field, dataSource, mappingTempl
  * @return {Output<DataSource>}		.dataSource
  * @return {[Output<Resolver>]}		.resolvers
  */
-const createLambdaResolvers = async ({ name, api, schema, functionArn, tags }) => {
+const createLambdaResolvers = ({ name, api, schema, functionArn, tags }) => {
 	tags = tags || {}
 	
 	if (!api)
@@ -291,7 +309,7 @@ const createLambdaResolvers = async ({ name, api, schema, functionArn, tags }) =
 		throw new Error(`Fields not found in schema for types ${includes}.`)
 
 	// Creates a single data source for all the resolvers
-	const dataSource = await createDataSource({ name, api, functionArn, tags })
+	const dataSource = new DataSource({ name, api, functionArn, tags })
 	
 	// Creates one resolver per field. Requests are forwarded to the Lambda
 	const resolvers = typeFields.reduce((acc, { type, fields }) => {
@@ -603,10 +621,10 @@ const _getSchemaTypeFields = schema => {
 }
 
 module.exports = {
-	api: createApi,
-	resolver: createResolver,
+	Api,
+	Resolver,
 	lambdaResolvers: createLambdaResolvers,
-	dataSource: createDataSource
+	DataSource
 }
 
 

@@ -6,11 +6,10 @@ This source code is licensed under the proprietary license found in the
 LICENSE file in the root directory of this source tree. 
 */
 
-// Version: 0.0.2
-
+const pulumi = require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
 const docker = require('@pulumi/docker')
-const { resolve } = require('../utils')
+const { unwrap } = require('../utils')
 
 
 /**
@@ -39,9 +38,9 @@ const { resolve } = require('../utils')
  * 
  * @return {[String]} 		imageValues								(4) Image values including its tag. Can be used in a Dockerfile with the FROM directive.
  * @return {Output<Repo>}	repository								Usual properties (e.g., id, arn, urn, ...)
- * @return {Output<String>}	repository.name							AWS repo name
- * @return {Output<String>}	repository.registryId					e.g., '1234' (same as AWS account ID)
- * @return {Output<String>}	repository.repositoryUrl				e.g., '1234.dkr.ecr.ap-southeast-2.amazonaws.com/your-repo-name'
+ * @return {Output<String>}		.name								AWS repo name
+ * @return {Output<String>}		.registryId							e.g., '1234' (same as AWS account ID)
+ * @return {Output<String>}		.repositoryUrl						e.g., '1234.dkr.ecr.ap-southeast-2.amazonaws.com/your-repo-name'
  * @return {Output<Policy>}	lifecyclePolicy							
  *
  *
@@ -55,7 +54,7 @@ const { resolve } = require('../utils')
  *   	- ${repositoryUrl}:1234556 where '1234556' is the SHA of the image.
  *
  */
-const createImage = async ({ name, tag, publicConfig, dir, args, scanOnPush, imageTagMutable, extraOptions, lifecyclePolicies, tags }) => {
+const Image = function ({ name, tag, publicConfig, dir, args, scanOnPush, imageTagMutable, extraOptions, lifecyclePolicies, tags }) {
 	if (!name)
 		throw new Error('Missing required argument \'name\'.')
 
@@ -112,42 +111,48 @@ const createImage = async ({ name, tag, publicConfig, dir, args, scanOnPush, ima
 		}
 	})
 
-	const [registryId, repositoryUrl] = await resolve([repository.registryId, repository.repositoryUrl])
-
 	const dockerBuildConfig = {
 		context: dir,
 		args, 
 		extraOptions
 	}
 
-	// Pushes image to repo.
-	const imageValue = await resolve(docker.buildAndPushImage(taggedName, dockerBuildConfig, repositoryUrl, null, async () => {
-		// Construct Docker registry auth data by getting the short-lived authorizationToken from ECR, and
-		// extracting the username/password pair after base64-decoding the token.
-		//
-		// See: http://docs.aws.amazon.com/cli/latest/reference/ecr/get-authorization-token.html
-		const credentials = await aws.ecr.getCredentials({ registryId }, { async: true })
-		const decodedCredentials = Buffer.from(credentials.authorizationToken, 'base64').toString()
-		const [username, password] = decodedCredentials.split(':')
-		if (!password || !username)
-			throw new Error('Invalid credentials')
-		
-		return {
-			registry: credentials.proxyEndpoint,
-			username: username,
-			password: password
-		}
-	}))
+	const output = pulumi.all([repository.registryId, repository.repositoryUrl]).appy(([registryId, repositoryUrl]) => {
+		// Pushes image to repo.
+		return unwrap(docker.buildAndPushImage(taggedName, dockerBuildConfig, repositoryUrl, null, async () => {
+			// Construct Docker registry auth data by getting the short-lived authorizationToken from ECR, and
+			// extracting the username/password pair after base64-decoding the token.
+			//
+			// See: http://docs.aws.amazon.com/cli/latest/reference/ecr/get-authorization-token.html
+			const credentials = await aws.ecr.getCredentials({ registryId }, { async: true })
+			const decodedCredentials = Buffer.from(credentials.authorizationToken, 'base64').toString()
+			const [username, password] = decodedCredentials.split(':')
+			if (!password || !username)
+				throw new Error('Invalid credentials')
+			
+			return {
+				registry: credentials.proxyEndpoint,
+				username: username,
+				password: password
+			}
+		})).apply(imageValue => {
+			const imageValues = cleanTag ? [`${repositoryUrl}:${cleanTag}`] : []
+			if (imageValues[0] != imageValue)
+				imageValues.push(imageValue)
 
-	const imageValues = cleanTag ? [`${repositoryUrl}:${cleanTag}`] : []
-	if (imageValues[0] != imageValue)
-		imageValues.push(imageValue)
+			return {
+				repository,
+				imageValues,
+				lifecyclePolicy
+			}
+		})
+	})
 
-	return {
-		repository,
-		imageValues,
-		lifecyclePolicy
-	}
+	this.repository = output.repository
+	this.imageValues = output.imageValues
+	this.lifecyclePolicy = output.lifecyclePolicy
+
+	return this
 }
 
 /**
@@ -211,7 +216,7 @@ const createRepo = ({ name, scanOnPush, imageTagMutable, publicConfig, tags }) =
 }
 
 module.exports = {
-	image: createImage
+	Image
 }
 
 

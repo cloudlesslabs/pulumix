@@ -120,9 +120,12 @@ const putParameter = async ({ name, type, value, description, overWrite, tags, t
  * @param  {Object} 					.value	This is serialized to string.
  * @param  {Object} 					.tags	
  * 
- * @return {Output<ParameterStore>}
+ * @return {Object>}				parameter
+ * @return {Output<String>}				.id
+ * @return {Output<String>}				.version
+ * @return {Output<Object>}				.tagsAll
  */
-const create = async (args) => {
+const Parameter = function (args) {
 	if (!args)
 		throw new Error('Missing required \'args\'.')
 	if (!args.name)
@@ -149,11 +152,17 @@ const create = async (args) => {
 		rest.tags = { ...rest.tags, Name:args.name }
 
 	// https://www.pulumi.com/registry/packages/aws/api-docs/ssm/parameter/
-	return new aws.ssm.Parameter(args.name, rest)
+	const v = new aws.ssm.Parameter(args.name, rest)
+
+	this.id = v.id
+	this.version = v.version
+	this.tagsAll = v.tagsAll
+
+	return this
 }
 
 module.exports = {
 	get: getParameter,
 	create: putParameter,
-	parameter: create
+	Parameter
 }

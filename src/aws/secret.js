@@ -32,11 +32,12 @@ const aws = require('@pulumi/aws')
  * @param  {Number} 				rotation.rotationInterval	Unit days. Default 7 days. 
  * @param  {Object} 				tags			
  * 
- * @return {Output<Secret>} 		output.secret
- * @return {Output<secretVersion>} 	output.secretVersion
- * @return {Output<SecretRotation>} output.rotation			
+ * @return {Object} 				secret
+ * @return {Output<Secret>} 			secret
+ * @return {Output<secretVersion>} 		secretVersion
+ * @return {Output<SecretRotation>} 	rotation			
  */
-const createSecret = async ({ name, value, rotation, tags:_tags }) => {
+const Secret = function ({ name, value, rotation, tags:_tags }) {
 	if (!name)
 		throw new Error('Missing required \'name\' argument.')
 
@@ -65,11 +66,11 @@ const createSecret = async ({ name, value, rotation, tags:_tags }) => {
 		tags
 	})
 
-	return {
-		secret: secretContainer,
-		secretVersion,
-		rotation: secretRotation
-	}
+	this.secret = secretContainer
+	this.secretVersion = secretVersion
+	this.rotation = secretRotation
+
+	return this
 }
 
 const serializeValue = value => {
@@ -124,7 +125,7 @@ const getSecret = async secretId => {
 }
 
 module.exports = {
-	create: createSecret,
+	Secret,
 	get: getSecret
 }
 
