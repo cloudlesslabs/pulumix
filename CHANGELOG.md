@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.4](https://github.com/cloudlesslabs/pulumix/compare/v0.1.3...v0.1.4) (2022-05-06)
+
+
+### Bug Fixes
+
+* The docker.buildAndPushImage output is incorrectly parsed from a string to an array of characters ([466dd35](https://github.com/cloudlesslabs/pulumix/commit/466dd35d3c5dae6037384e30ddd53fb2352e8737))
+
 ### [0.1.3](https://github.com/cloudlesslabs/pulumix/compare/v0.1.2...v0.1.3) (2022-05-06)
 
 
