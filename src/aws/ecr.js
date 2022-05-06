@@ -117,7 +117,7 @@ const Image = function ({ name, tag, publicConfig, dir, args, scanOnPush, imageT
 		extraOptions
 	}
 
-	const output = pulumi.all([repository.registryId, repository.repositoryUrl]).appy(([registryId, repositoryUrl]) => {
+	const output = pulumi.all([repository.registryId, repository.repositoryUrl]).apply(([registryId, repositoryUrl]) => {
 		// Pushes image to repo.
 		return unwrap(docker.buildAndPushImage(taggedName, dockerBuildConfig, repositoryUrl, null, async () => {
 			// Construct Docker registry auth data by getting the short-lived authorizationToken from ECR, and
