@@ -9,7 +9,6 @@ LICENSE file in the root directory of this source tree.
 const pulumi = require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
 const docker = require('@pulumi/docker')
-const { unwrap } = require('../utils')
 
 
 /**
@@ -119,7 +118,7 @@ const Image = function ({ name, tag, publicConfig, dir, args, scanOnPush, imageT
 
 	const output = pulumi.all([repository.registryId, repository.repositoryUrl]).apply(([registryId, repositoryUrl]) => {
 		// Pushes image to repo.
-		return unwrap(docker.buildAndPushImage(taggedName, dockerBuildConfig, repositoryUrl, null, async () => {
+		return pulumi.output(docker.buildAndPushImage(taggedName, dockerBuildConfig, repositoryUrl, null, async () => {
 			// Construct Docker registry auth data by getting the short-lived authorizationToken from ECR, and
 			// extracting the username/password pair after base64-decoding the token.
 			//
