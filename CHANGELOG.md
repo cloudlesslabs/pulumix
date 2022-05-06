@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.3](https://github.com/cloudlesslabs/pulumix/compare/v0.1.2...v0.1.3) (2022-05-06)
+
+
+### Bug Fixes
+
+* .appy is not a function ([930163d](https://github.com/cloudlesslabs/pulumix/commit/930163d13c7e3fde89fff7acce6f4000daac638c))
+
 ### [0.1.2](https://github.com/cloudlesslabs/pulumix/compare/v0.1.1...v0.1.2) (2022-05-05)
 
 ### [0.1.1](https://github.com/cloudlesslabs/pulumix/compare/v0.1.0...v0.1.1) (2022-04-29)
