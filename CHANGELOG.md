@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.2.0](https://github.com/cloudlesslabs/pulumix/compare/v0.1.4...v0.2.0) (2022-05-10)
+
+
+### Features
+
+* Add support for Cognito ([a822c78](https://github.com/cloudlesslabs/pulumix/commit/a822c78f2a45ff5c4a89d5a793097781f29ffdf7))
+
 ### [0.1.4](https://github.com/cloudlesslabs/pulumix/compare/v0.1.3...v0.1.4) (2022-05-06)
 
 
