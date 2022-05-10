@@ -29,20 +29,23 @@ const { unwrap } = require('../utils')
  * @param  {String}				name	
  * @param  {String}				description		
  * @param  {String}				architecture						Valid values: 'x86_64', 'arm64'(default) WARNING (3)
- * @param  {String}				fn.dir								The absolute path to the local folder containing the Lambda code that will be zipped.
- * @param  {String}				fn.type								Valid values: 'zip' (default), 'image' (1)											
- * @param  {String}				fn.runtime							Only required if 'fn.type' is 'zip'. e.g., 'nodejs14.x'. All runtimes: https://docs.aws.amazon.com/lambda/latest/dg/API_CreateFunction.html#SSS-CreateFunction-request-Runtime
- * @param  {Object}				fn.args								Only valid when 'fn.type' is 'image' (1). This is what would be passed in the --build-arg option of `docker build`.
- * @param  {Object}				fn.env								Environment variables for that fn. It works a bit differently when 'fn.type' is 'image' (2).
+ * @param  {Output<Object>}		fn
+ * @param  {Output<String>}			.dir							The absolute path to the local folder containing the Lambda code that will be zipped.
+ * @param  {Output<String>}			.type							Valid values: 'zip' (default), 'image' (1)											
+ * @param  {Output<String>}			.runtime						Only required if 'fn.type' is 'zip'. e.g., 'nodejs14.x'. All runtimes: https://docs.aws.amazon.com/lambda/latest/dg/API_CreateFunction.html#SSS-CreateFunction-request-Runtime
+ * @param  {Output<Object>}			.args							Only valid when 'fn.type' is 'image' (1). This is what would be passed in the --build-arg option of `docker build`.
+ * @param  {Output<Object>}			.env							Environment variables for that fn. It works a bit differently when 'fn.type' is 'image' (2).
  * @param  {[Output<String>]}	layers								Layer ARNS.
  * @param  {Number}				timeout								Unit seconds. Default is 3 and max is 900 (15 minutes).
  * @param  {Number}				memorySize							Unit is MB. Default is 128 and max is 10,240
  * @param  {String}				handler								Default is 'index.handler'.
  * @param  {[Output<Policy>]}	policies							Policies to attach to the lambda role.
- * @param  {Output<[String]>}	vpcConfig.subnetIds
- * @param  {Output<[String]>}	vpcConfig.securityGroupIds
- * @param  {Output<String>}		fileSystemConfig.arn				Used to mount an AWS EFS access point.
- * @param  {Output<String>}		fileSystemConfig.localMountPath		Used to mount an AWS EFS access point.
+ * @param  {Output<Object>}		vpcConfig
+ * @param  {Output<[String]>}		.subnetIds
+ * @param  {Output<[String]>}		.securityGroupIds
+ * @param  {Output<Object>}		fileSystemConfig
+ * @param  {Output<String>}			.arn							Used to mount an AWS EFS access point.
+ * @param  {Output<String>}			.localMountPath					Used to mount an AWS EFS access point.
  * @param  {Object}				schedule					
  * @param  {String}					.expression						e.g., 'rate(1 minute)'. Full doc at https://docs.aws.amazon.com/AmazonCloudWatch/latest/events/ScheduledEvents.html
  * @param  {Object}					.payload						Optional. When specified, the object is passed to the Lambda's event. Otherwise, the default object is passed as the event (4)
@@ -115,32 +118,40 @@ const Lambda = function ({ name, description, architecture, fn, layers, timeout=
 	
 	const canonicalName = `${name}-lambda`
 
-	const output = pulumi.all([fileExists(fn.dir), fileExists(path.join(fn.dir, 'Dockerfile'))]).apply(([fnDirFound, dockerFileFound]) => {
+	const output = unwrap(fn).apply(_fn => pulumi.all([
+		fileExists(_fn.dir), 
+		fileExists(path.join(_fn.dir, 'Dockerfile')),
+		_fn.dir, 
+		_fn.type, 
+		_fn.runtime, 
+		_fn.args, 
+		_fn.env
+	]).apply(([fnDirFound, dockerFileFound, dir, type, runtime, args, env]) => {
 		if (!fnDirFound)
-			throw new Error(`Function folder '${fn.dir}' not found.`)	
+			throw new Error(`Function folder '${dir}' not found.`)	
 
 		// ECR images. Doc:
 		// 	- buildAndPushImage API: https://www.pulumi.com/docs/reference/pkg/nodejs/pulumi/awsx/ecr/#buildAndPushImage
 		// 	- 2nd argument is a DockerBuild object: https://www.pulumi.com/docs/reference/pkg/docker/image/#dockerbuild
 		// image = awsx.ecr.buildAndPushImage(canonicalName, {
-		// 	context: fn.dir,
+		// 	context: dir,
 		// 	args,
 		// 	tags: {
 		// 		...tags,
 		// 		Name: canonicalName
 		// 	}
 		// })
-		const image = fn.type == 'image' || dockerFileFound 
+		const image = type == 'image' || dockerFileFound 
 			? new Image({ 
 				name: canonicalName,
-				dir: fn.dir,
-				args: fn.args || fn.env ? { ...(fn.args||{}), ...(fn.env||{}) } : undefined,
+				dir: dir,
+				args: args || env ? { ...(args||{}), ...(env||{}) } : undefined,
 				tags
 			})
 			: null
 
 		const imageUri = image ? image.imageValues[0] : null
-		
+			
 		// IAM role. Doc: https://www.pulumi.com/docs/reference/pkg/aws/iam/role/
 		const lambdaRole = new aws.iam.Role(canonicalName, {
 			name: canonicalName,
@@ -188,7 +199,7 @@ const Lambda = function ({ name, description, architecture, fn, layers, timeout=
 					throw new Error(`Invalid argument exception. Some policies in lambda ${name} don't have a name.`)	
 				if (!policy.arn)
 					throw new Error(`Invalid argument exception. Some policies in lambda ${name} don't have an arn.`)	
-				
+					
 				dependsOn.push(new aws.iam.RolePolicyAttachment(`${canonicalName}-${policy.name}`, {
 					role: lambdaRole.name,
 					policyArn: policy.arn
@@ -196,17 +207,17 @@ const Lambda = function ({ name, description, architecture, fn, layers, timeout=
 			}
 
 			// Configure the function code used for that lambda
-			if (!_imageUri && !fn.runtime)
+			if (!_imageUri && !runtime)
 				throw new Error('Missing required argument \'fn.runtime\'. Please select one amongst the list at https://docs.aws.amazon.com/lambda/latest/dg/API_CreateFunction.html#SSS-CreateFunction-request-Runtime')
-			
+				
 			const functionCode = _imageUri 
 				? {
 					packageType: 'Image',
 					imageUri: _imageUri
 				} : {
-					runtime: fn.runtime,
+					runtime,
 					code: new pulumi.asset.AssetArchive({
-						'.': new pulumi.asset.FileArchive(fn.dir),
+						'.': new pulumi.asset.FileArchive(dir),
 					}),
 					handler: handler || 'index.handler'
 				}
@@ -287,7 +298,7 @@ const Lambda = function ({ name, description, architecture, fn, layers, timeout=
 				schedule: _schedule
 			}
 		})
-	})
+	}))
 
 	this.lambda = output.lambda
 	this.image = output.image
@@ -318,7 +329,7 @@ const Lambda = function ({ name, description, architecture, fn, layers, timeout=
  * 		- arn: 		'arn:aws:lambda:ap-southeast-2:1234:layer:aws-layer-dev-layer-01:1' 
  * 		- layerArn: 'arn:aws:lambda:ap-southeast-2:1234:layer:aws-layer-dev-layer-01' 
  */
-const Layer = function ({ name, runtime, dir, description, licenseInfo, tags }) {
+const LambdaLayer = function ({ name, runtime, dir, description, licenseInfo, tags }) {
 	if (!name)
 		throw new Error('Missing required \'name\' argument .')
 	if (!runtime)
@@ -440,7 +451,7 @@ const fileExists = filePath => new Promise(onSuccess => fs.exists(path.resolve(f
 
 module.exports = {
 	Lambda,
-	Layer
+	LambdaLayer
 }
 
 

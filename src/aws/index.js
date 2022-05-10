@@ -8,13 +8,14 @@ LICENSE file in the root directory of this source tree.
 
 module.exports = {
 	appSync: require('./appSync'),
+	cognito: require('./cognito'),
 	...require('./ec2'),
 	ecr: require('./ecr'),
 	efs: require('./efs'),
-	lambda: require('./lambda'),
+	...require('./lambda'),
 	rds: require('./rds'),
 	s3: require('./s3'),
-	secret: require('./secret'),
+	...require('./secret'),
 	...require('./securityGroup'),
 	ssm: require('./ssm'),
 	stepFunction: require('./stepFunction'),

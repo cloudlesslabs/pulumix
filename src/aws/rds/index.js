@@ -6,6 +6,7 @@ This source code is licensed under the proprietary license found in the
 LICENSE file in the root directory of this source tree. 
 */
 
+const pulumi = require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
 
 /**
@@ -37,7 +38,7 @@ const getUserDbArn = ({ rdsArn, resourceId, username }) => {
  * 
  * @return {Output<Policy>}	policy	
  */
-const createConnectPolicy = ({ name, rdsArn, resourceId, username }) => {
+const createConnectPolicy = input => pulumi.output(input).apply(({ name, rdsArn, resourceId, username }) => {
 	const userArn = getUserDbArn({ rdsArn, resourceId, username })
 	// IAM policy doc: https://www.pulumi.com/docs/reference/pkg/aws/iam/policy/
 	const executeRdsQueriesPolicy = new aws.iam.Policy(name, {
@@ -57,7 +58,7 @@ const createConnectPolicy = ({ name, rdsArn, resourceId, username }) => {
 	})
 
 	return executeRdsQueriesPolicy
-}
+})
 
 module.exports = {
 	...require('./aurora'),

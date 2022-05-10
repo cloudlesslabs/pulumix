@@ -161,8 +161,9 @@ const Parameter = function (args) {
 	return this
 }
 
+Parameter.get = getParameter
+Parameter.createOrUpdate = putParameter
+
 module.exports = {
-	get: getParameter,
-	create: putParameter,
 	Parameter
 }

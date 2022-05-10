@@ -124,9 +124,10 @@ const getSecret = async secretId => {
 	}
 }
 
+Secret.get = getSecret
+
 module.exports = {
-	Secret,
-	get: getSecret
+	Secret
 }
 
 

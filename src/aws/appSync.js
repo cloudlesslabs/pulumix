@@ -6,6 +6,7 @@ This source code is licensed under the proprietary license found in the
 LICENSE file in the root directory of this source tree. 
 */
 
+const pulumi = require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
 const { parse } = require('graphql')
 
@@ -20,7 +21,6 @@ const { parse } = require('graphql')
  * @param  {String}				description		
  * @param  {String}				schema							GraphQL schema	
  * @param  {[Output<String>]}	resolver.lambdaArns				Lambda ARNs. This is needed to create 'invoke' policies
- * 
  * @param  {Object}				authConfig						Default { apiKey:true }
  * @param  {Boolean}				.apiKey						Default true if none of the other methods are enabled.
  * @param  {Boolean}				.iam
@@ -87,48 +87,57 @@ const Api = function ({ name, description, schema, resolver, authConfig, cloudwa
 		}))
 	}
 
-	// Creates a policy that allows to invoke Lambdas
-	if (resolver && resolver.lambdaArns && resolver.lambdaArns.length) {
-		if (resolver.lambdaArns.some(arn => typeof(arn) != 'string'))
-			throw new Error('\'resolver.lambdaArns\' must be strings.')
-		
-		const invokeLambdaPolicy = new aws.iam.Policy(`${canonicalName}-invoke-lambdas`, {
-			path: '/',
-			description: `Allows AppSync API '${name}' to invoke AWS Lambdas`,
-			policy: JSON.stringify({
-				Version: '2012-10-17',
-				Statement: [{
-					Action: [
-						'lambda:InvokeFunction'
-					],
-					Resource: resolver.lambdaArns,
-					Effect: 'Allow'
-				}]
-			}),
-			tags
-		})
-		dependsOn.push(new aws.iam.RolePolicyAttachment(`${canonicalName}-invoke-lambdas-attach`, {
-			role: appSyncRole.name,
-			policyArn: invokeLambdaPolicy.arn
-		}))
-	}
+	const _lambdaArns = (resolver||{}).lambdaArns || []
 
-	// GraphQL API doc: https://www.pulumi.com/docs/reference/pkg/aws/appsync/graphqlapi/
-	const graphQlApi = new aws.appsync.GraphQLApi(name, {
-		name,
-		description,
-		..._getAuth(authConfig),
-		schema,
-		logConfig,
-		dependsOn,
-		tags: {
-			...tags,
-			Name: name
+	const output = pulumi.all(_lambdaArns).apply(lambdaArns => {
+		// Creates a policy that allows to invoke Lambdas
+		if (lambdaArns && lambdaArns.length) {
+			if (lambdaArns.some(arn => typeof(arn) != 'string'))
+				throw new Error('\'resolver.lambdaArns\' must be strings.')
+			
+			const invokeLambdaPolicy = new aws.iam.Policy(`${canonicalName}-invoke-lambdas`, {
+				path: '/',
+				description: `Allows AppSync API '${name}' to invoke AWS Lambdas`,
+				policy: JSON.stringify({
+					Version: '2012-10-17',
+					Statement: [{
+						Action: [
+							'lambda:InvokeFunction'
+						],
+						Resource: lambdaArns,
+						Effect: 'Allow'
+					}]
+				}),
+				tags
+			})
+			dependsOn.push(new aws.iam.RolePolicyAttachment(`${canonicalName}-invoke-lambdas-attach`, {
+				role: appSyncRole.name,
+				policyArn: invokeLambdaPolicy.arn
+			}))
+		}
+
+		// GraphQL API doc: https://www.pulumi.com/docs/reference/pkg/aws/appsync/graphqlapi/
+		const graphQlApi = new aws.appsync.GraphQLApi(name, {
+			name,
+			description,
+			..._getAuth(authConfig),
+			schema,
+			logConfig,
+			dependsOn,
+			tags: {
+				...tags,
+				Name: name
+			}
+		})
+
+		return {
+			api: _leanify(graphQlApi),
+			roleArn: appSyncRole.arn
 		}
 	})
 
-	this.api = _leanify(graphQlApi)
-	this.roleArn = appSyncRole.arn
+	this.api = output.api
+	this.roleArn = output.roleArn
 
 	return this
 }
@@ -140,12 +149,12 @@ const Api = function ({ name, description, schema, resolver, authConfig, cloudwa
  * @param  {Object}					api						Required
  * @param  {Output<String>}				.id					Required
  * @param  {Output<String>}				.roleArn			Required
- * @param  {String}					functionArn						
- * @param  {String}					tableName						
- * @param  {String}					useCallerCredentials						
- * @param  {String}					region						
- * @param  {String}					httpEndpoint						
- * @param  {String}					openSearchEndpoint						
+ * @param  {Output<String>}			functionArn						
+ * @param  {Output<String>}			tableName						
+ * @param  {Output<String>}			useCallerCredentials						
+ * @param  {Output<String>}			region						
+ * @param  {Output<String>}			httpEndpoint						
+ * @param  {Output<String>}			openSearchEndpoint						
  * @param  {Object}					tags
  * 						
  * @return {Object}					dataSource
@@ -256,7 +265,11 @@ const Resolver = function ({ name, api, type, field, dataSource, mappingTemplate
 }
 
 /**
- * Creates a single Lambda data source and many resolvers that forward requests to that lambda.
+ * Creates a single Lambda data source and many resolvers that forward requests to that lambda. How it works:
+ * 1. Creates a new DataSource for the AppSync 'api' object using the lambda's ARN 'functionArn'.
+ * 2. Extracts all the fields out of the GraphQL schema string 'schema.value' for the GraphQL types defined in 'schema.includes' (default: ['Query', 'Mutation', 'Subscription']).
+ * 3. For each extracted field, create a new resolver which uses the data source created in step 1.
+ * 
  * Doc:
  * 	- AppSync resolver doc: https://www.pulumi.com/docs/reference/pkg/aws/appsync/resolver/
  * 	- AppSync data source doc: https://www.pulumi.com/docs/reference/pkg/aws/appsync/datasource/
@@ -268,16 +281,17 @@ const Resolver = function ({ name, api, type, field, dataSource, mappingTemplate
  * @param  {String}				api.id			
  * @param  {String}				api.roleArn		
  * @param  {String}				name			
- * @param  {Object}				schema					e.g., 'Query', 'Mutation', 'Product', 'Person'.	
+ * @param  {Object}				schema					
  * @param  {String}					.value				GraphQL schema string
- * @param  {[String]}				.includes			Default ['Query', 'Mutation', 'Subscription'].
+ * @param  {[String]}				.includes			Default ['Query', 'Mutation', 'Subscription']. Examples: ['Query', 'Product', 'Person'].	
+ * @param  {Output<String>}		functionArn	
  * @param  {Object}				tags	
  * 								
  * @return {Object}				output
  * @return {Output<DataSource>}		.dataSource
  * @return {[Output<Resolver>]}		.resolvers
  */
-const createLambdaResolvers = ({ name, api, schema, functionArn, tags }) => {
+const createDataSourceResolvers = ({ name, api, schema, functionArn, tags }) => {
 	tags = tags || {}
 	
 	if (!api)
@@ -590,7 +604,7 @@ const _leanify = resource => {
  * High-order function that gets the fields of a graphql type.
  * 
  * @param  {String} schema		GraphQL string schema
- * @return {[type]}        [description]
+ * @return {Function}
  */
 const _getSchemaTypeFields = schema => {
 	if (!schema)
@@ -623,8 +637,8 @@ const _getSchemaTypeFields = schema => {
 module.exports = {
 	Api,
 	Resolver,
-	lambdaResolvers: createLambdaResolvers,
-	DataSource
+	DataSource,
+	createDataSourceResolvers
 }
 
 
