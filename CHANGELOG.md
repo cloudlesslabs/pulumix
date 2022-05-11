@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.1](https://github.com/cloudlesslabs/pulumix/compare/v0.2.0...v0.2.1) (2022-05-11)
+
+
+### Features
+
+* Add support for Output as property values for the appSync.Api object ([3b62137](https://github.com/cloudlesslabs/pulumix/commit/3b621374b0485cf3d4b77e97c9383f515e0bdd50))
+
 ## [0.2.0](https://github.com/cloudlesslabs/pulumix/compare/v0.1.4...v0.2.0) (2022-05-10)
 
 
