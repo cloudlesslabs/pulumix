@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.3.1](https://github.com/cloudlesslabs/pulumix/compare/v0.3.0...v0.3.1) (2022-05-15)
+
+
+### Features
+
+* Add new helpers to universally get a consistent project, stack and stack reference regardless of the backend type ([1a4b6ab](https://github.com/cloudlesslabs/pulumix/commit/1a4b6ab996b344e9d261935a93288d065d94f5d8))
+
 ## [0.3.0](https://github.com/cloudlesslabs/pulumix/compare/v0.2.1...v0.3.0) (2022-05-11)
 
 
