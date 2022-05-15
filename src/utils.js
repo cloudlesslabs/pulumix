@@ -132,9 +132,49 @@ const unwrap = (output, props) => {
 	})
 }
 
+const SUPPORTED_BACKENDS = ['pulumi', 's3', 'azblob', 'gs', 'file']
+/**
+ * Gets the project and stack name. Manages cases where the backend is not Pulumi.
+ * 
+ * @param  {Object}	options
+ * @param  {String}		.backend	Valid values: 'pulumi' (default), 's3', 'azblob', 'gs', 'file'.
+ * 
+ * @return {Object}	output
+ * @return {String}		.project	e.g., 'my-project'
+ * @return {String}		.stack		e.g., 'prod'
+ * @return {String}		.fullStack	e.g., 'prod' or 'my-project.prod'
+ */
+const getProject = options => {
+	const { backend } = options || {}
+	const project = pulumi.getProject()
+	const stack = pulumi.getStack()
+
+	if (backend === undefined || backend === null || backend === 'pulumi')
+		return { project, stack, fullStack:stack }
+	else if (SUPPORTED_BACKENDS.indexOf(backend) < 0)
+		throw new Error(`Unsupported 'backend' value. Expecting one of those values: ${SUPPORTED_BACKENDS}. Found '${backend}' instead.`)
+	return { project, stack:stack.replace(`${project}.`,''), fullStack:stack }
+}
+
+const getStack = ({ org, project, stack, backend }) => {
+	if (!project)
+		throw new Error('Missing required argument \'project\',')
+	if (!stack)
+		throw new Error('Missing required argument \'stack\',')
+
+	if (backend === undefined || backend === null || backend === 'pulumi')
+		return new pulumi.StackReference(org ? `${org}/${project}/${stack}` : `${project}/${stack}`)
+	else if (SUPPORTED_BACKENDS.indexOf(backend) < 0)
+		throw new Error(`Unsupported 'backend' value. Expecting one of those values: ${SUPPORTED_BACKENDS}. Found '${backend}' instead.`)
+
+	return new pulumi.StackReference(`${project}.${stack}`)
+}
+
 module.exports = {
 	resolve,
 	unwrap,
+	getProject,
+	getStack,
 	files: {
 		list: listFiles,
 		remove: deleteFile,

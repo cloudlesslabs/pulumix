@@ -193,6 +193,7 @@ const UserPool = function (input) {
 
 /**
  * Creates a client App for a user pool. By default the 2 OAuth grant type flows(1) are enabled: 'password', 'refresh_token'.
+ * doc: https://www.pulumi.com/docs/reference/pkg/aws/cognito/userpoolclient/
  *
  * IMPORTANT:
  * 	- By default:
