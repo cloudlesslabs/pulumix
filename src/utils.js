@@ -156,6 +156,17 @@ const getProject = options => {
 	return { project, stack:stack.replace(`${project}.`,''), fullStack:stack }
 }
 
+/**
+ * Gets the stack reference
+ * 
+ * @param  {Object}			input
+ * @param  {String}				.org		
+ * @param  {String}				.project		
+ * @param  {String}				.stack		
+ * @param  {String}				.backend	
+ * 	
+ * @return {Output<Stack>}	stackRef
+ */
 const getStack = ({ org, project, stack, backend }) => {
 	if (!project)
 		throw new Error('Missing required argument \'project\',')

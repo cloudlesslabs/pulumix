@@ -37,4 +37,15 @@ console.log(sg)
 ```
 
 
-The full documentation for this package is located in the project's wiki: https://github.com/cloudlesslabs/pulumix/wiki
+The full documentation for this package is located in the project's wiki: https://github.com/cloudlesslabs/pulumix/wiki/
+
+This wiki contains the following sections:
+
+- [0. CORE APIs](https://github.com/cloudlesslabs/pulumix/wiki/0.-CORE-APIs): Core APIs applicable to any Cloud provider.
+- [A. AWS](https://github.com/cloudlesslabs/pulumix/wiki/A.-AWS): AWS modules
+- [B. GCP](https://github.com/cloudlesslabs/pulumix/wiki/B.-GCP): GCP modules
+- [W. Docker](https://github.com/cloudlesslabs/pulumix/wiki/W.-Docker): Docker modules
+- [X. Annexes](https://github.com/cloudlesslabs/pulumix/wiki/X.-Annexes): Pulumi related information:
+	- [Common Pulumi code snippets](https://github.com/cloudlesslabs/pulumix/wiki/X.-Annexes#common-pulumi-code-snippets)
+	- [NPM package.json scripts](https://github.com/cloudlesslabs/pulumix/wiki/X.-Annexes#npm-packagejson-scripts): Commonly used NPM scripts to automate Pulumi operations.
+	- [Automation API](https://github.com/cloudlesslabs/pulumix/wiki/X.-Annexes#automation-api): That's the Pulumi API used to provision infrastructure on-the-fly.
