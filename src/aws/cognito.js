@@ -6,6 +6,7 @@ This source code is licensed under the proprietary license found in the
 LICENSE file in the root directory of this source tree. 
 */
 
+const pulumi = require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
 
 const REGION = aws.config.region
@@ -207,30 +208,58 @@ const UserPool = function (input) {
  * 	- To setup the 'code' or 'implicit' grant type, at least one callback URL must be set in the 'allowedUrls.callbacks' string array.
  * 
  * @param  {String}					name
- * @param  {Output<String>}			userPoolId
- * @param  {Object}  				oauth							Default is only 'refresh_token' and 'password'('srp' mode only) grant type flows are enabled.
- * @param  {Boolean}  					.disable					Default false.
- * @param  {[String]} 					.grantTypes					(1) Default [password', 'refresh_token']. Allowed values: 'code', 'implicit', 'client_credentials', 'password', 'refresh_token'	
- * @param  {[String]} 					.scopes						(2) e.g., 'phone', 'email', 'openid', and 'profile'
- * @param  {Boolean}  					.secret					    Default false. WARNING: True forces the secret to be passed during the authorizaton_code flow, which is not suitable for a SPA or PWA.
- * @param  {[String]} 					.passwordModes				Allowed values: 'srp'(default), 'standard', 'admin'
+ * @param  {Object}					userPool								Required
+ * @param  {Output<String>}				.id									Required
+ * @param  {Output<String>}				.endpoint
+ * @param  {Object}  				oauth									Default is only 'refresh_token' and 'password'('srp' mode only) grant type flows are enabled.
+ * @param  {Boolean}  					.disable							Default false.
+ * @param  {[String]} 					.grantTypes							(1) Default [password', 'refresh_token']. Allowed values: 'code', 'implicit', 'client_credentials', 'password', 'refresh_token'	
+ * @param  {[String]} 					.scopes								(2) e.g., 'phone', 'email', 'openid', and 'profile'
+ * @param  {Boolean}  					.secret					    		Default false. WARNING: True forces the secret to be passed during the authorizaton_code flow, which is not suitable for a SPA or PWA.
+ * @param  {[String]} 					.passwordModes						Allowed values: 'srp'(default), 'standard', 'admin'
  * 
- * @param  {Object} 				tokenDuration					Default is 1 hour for both id/access token and 30 days for refresh token.
- * @param  {Number}						.idToken.value				Default 1.
- * @param  {Number}						.idToken.unit				Default 'hours'. Allowed values: 'seconds', 'minutes', 'hours' (default), 'days'
- * @param  {Number}						.accessToken.value			Default 1.
- * @param  {Number}						.accessToken.unit			Default 'hours'. Allowed values: 'seconds', 'minutes', 'hours' (default), 'days'
- * @param  {Number}						.refreshToken.value			Default 30.
- * @param  {Number}						.refreshToken.unit			Default 'days'. Allowed values: 'seconds', 'minutes', 'hours' (default), 'days'			
+ * @param  {Object} 				tokenDuration							Default is 1 hour for both id/access token and 30 days for refresh token.
+ * @param  {Number}						.idToken.value						Default 1.
+ * @param  {Number}						.idToken.unit						Default 'hours'. Allowed values: 'seconds', 'minutes', 'hours' (default), 'days'
+ * @param  {Number}						.accessToken.value					Default 1.
+ * @param  {Number}						.accessToken.unit					Default 'hours'. Allowed values: 'seconds', 'minutes', 'hours' (default), 'days'
+ * @param  {Number}						.refreshToken.value					Default 30.
+ * @param  {Number}						.refreshToken.unit					Default 'days'. Allowed values: 'seconds', 'minutes', 'hours' (default), 'days'			
  * 
- * @param  {Object}					allowedUrls						Default is no allowed URLs configured, meaning 'code' and 'implicit' cannot work.
- * @param  {[String|Object]} 			.callbacks					(3) e.g., ['https://sample.co', { url:'https://sample.com', default:true }]
+ * @param  {Object}					allowedUrls								Default is no allowed URLs configured, meaning 'code' and 'implicit' cannot work.
+ * @param  {[String|Object]} 			.callbacks							(3) e.g., ['https://sample.co', { url:'https://sample.com', default:true }]
  * @param  {[String]} 					.logouts	
- * @param  {[String]} 				idps							Allowed values: 'facebook', 'google', 'amazon', 'apple', 'oidc', 'saml'
- * @param  {Boolean}				protect							Default false.
+ * @param  {[String]} 				idps									Allowed values: 'facebook', 'google', 'amazon', 'apple', 'oidc', 'saml'
+ * @param  {Boolean}				protect									Default false.
  * @param  {Object}					tags
  * 
- * @return {Output<UserPoolClient>}	app
+ * @return {Object}					app
+ * @return {Output<String>}				.id
+ * @return {Output<String>}				.name
+ * @return {Output<String>}				.arn
+ * @return {Output<String>}				.clientSecret
+ * @return {Output<Object>}				.hostedUI							URLs for the default Cognito hosted UI. Only defined if the 'code' flow is enabled and at least one 'callbackUrls' is defined.
+ * @return {Output<String>}					.loginUrl						
+ * @return {Output<String>}					.signupUrl
+ * @return {Output<String>}				.userPoolId
+ * @return {Output<String>}				.accessTokenValidity
+ * @return {Output<String>}				.allowedOauthFlows
+ * @return {Output<String>}				.allowedOauthFlowsUserPoolClient
+ * @return {Output<String>}				.allowedOauthScopes
+ * @return {Output<String>}				.analyticsConfiguration
+ * @return {Output<String>}				.callbackUrls
+ * @return {Output<String>}				.defaultRedirectUri
+ * @return {Output<String>}				.enableTokenRevocation
+ * @return {Output<String>}				.explicitAuthFlows
+ * @return {Output<String>}				.generateSecret
+ * @return {Output<String>}				.idTokenValidity
+ * @return {Output<String>}				.logoutUrls
+ * @return {Output<String>}				.preventUserExistenceErrors
+ * @return {Output<String>}				.readAttributes
+ * @return {Output<String>}				.refreshTokenValidity
+ * @return {Output<String>}				.supportedIdentityProviders
+ * @return {Output<String>}				.tokenValidityUnits
+ * @return {Output<String>}				.writeAttributes
  *
  * (1) OAuth 2.0 grant type flows:
  * 		- code (official name is authorization_code)
@@ -250,14 +279,17 @@ const UserPool = function (input) {
  * 		
  * (3) If no item with the 'default' property is found, the first item is assumed to be the default one.
  */
-const App = function ({ name, userPoolId, oauth, tokenDuration, allowedUrls, idps, protect, tags }) {
+const App = function ({ name, userPool, oauth, tokenDuration, allowedUrls, idps, protect, tags }) {
 	tags = tags || {}
 	const options = protect === undefined ? undefined : { protect }
 
 	if (!name)
 		throw new Error('Missing required \'name\' argument')
-	if (!userPoolId)
-		throw new Error('Missing required \'userPoolId\' argument')
+	if (!userPool)
+		throw new Error('Missing required \'userPool\' argument')
+	if (!userPool.id)
+		throw new Error('Missing required \'userPool.id\' argument')
+
 	if (oauth && oauth.grantTypes && oauth.grantTypes.length) {
 		const clientCredsFlowOn = oauth.grantTypes.indexOf('client_credentials') >= 0
 		const implicitFlowOn = oauth.grantTypes.indexOf('implicit') >= 0
@@ -273,7 +305,7 @@ const App = function ({ name, userPoolId, oauth, tokenDuration, allowedUrls, idp
 	// User pool client doc: https://www.pulumi.com/docs/reference/pkg/aws/cognito/userpoolclient/
 	const app = new aws.cognito.UserPoolClient(name, {
 		name,
-		userPoolId,
+		userPoolId: userPool.id,
 		...getOAuthConfig(oauth),
 		...getTokensConfig(tokenDuration),
 		...getUrlsConfig(allowedUrls),
@@ -285,8 +317,27 @@ const App = function ({ name, userPoolId, oauth, tokenDuration, allowedUrls, idp
 		}
 	}, options)
 
+	const hostedUI = pulumi.all([userPool.endpoint, app.id, app.allowedOauthFlows, app.allowedOauthScopes, app.defaultRedirectUri]).apply(([endpoint, appId, allowedOauthFlows, allowedOauthScopes, defaultRedirectUri]) => {
+		const authorizationCodeFlowOn = allowedOauthFlows 
+			&& allowedOauthFlows.some 
+			&& allowedOauthFlows.some(f => f == 'code')
+			&& defaultRedirectUri
+
+		if (authorizationCodeFlowOn) {
+			const createUrl = type => `${endpoint || '<USERPOOL_ENDPOINT>'}/${type}?client_id=${appId}&response_type=code&scope=${allowedOauthScopes.join('+')}&redirect_uri=${encodeURIComponent(defaultRedirectUri)}`
+			return {
+				loginUrl: createUrl('login'),
+				signupUrl: createUrl('signup')
+			}
+		} else
+			return { loginUrl: null, signupUrl:null }
+	})
+
 	this.id = app.id
+	this.name = app.name
+	this.arn = app.arn
 	this.clientSecret = app.clientSecret
+	this.hostedUI = hostedUI
 	this.userPoolId = app.userPoolId
 	this.accessTokenValidity = app.accessTokenValidity
 	this.allowedOauthFlows = app.allowedOauthFlows
@@ -300,7 +351,6 @@ const App = function ({ name, userPoolId, oauth, tokenDuration, allowedUrls, idp
 	this.generateSecret = app.generateSecret
 	this.idTokenValidity = app.idTokenValidity
 	this.logoutUrls = app.logoutUrls
-	this.name = app.name
 	this.preventUserExistenceErrors = app.preventUserExistenceErrors
 	this.readAttributes = app.readAttributes
 	this.refreshTokenValidity = app.refreshTokenValidity
