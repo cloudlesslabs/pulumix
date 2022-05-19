@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.3.3](https://github.com/cloudlesslabs/pulumix/compare/v0.3.2...v0.3.3) (2022-05-19)
+
+
+### Features
+
+* Add a new 'hostedUI' property in the Cognito App object ([4439022](https://github.com/cloudlesslabs/pulumix/commit/44390226128fdea120d8ff39c481e961993b775e))
+
 ### [0.3.2](https://github.com/cloudlesslabs/pulumix/compare/v0.3.1...v0.3.2) (2022-05-15)
 
 ### [0.3.1](https://github.com/cloudlesslabs/pulumix/compare/v0.3.0...v0.3.1) (2022-05-15)
