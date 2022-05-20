@@ -420,7 +420,7 @@ const attachPolicy = lambdaRoleName => {
 		if (!policyDef.name)
 			throw new Error('Missing required argument \'policyDef.name\'.')
 		
-		const policyDefExists = !policyDef.arn && policyDef.policy && typeof(policyDef.policy) == 'string'
+		const policyDefExists = !policyDef.arn && policyDef.policy
 
 		const policy = policyDefExists
 			? new aws.iam.Policy(policyDef.name, policyDef)
