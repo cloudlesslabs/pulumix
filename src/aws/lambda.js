@@ -56,6 +56,8 @@ const { unwrap } = require('../utils')
  * @param  {String}				tags		
  * 				
  * @return {Object}				lambda
+ * @return {Function}				.attachPolicy					(policy: Output<Policy>) => Output<RolePolicyAttachment> or
+ *                                         							(attachName:String, policy: Output<Policy>) => Output<RolePolicyAttachment>
  * @return {Output<Lambda>}			.lambda						
  * @return {Output<Role>}			.role
  * @return {Output<LogGroup>}		.logGroup
@@ -305,6 +307,7 @@ const Lambda = function ({ name, description, architecture, fn, layers, timeout=
 	this.role = output.role
 	this.logGroup = output.logGroup
 	this.schedule = output.schedule
+	this.attachPolicy = attachPolicy(output.role.name)
 
 	return this
 }
@@ -386,6 +389,28 @@ const leanifyImage = resource => {
 			registryId, 
 			url: repositoryUrl
 		}
+	}
+}
+
+const attachPolicy = lambdaRoleName => {
+	if (!lambdaRoleName)
+		throw new Error('Missing required argument \'lambdaRoleName\'')
+
+	return (...args) => {
+		const [attachName, policy] = args.length == 1 ? [null, args[0]] : args
+		if (!policy)
+			throw new Error('Missing required argument \'policy\'')
+		if (!policy.name)
+			throw new Error('Missing required argument \'policy.name\'')
+		if (!policy.arn)
+			throw new Error('Missing required argument \'policy.arn\'')
+
+		return pulumi.all([lambdaRoleName, policy.name, policy.arn]).apply(([role, policyName, policyArn]) => {
+			const name = attachName && typeof(attachName) == 'string' 
+				? attachName
+				: `${lambdaRoleName}-${policyName}`
+			return new aws.iam.RolePolicyAttachment(name, { role, policyArn })
+		})
 	}
 }
 
