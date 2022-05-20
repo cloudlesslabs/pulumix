@@ -396,12 +396,36 @@ const attachPolicy = lambdaRoleName => {
 	if (!lambdaRoleName)
 		throw new Error('Missing required argument \'lambdaRoleName\'')
 
+	/**
+	 * Attach a  policy to a Lambda role. Potentially creates a new Policy. This API supports multiple signatures:
+	 * 
+	 * ('policy-attachement-123', { name:'xxx', description:'xxx', policy:'xxxx' }) => ... or
+	 * ('policy-attachement-123', policyOutput) => ... or
+	 * ({ name:'xxx', description:'xxx', policy:'xxxx' }) => ... or
+	 * (policyOutput) => ... or
+	 *
+	 * When the 'attachName' is not specified, its default is `${lambdaRoleName}-${policyName}`.
+	 * 
+	 * @param  {Object} 						attachName|policyDef|policy	
+	 * @param  {Object} 						policyDef|policy	
+	 * 
+	 * @return {Output<Object>}					output
+	 * @return {Output<Policy>}						.policy
+	 * @return {Output<RolePolicyAttachment>}		.rolePolicyAttachment
+	 */
 	return (...args) => {
-		const [attachName, policy] = args.length == 1 ? [null, args[0]] : args
-		if (!policy)
-			throw new Error('Missing required argument \'policy\'')
-		if (!policy.name)
-			throw new Error('Missing required argument \'policy.name\'')
+		const [attachName, policyDef] = args.length == 1 ? [null, args[0]] : args
+		if (!policyDef)
+			throw new Error('Missing required argument \'policyDef\'')
+		if (!policyDef.name)
+			throw new Error('Missing required argument \'policyDef.name\'.')
+		
+		const policyDefExists = !policyDef.arn && policyDef.policy && typeof(policyDef.policy) == 'string'
+
+		const policy = policyDefExists
+			? new aws.iam.Policy(policyDef.name, policyDef)
+			: policyDef
+		
 		if (!policy.arn)
 			throw new Error('Missing required argument \'policy.arn\'')
 
@@ -409,7 +433,10 @@ const attachPolicy = lambdaRoleName => {
 			const name = attachName && typeof(attachName) == 'string' 
 				? attachName
 				: `${lambdaRoleName}-${policyName}`
-			return new aws.iam.RolePolicyAttachment(name, { role, policyArn })
+			return {
+				policy,
+				rolePolicyAttachment: new aws.iam.RolePolicyAttachment(name, { role, policyArn })
+			}
 		})
 	}
 }
