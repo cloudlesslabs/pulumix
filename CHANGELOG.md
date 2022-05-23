@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.5.2](https://github.com/cloudlesslabs/pulumix/compare/v0.5.1...v0.5.2) (2022-05-23)
+
+
+### Features
+
+* Add support for configuring Lambda VPC config from subnet resources on top of the usual subnet IDs ([fd1058d](https://github.com/cloudlesslabs/pulumix/commit/fd1058db9b85832186cd68a15091790975597609))
+
 ### [0.5.1](https://github.com/cloudlesslabs/pulumix/compare/v0.5.0...v0.5.1) (2022-05-23)
 
 
