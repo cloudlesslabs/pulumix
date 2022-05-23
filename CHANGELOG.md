@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.5.1](https://github.com/cloudlesslabs/pulumix/compare/v0.5.0...v0.5.1) (2022-05-23)
+
+
+### Bug Fixes
+
+* Incorrect security group name ([ba16de5](https://github.com/cloudlesslabs/pulumix/commit/ba16de54c3e8e6ab7f765952f0f54eda6f7a2f0b))
+
 ## [0.5.0](https://github.com/cloudlesslabs/pulumix/compare/v0.4.2...v0.5.0) (2022-05-23)
 
 ### [0.4.2](https://github.com/cloudlesslabs/pulumix/compare/v0.4.1...v0.4.2) (2022-05-20)
