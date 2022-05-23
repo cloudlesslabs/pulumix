@@ -115,7 +115,10 @@ const _uploadFiles = async ({ bucket, content, cloudfrontDistro, cloudfront }) =
  * @param  {Output<[String]>}					.allowedMethods			Default ['GET', 'HEAD', 'OPTIONS']
  * @param  {Output<Boolean>}					.invalidateOnUpdate		Default false. True means that if 'website.content' is set and content updates are detected, then the distribution must be invalidated
  * @param  {Output<Boolean>}			versioning						Default false.		
- * @param  {Output<String>}				tags				
+ * @param  {Output<String>}				tags
+ * @param  {Output<Resource>}			parent
+ * @param  {Output<[Resource]>}			dependsOn
+ * @param  {Boolean}					protect					
  * 
  * @return {Object}						output
  * @return {Output<Bucket>}					.bucket
@@ -133,7 +136,7 @@ const _uploadFiles = async ({ bucket, content, cloudfrontDistro, cloudfront }) =
 // (1) For example, to ignore the content under the node_modules folder: '**/node_modules/**'
 // 
 const Website = function (input) {
-	const output = unwrap(input).apply(({ name, acl:_acl, website:__website, versioning, tags }) => {
+	const output = unwrap(input).apply(({ name, acl:_acl, website:__website, versioning, tags, parent, dependsOn, protect }) => {
 		if (!name)
 			throw new Error('Missing required argument \'name\'.')
 
@@ -169,6 +172,10 @@ const Website = function (input) {
 						...tags,
 						Name: name
 					}
+				}, { 
+					parent, 
+					dependsOn, 
+					protect 
 				})
 
 				let cloudfrontDistro = null
@@ -212,6 +219,9 @@ const Website = function (input) {
 						viewerCertificate: {
 							cloudfrontDefaultCertificate: true
 						}
+					}, {
+						protect,
+						dependsOn: [bucket]
 					})
 				}
 

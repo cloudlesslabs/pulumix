@@ -13,98 +13,97 @@ const aws = require('@pulumi/aws')
 const crypto = require('crypto')
 const { unwrap } = require('../utils')
 
-/**
- * Creates a security group and attach(1) ingress and egress rules to it.
- *
- * WARNING: DO NOT UPDATE THE 'description' FIELD. This will trigger a replace of the security group, even if the name is the same.
- * 
- * Resources:
- *     1. Security group
- *     2. Multiple security group rules (as many as the total of the ingress and egress rules).
- *
- * (1) As of August 2021, the aws.ec2.SecurityGroup API is limited to max 2 rules. That's why we use the 'aws.ec2.SecurityGroupRule' API 
- * instead. More details about this limitation at https://www.pulumi.com/docs/reference/pkg/aws/ec2/securitygroup/
- * 
- * @param  {String}								name                
- * @param  {String}								description                
- * @param  {String}								vpcId                
- * @param  {Output<String>}						ingress[].protocol            e.g., 'tcp', '-1' (all protocols)
- * @param  {Output<Number>}						ingress[].fromPort            e.g., 3306
- * @param  {Output<Number>}						ingress[].toPort            e.g., 3306
- * @param  {Output<String>}						ingress[].description
- * @param  {[Output<String>]}					ingress[].cidrBlocks        e.g., ['0.0.0.0/0']
- * @param  {[Output<String>]}					ingress[].ipv6CidrBlocks    e.g., ['::/0']
- * @param  {[Output<String>]}					ingress[].securityGroups    e.g., ['sg-1234522', 'sg-76322']
- * @param  {Output<Boolean>}					ingress[].self        
- * @param  {Output<String>}						egress[].protocol            e.g., 'tcp', '-1' (all protocols)
- * @param  {Output<Number>}						egress[].fromPort            e.g., 3306
- * @param  {Output<Number>}						egress[].toPort                e.g., 3306
- * @param  {Output<String>}						egress[].description
- * @param  {[Output<String>]}					egress[].cidrBlocks            e.g., ['0.0.0.0/0']
- * @param  {[Output<String>]}					egress[].ipv6CidrBlocks        e.g., ['::/0']
- * @param  {[Output<String>]}					egress[].securityGroups        e.g., ['sg-1234522', 'sg-76322']
- * @param  {Output<Boolean>}					egress[].self            
- * @param  {Boolean}							protect
- * @param  {Object}								tags        
- *         
- * @return {Object}								securityGroup
- * @return {Output<String>}							.id
- * @return {Output<String>}							.arn
- * @return {Output<String>}							.name
- * @return {Output<String>}							.description
- * @return {Output<[SecurityGroupRule]>}			.rules
- */
-const SecurityGroup = function ({ name, description, vpcId, ingress, egress, protect, tags }) {
-	if (!name)
-		throw new Error('Missing required \'name\' argument.')
+class SecurityGroup extends aws.ec2.SecurityGroup {
+	/**
+	 * Creates a security group and attach(1) ingress and egress rules to it.
+	 *
+	 * WARNING: DO NOT UPDATE THE 'description' FIELD. This will trigger a replace of the security group, even if the name is the same.
+	 * 
+	 * Resources:
+	 *     1. Security group
+	 *     2. Multiple security group rules (as many as the total of the ingress and egress rules).
+	 *
+	 * (1) As of August 2021, the aws.ec2.SecurityGroup API is limited to max 2 rules. That's why we use the 'aws.ec2.SecurityGroupRule' API 
+	 * instead. More details about this limitation at https://www.pulumi.com/docs/reference/pkg/aws/ec2/securitygroup/
+	 * 
+	 * @param  {String}								name                
+	 * @param  {String}								description                
+	 * @param  {String}								vpcId                
+	 * @param  {Output<String>}						ingress[].protocol            e.g., 'tcp', '-1' (all protocols)
+	 * @param  {Output<Number>}						ingress[].fromPort            e.g., 3306
+	 * @param  {Output<Number>}						ingress[].toPort            e.g., 3306
+	 * @param  {Output<String>}						ingress[].description
+	 * @param  {[Output<String>]}					ingress[].cidrBlocks        e.g., ['0.0.0.0/0']
+	 * @param  {[Output<String>]}					ingress[].ipv6CidrBlocks    e.g., ['::/0']
+	 * @param  {[Output<String>]}					ingress[].securityGroups    e.g., ['sg-1234522', 'sg-76322']
+	 * @param  {Output<Boolean>}					ingress[].self        
+	 * @param  {Output<String>}						egress[].protocol            e.g., 'tcp', '-1' (all protocols)
+	 * @param  {Output<Number>}						egress[].fromPort            e.g., 3306
+	 * @param  {Output<Number>}						egress[].toPort                e.g., 3306
+	 * @param  {Output<String>}						egress[].description
+	 * @param  {[Output<String>]}					egress[].cidrBlocks            e.g., ['0.0.0.0/0']
+	 * @param  {[Output<String>]}					egress[].ipv6CidrBlocks        e.g., ['::/0']
+	 * @param  {[Output<String>]}					egress[].securityGroups        e.g., ['sg-1234522', 'sg-76322']
+	 * @param  {Output<Boolean>}					egress[].self            
+	 * @param  {Object}								tags        
+	 * @param  {Output<Resource>}					parent
+	 * @param  {Output<[Resource]>}					dependsOn
+	 * @param  {Boolean}							protect									Default false.
+	 *         
+	 * @return {Object}								securityGroup
+	 * @return {Output<String>}							.id
+	 * @return {Output<String>}							.arn
+	 * @return {Output<String>}							.name
+	 * @return {Output<String>}							.description
+	 * @return {Output<[SecurityGroupRule]>}			.rules
+	 */
+	constructor({ name, description, vpcId, ingress, egress, tags, protect, parent, dependsOn }) {
+		if (!name)
+			throw new Error('Missing required \'name\' argument.')
 
-	tags = tags || {}
-	
-	// Security group doc: https://www.pulumi.com/docs/reference/pkg/aws/ec2/securitygroup/
-	const securityGroup = new aws.ec2.SecurityGroup(name, {
-		name,
-		description,
-		vpcId,
-		tags: {
-			...tags,
-			Name: name
-		}
-	}, {
-		protect
-	})
+		tags = tags || {}
+		super(name, {
+			name,
+			description,
+			vpcId,
+			tags: {
+				...tags,
+				Name: name
+			}
+		}, {
+			protect,
+			dependsOn,
+			parent
+		})
 
-	this.id = securityGroup.id
-	this.arn = securityGroup.arn
-	this.name = securityGroup.name
-	this.description = securityGroup.description
-	this.rules = unwrap(securityGroup, x => ({ id:x.id })).apply(sg => {
-		return pulumi
-			.all([
-				resolveRules(ingress, 'ingress', sg.id),
-				resolveRules(egress, 'egress', sg.id)
-			])
-			.apply(([ingressRules, egressRules]) => {
-				return [...(ingressRules||[]), ...(egressRules||[])].map(rule => {
-					const { hash, ...raw } = rule
-					const ruleName = `${name}-sgr-${hash}`
-					// Security group rule doc: https://www.pulumi.com/docs/reference/pkg/aws/ec2/securitygrouprule/
-					return new aws.ec2.SecurityGroupRule(ruleName, {
-						...raw,
-						tags: {
-							...tags,
-							Name: ruleName
-						}
-					}, {
-						protect
+		this.rules = pulumi.output(this.id).apply(id => {
+			return pulumi
+				.all([
+					_resolveRules(ingress, 'ingress', id),
+					_resolveRules(egress, 'egress', id)
+				])
+				.apply(([ingressRules, egressRules]) => {
+					return [...(ingressRules||[]), ...(egressRules||[])].map(rule => {
+						const { hash, ...raw } = rule
+						const ruleName = `${name}-sgr-${hash}`
+						// Security group rule doc: https://www.pulumi.com/docs/reference/pkg/aws/ec2/securitygrouprule/
+						return new aws.ec2.SecurityGroupRule(ruleName, {
+							...raw,
+							tags: {
+								...tags,
+								Name: ruleName
+							}
+						}, {
+							protect,
+							dependsOn:[this]
+						})
 					})
 				})
-			})
-	})
-
-	return this
+		})
+	}
 }
 
-const hashRule = rule => crypto.createHash('md5').update(JSON.stringify(rule)).digest('hex').slice(0,8)
+const _hashRule = rule => crypto.createHash('md5').update(JSON.stringify(rule)).digest('hex').slice(0,8)
 
 /**
  * Map inline security group rules to explicit SecurityGroupRule objects
@@ -131,7 +130,7 @@ const hashRule = rule => crypto.createHash('md5').update(JSON.stringify(rule)).d
  * @return {String}                    securityGroupRules[].description
  * @return {String}                    securityGroupRules[].hash                        First 8 characters of the MD5 hash of the securityGroupRule object (excl. description).
  */
-const resolveRules = (rules, type, securityGroupId) => {
+const _resolveRules = (rules, type, securityGroupId) => {
 	if (!rules || !rules.length)
 		return []
 
@@ -166,7 +165,7 @@ const resolveRules = (rules, type, securityGroupId) => {
 					securityGroupRule.ipv6CidrBlocks = ipv6CidrBlocks
 				}
 
-				securityGroupRule.hash = hashRule(securityGroupRule)
+				securityGroupRule.hash = _hashRule(securityGroupRule)
 				if (description)
 					securityGroupRule.description = description
 				securityGroupRules.push(securityGroupRule)

@@ -18,62 +18,68 @@ LICENSE file in the root directory of this source tree.
 require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
 
-/**
- * Create a upload a secret to AWS secrets manager. 
- * Resources:
- * 	1. Secret
- * 	2. Secret version (i.e., the actual secret content)
- * 	3. (Optional) Secret rotation if the 'rotation.lambdaArn' is provided.
- * 
- * @param  {String} 				name			
- * @param  {Object} 				value						e.g., { username:'admin', password:'12345' }
- * @param  {Object} 				rotation					Optional. If specified, the 'rotation.lambdaArn' is required.
- * @param  {Output<String>} 		rotation.lambdaArn			
- * @param  {Number} 				rotation.rotationInterval	Unit days. Default 7 days. 
- * @param  {Object} 				tags			
- * 
- * @return {Object} 				secret
- * @return {Output<Secret>} 			secret
- * @return {Output<secretVersion>} 		secretVersion
- * @return {Output<SecretRotation>} 	rotation			
- */
-const Secret = function ({ name, value, rotation, tags:_tags }) {
-	if (!name)
-		throw new Error('Missing required \'name\' argument.')
+class Secret extends aws.secretsmanager.Secret {
+	/**
+	 * Create a upload a secret to AWS secrets manager. 
+	 * Resources:
+	 * 	1. Secret
+	 * 	2. Secret version (i.e., the actual secret content)
+	 * 	3. (Optional) Secret rotation if the 'rotation.lambdaArn' is provided.
+	 * 
+	 * @param  {String} 				name			
+	 * @param  {Object} 				value						e.g., { username:'admin', password:'12345' }
+	 * @param  {Object} 				rotation					Optional. If specified, the 'rotation.lambdaArn' is required.
+	 * @param  {Output<String>} 			.lambdaArn			
+	 * @param  {Number} 					.rotationInterval		Unit days. Default 7 days. 
+	 * @param  {Object} 				tags			
+	 * @param  {Output<Resource>}		parent
+	 * @param  {Output<[Resource]>}		dependsOn
+	 * @param  {Boolean}				protect									Default false.
+	 * 
+	 * @return {Output<Secret>} 			secret
+	 * @return {Output<String>} 				.id
+	 * @return {Output<String>} 				.name
+	 * @return {Output<String>} 				.arn
+	 * @return {Output<Object>} 				...
+	 * @return {Output<secretVersion>} 			.secretVersion
+	 * @return {Output<SecretRotation>} 		.rotation			
+	 */
+	constructor({ name, value, rotation, tags:_tags, protect, dependsOn, parent }) {
+		if (!name)
+			throw new Error('Missing required \'name\' argument.')
 
-	const tags = {
-		...(_tags||{}),
-		Name: name		
+		const tags = {
+			...(_tags||{}),
+			Name: name		
+		}
+
+		// Create the secret: https://www.pulumi.com/docs/reference/pkg/aws/secretsmanager/secret/
+		super(name, { tags })
+
+		// Create the secret: https://www.pulumi.com/docs/reference/pkg/aws/secretsmanager/secretversion/
+		const secretVersion = new aws.secretsmanager.SecretVersion(name, {
+			secretId: this.id,
+			..._serializeValue(value),
+			tags
+		}, { protect, dependsOn, parent })
+
+		// Link a rotation lambda to this secret: https://www.pulumi.com/docs/reference/pkg/aws/secretsmanager/secretrotation/
+		const secretRotation = !rotation || !rotation.lambdaArn ? null : new aws.secretsmanager.SecretRotation(name, {
+			secretId: this.id,
+			rotationLambdaArn: rotation.lambdaArn,
+			rotationRules: {
+				automaticallyAfterDays: rotation.rotationInterval || 7
+			},
+			tags
+		}, { protect, dependsOn:[this] })
+
+		this.secretVersion = secretVersion
+		this.rotation = secretRotation
 	}
-
-	// Create the secret: https://www.pulumi.com/docs/reference/pkg/aws/secretsmanager/secret/
-	const secretContainer = new aws.secretsmanager.Secret(name, { tags })
-
-	// Create the secret: https://www.pulumi.com/docs/reference/pkg/aws/secretsmanager/secretversion/
-	const secretVersion = new aws.secretsmanager.SecretVersion(name, {
-		secretId: secretContainer.id,
-		...serializeValue(value),
-		tags
-	})
-
-	// Link a rotation lambda to this secret: https://www.pulumi.com/docs/reference/pkg/aws/secretsmanager/secretrotation/
-	const secretRotation = !rotation || !rotation.lambdaArn ? null : new aws.secretsmanager.SecretRotation(name, {
-		secretId: secretContainer.id,
-		rotationLambdaArn: rotation.lambdaArn,
-		rotationRules: {
-			automaticallyAfterDays: rotation.rotationInterval || 7
-		},
-		tags
-	})
-
-	this.secret = secretContainer
-	this.secretVersion = secretVersion
-	this.rotation = secretRotation
-
-	return this
+	static get(...args) { return getSecret(...args) }
 }
 
-const serializeValue = value => {
+const _serializeValue = value => {
 	if (value === null || value === undefined)
 		return ''
 
@@ -123,8 +129,6 @@ const getSecret = async secretId => {
 		data
 	}
 }
-
-Secret.get = getSecret
 
 module.exports = {
 	Secret

@@ -111,58 +111,56 @@ const putParameter = async ({ name, type, value, description, overWrite, tags, t
 	return { version:Version, tier:Tier }
 }
 
-/**
- * Creates a new Parameter Store value. Doc: https://www.pulumi.com/registry/packages/aws/api-docs/ssm/parameter/
- * 
- * @param  {Object} 				args
- * @param  {String} 					.name	required	
- * @param  {String} 					.type	Valid types are 'String' (default), 'StringList' and 'SecureString'	
- * @param  {Object} 					.value	This is serialized to string.
- * @param  {Object} 					.tags	
- * 
- * @return {Object>}				parameter
- * @return {Output<String>}				.id
- * @return {Output<String>}				.version
- * @return {Output<Object>}				.tagsAll
- */
-const Parameter = function (args) {
-	if (!args)
-		throw new Error('Missing required \'args\'.')
-	if (!args.name)
-		throw new Error('Missing required \'args.name\'.')
-	if (args.value === undefined || args.value === null)
-		throw new Error('Missing required \'args.value\'.')
+class Parameter extends aws.ssm.Parameter {
+	/**
+	 * Creates a new Parameter Store value. Doc: https://www.pulumi.com/registry/packages/aws/api-docs/ssm/parameter/
+	 * 
+	 * @param  {Object} 				args
+	 * @param  {String} 					.name	required	
+	 * @param  {String} 					.type	Valid types are 'String' (default), 'StringList' and 'SecureString'	
+	 * @param  {Object} 					.value	This is serialized to string.
+	 * @param  {Object} 					.tags	
+	 * @param  {Output<Resource>}			.parent
+	 * @param  {Output<[Resource]>}			.dependsOn
+	 * @param  {Boolean}					.protect	
+	 * 
+	 * @return {Object>}				parameter
+	 * @return {Output<String>}				.id
+	 * @return {Output<String>}				.version
+	 * @return {Output<Object>}				.tagsAll
+	 */
+	constructor(args) {
+		if (!args)
+			throw new Error('Missing required \'args\'.')
+		if (!args.name)
+			throw new Error('Missing required \'args.name\'.')
+		if (args.value === undefined || args.value === null)
+			throw new Error('Missing required \'args.value\'.')
 
-	const { value, ...rest } = args
-	const t = typeof(value)
-	if (t == 'object')
-		rest.value = value instanceof Date ? value.toISOString() : JSON.stringify(value)
-	else if (t == 'number')
-		rest.value = `${value}`
-	else if (t == 'boolean')
-		rest.value = value ? 'true' : 'false'
-	else if (t == 'function')
-		rest.value = value.toString()
-	else
-		rest.value = value
+		const { value, protect, parent, dependsOn, ...rest } = args
+		const t = typeof(value)
+		if (t == 'object')
+			rest.value = value instanceof Date ? value.toISOString() : JSON.stringify(value)
+		else if (t == 'number')
+			rest.value = `${value}`
+		else if (t == 'boolean')
+			rest.value = value ? 'true' : 'false'
+		else if (t == 'function')
+			rest.value = value.toString()
+		else
+			rest.value = value
 
-	if (!rest.type)
-		rest.type = 'String'
-	if (rest.tags && !rest.tags.Name)
-		rest.tags = { ...rest.tags, Name:args.name }
+		if (!rest.type)
+			rest.type = 'String'
+		if (rest.tags && !rest.tags.Name)
+			rest.tags = { ...rest.tags, Name:args.name }
 
-	// https://www.pulumi.com/registry/packages/aws/api-docs/ssm/parameter/
-	const v = new aws.ssm.Parameter(args.name, rest)
-
-	this.id = v.id
-	this.version = v.version
-	this.tagsAll = v.tagsAll
-
-	return this
+		// https://www.pulumi.com/registry/packages/aws/api-docs/ssm/parameter/
+		super(args.name, rest, { protect, parent, dependsOn })
+	}
+	static get(...args) { return getParameter(...args) }
+	static createOrUpdate(...args) { return putParameter(...args) }
 }
-
-Parameter.get = getParameter
-Parameter.createOrUpdate = putParameter
 
 module.exports = {
 	Parameter
