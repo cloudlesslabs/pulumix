@@ -429,7 +429,7 @@ const _parseVpcConfig = vpcConfig => {
 			securityGroups = securityGroups || []
 			// Creates new Security Group to allow all responses from the Lambda.
 			allowAllResponsesSg = new SecurityGroup({
-				name: `sg-allow-all-response-${vpcConfig.name}`, 
+				name: `allow-all-response-sg-${vpcConfig.name}`, 
 				description: `Allow all responses for Lambda ${vpcConfig.name}.`, 
 				vpcId, 
 				egress: [{  
