@@ -44,6 +44,7 @@ class Lambda extends aws.lambda.Function {
 	 * @param  {[Output<Policy>]}			policies							Policies to attach to the lambda role.
 	 * @param  {Output<Object>}				vpcConfig
 	 * @param  {Output<String>}					.vpcId							Only required if 'vpcConfig.allResponsesAllowed' is true.
+	 * @param  {Output<[Subnet]>}				.subnets
 	 * @param  {Output<[String]>}				.subnetIds
 	 * @param  {Output<[SecurityGroup]>}		.securityGroups
 	 * @param  {Output<[String]>}				.securityGroupIds				
@@ -400,6 +401,7 @@ class LambdaLayer extends aws.lambda.LayerVersion {
  * @param  {String}							.name							Lambda's name.
  * @param  {Object}							.tags							Lambda's tags.
  * @param  {Output<String>}					.vpcId							Only required if 'vpcConfig.allResponsesAllowed' is true.
+ * @param  {Output<[Subnet]>}				.subnets
  * @param  {Output<[String]>}				.subnetIds
  * @param  {Output<[SecurityGroup]>}		.securityGroups
  * @param  {Output<[String]>}				.securityGroupIds				
@@ -417,10 +419,11 @@ const _parseVpcConfig = vpcConfig => {
 	return pulumi.all([
 		vpcConfig.vpcId,
 		vpcConfig.allResponsesAllowed,
+		pulumi.output(vpcConfig.subnets).apply(subnets => pulumi.all((subnets||[]).map(s => s.id))),
 		pulumi.output(vpcConfig.subnetIds).apply(ids => pulumi.all(ids||[])),
 		pulumi.output(vpcConfig.securityGroups).apply(groups => pulumi.all(groups||[])),
 		pulumi.output(vpcConfig.securityGroupIds).apply(ids => pulumi.all(ids||[]))
-	]).apply(([vpcId, allResponsesAllowed, subnetIds, securityGroups, securityGroupIds]) => {
+	]).apply(([vpcId, allResponsesAllowed, subnet01Ids, subnet02Ids, securityGroups, securityGroupIds]) => {
 		let allowAllResponsesSg = null
 		if (allResponsesAllowed) {
 			if (!vpcId)
@@ -442,6 +445,8 @@ const _parseVpcConfig = vpcConfig => {
 			})
 			securityGroups.push(allowAllResponsesSg)
 		}
+
+		const subnetIds = [...(subnet01Ids||[]), ...(subnet02Ids||[])]
 
 		if (!subnetIds || !subnetIds.length)
 			return { securityGroups, allowAllResponsesSg }
