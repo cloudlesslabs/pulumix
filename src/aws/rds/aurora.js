@@ -398,6 +398,8 @@ class Aurora extends aws.rds.Cluster {
 				this.proxy.targetGroup = proxyTargetGroup
 				this.proxy.target = proxyTarget
 				this.proxyEnpoint = rdsProxy.endpoint
+
+				return this
 			}
 		})
 
