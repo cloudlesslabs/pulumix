@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.5.6](https://github.com/cloudlesslabs/pulumix/compare/v0.5.5...v0.5.6) (2022-05-24)
+
+
+### Bug Fixes
+
+* Aurora API is not respecting the dependency order forcing the user to deploy the stack multiple times to make it work. Use the 'dependsOn' property to explicitly define the dependency tree ([d110f28](https://github.com/cloudlesslabs/pulumix/commit/d110f28f2c22c409f2a13004c524e72aa45ade53))
+* Filter dependencies that are not of type pulumi.Resource or pulumi.CustomResource in the Lambda constructor ([5c897ed](https://github.com/cloudlesslabs/pulumix/commit/5c897ed0462ecdc70e70ad9df46ff2c8d718349e))
+* The Aurora constructor does not return any instance ([c493892](https://github.com/cloudlesslabs/pulumix/commit/c493892cfcf331a59f18c1c66965701edeb6d40d))
+
 ### [0.5.5](https://github.com/cloudlesslabs/pulumix/compare/v0.5.4...v0.5.5) (2022-05-24)
 
 ### [0.5.4](https://github.com/cloudlesslabs/pulumix/compare/v0.5.2...v0.5.4) (2022-05-24)
