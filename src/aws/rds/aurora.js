@@ -70,6 +70,7 @@ class Aurora extends aws.rds.Cluster {
 	 * @param  {Object}							tags
 	 * @param  {Boolean}						applyImmediately			Default true.
 	 * @param  {Boolean}						allowMajorVersionUpgrade	Default false.
+	 * @param  {String}							preferredBackupWindow		Default '15:00-17:00' (time is UTC).
 	 * @param  {Output<Resource>}				parent
 	 * @param  {Output<[Resource]>}				dependsOn
 	 * @param  {Boolean}						protect						Default false.
@@ -130,6 +131,7 @@ class Aurora extends aws.rds.Cluster {
 		proxy,
 		allowMajorVersionUpgrade,
 		applyImmediately,
+		preferredBackupWindow,
 		tags,
 		protect=false, 
 		parent,
@@ -216,7 +218,7 @@ class Aurora extends aws.rds.Cluster {
 				masterPassword,
 				skipFinalSnapshot: true,
 				enabledCloudwatchLogsExports: cloudWatch ? logs : undefined,
-				preferredBackupWindow: '15:00-17:00', // time is UTC
+				preferredBackupWindow: preferredBackupWindow || '15:00-17:00', // time is UTC
 				applyImmediately,
 				allowMajorVersionUpgrade,
 				vpcSecurityGroupIds: [rdsSecurityGroup.id], // Must be set to allow traffic based on the security group
@@ -374,7 +376,7 @@ class Aurora extends aws.rds.Cluster {
 				}, {
 					parent: this,
 					protect,
-					dependsOn: [rdsProxy]
+					dependsOn: [rdsProxy, ...clusterInstances]
 				})
 
 				// RDS Proxy target doc: https://www.pulumi.com/docs/reference/pkg/aws/rds/proxytarget/
@@ -389,7 +391,7 @@ class Aurora extends aws.rds.Cluster {
 				}, {
 					parent: this,
 					protect,
-					dependsOn: [rdsProxy, proxyTargetGroup]
+					dependsOn: [rdsProxy, proxyTargetGroup, ...clusterInstances]
 				})
 
 				this.proxy = rdsProxy
