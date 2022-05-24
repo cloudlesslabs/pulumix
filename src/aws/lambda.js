@@ -287,7 +287,10 @@ class Lambda extends aws.lambda.Function {
 					...tags,
 					Name: eventRuleName
 				}
-			}, { protect, dependsOn:[this] })
+			}, { 
+				protect, 
+				dependsOn:[this] 
+			})
 
 			// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/cloudwatch/eventtarget/
 			const eventTargetName = `${name}-eventtarget`
@@ -313,7 +316,10 @@ class Lambda extends aws.lambda.Function {
 				function: this.name,
 				principal: 'events.amazonaws.com',
 				sourceArn: eventRule.arn
-			}, { protect, dependsOn:[this] })
+			}, { 
+				protect, 
+				dependsOn:[this] 
+			})
 
 			_schedule = {
 				eventRule,
@@ -327,7 +333,63 @@ class Lambda extends aws.lambda.Function {
 		this.logGroup = logGroup
 		this.schedule = _schedule
 		this.allowAllResponsesSg = asyncData.allowAllResponsesSg
-		this.attachPolicy = _attachPolicy(lambdaRole.name, this)
+	}
+
+	/**
+	 * Attach a  policy to a Lambda role. Potentially creates a new Policy. This API supports multiple signatures:
+	 * 
+	 * ('policy-attachement-123', { name:'xxx', description:'xxx', policy:'xxxx' }) => ... or
+	 * ('policy-attachement-123', policyOutput) => ... or
+	 * ({ name:'xxx', description:'xxx', policy:'xxxx' }) => ... or
+	 * (policyOutput) => ... or
+	 *
+	 * When the 'attachName' is not specified, its default is `${lambdaRoleName}-${policyName}`.
+	 * 
+	 * @param  {Object} 						attachName|policyDef|policy	
+	 * @param  {Object} 						policyDef|policy	
+	 * 
+	 * @return {Output<Object>}					output
+	 * @return {Output<Policy>}						.policy
+	 * @return {Output<RolePolicyAttachment>}		.rolePolicyAttachment
+	 */
+	static attachPolicy(lambda, ...args) {
+		if (!lambda)
+			throw new Error('Missing 1st argument \'lambda\'.')
+		if (!lambda.role)
+			throw new Error('Wrong argument exception. \'lambda\' argument is missing its required \'role\' property.')
+
+		const [attachName, policyDef] = args.length == 1 ? [null, args[0]] : args
+		if (!policyDef)
+			throw new Error('Missing required argument \'policyDef\'')
+		if (!policyDef.name)
+			throw new Error('Missing required argument \'policyDef.name\'.')
+		
+		const policyDefExists = !policyDef.arn && policyDef.policy
+
+		const policy = policyDefExists
+			? new aws.iam.Policy(policyDef.name, policyDef)
+			: policyDef
+		
+		if (!policy.arn)
+			throw new Error('Missing required argument \'policy.arn\'')
+
+		return pulumi.all([lambda.role.name, policy.name, policy.arn]).apply(([role, policyName, policyArn]) => {
+			if (!role)
+				throw new Error('Missing required argument \'lambda.role.name\'')
+
+			const name = attachName && typeof(attachName) == 'string' 
+				? attachName
+				: `${role}-${policyName}`
+			return {
+				policy,
+				rolePolicyAttachment: new aws.iam.RolePolicyAttachment(name, { 
+					role, 
+					policyArn 
+				}, {
+					dependsOn:[policy]
+				})
+			}
+		})
 	}
 }
 
@@ -483,55 +545,6 @@ const _leanifyImage = resource => {
 			registryId, 
 			url: repositoryUrl
 		}
-	}
-}
-
-const _attachPolicy = (lambdaRoleName) => {
-	if (!lambdaRoleName)
-		throw new Error('Missing required argument \'lambdaRoleName\'')
-
-	/**
-	 * Attach a  policy to a Lambda role. Potentially creates a new Policy. This API supports multiple signatures:
-	 * 
-	 * ('policy-attachement-123', { name:'xxx', description:'xxx', policy:'xxxx' }) => ... or
-	 * ('policy-attachement-123', policyOutput) => ... or
-	 * ({ name:'xxx', description:'xxx', policy:'xxxx' }) => ... or
-	 * (policyOutput) => ... or
-	 *
-	 * When the 'attachName' is not specified, its default is `${lambdaRoleName}-${policyName}`.
-	 * 
-	 * @param  {Object} 						attachName|policyDef|policy	
-	 * @param  {Object} 						policyDef|policy	
-	 * 
-	 * @return {Output<Object>}					output
-	 * @return {Output<Policy>}						.policy
-	 * @return {Output<RolePolicyAttachment>}		.rolePolicyAttachment
-	 */
-	return (...args) => {
-		const [attachName, policyDef] = args.length == 1 ? [null, args[0]] : args
-		if (!policyDef)
-			throw new Error('Missing required argument \'policyDef\'')
-		if (!policyDef.name)
-			throw new Error('Missing required argument \'policyDef.name\'.')
-		
-		const policyDefExists = !policyDef.arn && policyDef.policy
-
-		const policy = policyDefExists
-			? new aws.iam.Policy(policyDef.name, policyDef)
-			: policyDef
-		
-		if (!policy.arn)
-			throw new Error('Missing required argument \'policy.arn\'')
-
-		return pulumi.all([lambdaRoleName, policy.name, policy.arn]).apply(([role, policyName, policyArn]) => {
-			const name = attachName && typeof(attachName) == 'string' 
-				? attachName
-				: `${lambdaRoleName}-${policyName}`
-			return {
-				policy,
-				rolePolicyAttachment: new aws.iam.RolePolicyAttachment(name, { role, policyArn })
-			}
-		})
 	}
 }
 
