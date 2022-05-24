@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.5.4](https://github.com/cloudlesslabs/pulumix/compare/v0.5.2...v0.5.4) (2022-05-24)
+
+
+### Bug Fixes
+
+* Lambda is not working at all ([e5cf554](https://github.com/cloudlesslabs/pulumix/commit/e5cf5540e26794b0b2107c7bae77cc6ce946ded1))
+
 ### [0.5.2](https://github.com/cloudlesslabs/pulumix/compare/v0.5.1...v0.5.2) (2022-05-23)
 
 
