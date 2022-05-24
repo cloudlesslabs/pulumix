@@ -242,7 +242,7 @@ class Lambda extends aws.lambda.Function {
 						},
 					allowAllResponsesSg,
 					vpcConfig,
-					dependsOn
+					dependsOn: dependsOn.filter(d => d && (d instanceof pulumi.Resource || d instanceof pulumi.CustomResource))
 				}
 			})
 		}))
@@ -307,7 +307,10 @@ class Lambda extends aws.lambda.Function {
 					throw new Error(`Wrong argument exception. 'schedule.payload' is expecting an object. Found ${typeof(schedule.payload)} instead.`)
 				eventTargetConfig.input = JSON.stringify(schedule.payload)
 			}
-			const eventTarget = new aws.cloudwatch.EventTarget(eventTargetName, eventTargetConfig, { protect, dependsOn:[this] })
+			const eventTarget = new aws.cloudwatch.EventTarget(eventTargetName, eventTargetConfig, { 
+				protect, 
+				dependsOn:[this] 
+			})
 
 			// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/lambda/permission/
 			const schedulePermissionName = `${name}-schedule-permission`
