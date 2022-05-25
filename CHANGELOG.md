@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.5.8](https://github.com/cloudlesslabs/pulumix/compare/v0.5.7...v0.5.8) (2022-05-25)
+
+
+### Bug Fixes
+
+* Including non-resource objects in the dependsOn break constructors ([ca06102](https://github.com/cloudlesslabs/pulumix/commit/ca061028d02fdd41818697343582d7087d01b483))
+
 ### [0.5.7](https://github.com/cloudlesslabs/pulumix/compare/v0.5.6...v0.5.7) (2022-05-25)
 
 
