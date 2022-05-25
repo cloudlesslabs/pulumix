@@ -175,13 +175,15 @@ class Lambda extends aws.lambda.Function {
 			_fn.env,
 			_parseVpcConfig({ ...(_vpcConfig||{}), name, tags }),
 			_dependsOn
-		]).apply(([fnDirFound, dockerFileFound, dir, type, runtime, args, env, { config:vpcConfig, securityGroups, allowAllResponsesSg }, dependsOn]) => {
+		]).apply(([fnDirFound, dockerFileFound, dir, type, runtime, args, env, { config:vpcConfig, securityGroups, subnets, allowAllResponsesSg }, dependsOn]) => {
 			dependsOn = dependsOn || []
 			if (!fnDirFound)
 				throw new Error(`Function folder '${dir}' not found.`)	
 
 			if (securityGroups && securityGroups.length)
 				dependsOn.push(...securityGroups)
+			if (subnets && subnets.length)
+				dependsOn.push(...subnets)
 
 			// ECR images. Doc:
 			// 	- buildAndPushImage API: https://www.pulumi.com/docs/reference/pkg/nodejs/pulumi/awsx/ecr/#buildAndPushImage
@@ -477,6 +479,7 @@ class LambdaLayer extends aws.lambda.LayerVersion {
  * @return {Output<[String]>}						.subnetIds
  * @return {Output<[String]>}						.securityGroupIds
  * @return {Output<[SecurityGroup]>}		.securityGroups					All security groups. They will be used to create a dependency on the Lambda to avoid deleting conflicts and the stack is destroyed.
+ * @return {Output<[Subnet]>}				.subnets						vpcConfig.subnets
  * @return {Output<SecurityGroup>}			.allowAllResponsesSg			New security group created to allow all responses from the Lambda. It is also included in the 'output.securityGroups'
  */
 const _parseVpcConfig = vpcConfig => {
@@ -484,11 +487,16 @@ const _parseVpcConfig = vpcConfig => {
 	return pulumi.all([
 		vpcConfig.vpcId,
 		vpcConfig.allResponsesAllowed,
-		pulumi.output(vpcConfig.subnets).apply(subnets => pulumi.all((subnets||[]).map(s => s.id))),
+		pulumi.output(vpcConfig.subnets).apply(subnets => {
+			return [
+				subnets||[],
+				pulumi.all((subnets||[]).map(s => s.id))
+			]
+		}),
 		pulumi.output(vpcConfig.subnetIds).apply(ids => pulumi.all(ids||[])),
 		pulumi.output(vpcConfig.securityGroups).apply(groups => pulumi.all(groups||[])),
 		pulumi.output(vpcConfig.securityGroupIds).apply(ids => pulumi.all(ids||[]))
-	]).apply(([vpcId, allResponsesAllowed, subnet01Ids, subnet02Ids, securityGroups, securityGroupIds]) => {
+	]).apply(([vpcId, allResponsesAllowed, [subnets, implicitSubnetIds], explicitSubnetIds, securityGroups, securityGroupIds]) => {
 		let allowAllResponsesSg = null
 		if (allResponsesAllowed) {
 			if (!vpcId)
@@ -511,12 +519,18 @@ const _parseVpcConfig = vpcConfig => {
 			securityGroups.push(allowAllResponsesSg)
 		}
 
-		const subnetIds = [...(subnet01Ids||[]), ...(subnet02Ids||[])]
+		const subnetIds = [...(implicitSubnetIds||[]), ...(explicitSubnetIds||[])]
+
+		const common = {
+			subnets,
+			securityGroups,
+			allowAllResponsesSg
+		}
 
 		if (!subnetIds || !subnetIds.length)
-			return { securityGroups, allowAllResponsesSg }
+			return common
 		else if (!securityGroups || !securityGroups.length)
-			return { config: { subnetIds, securityGroupIds }, securityGroups, allowAllResponsesSg }
+			return { config: { subnetIds, securityGroupIds }, ...common }
 		else 
 			return pulumi.all(securityGroups.map(sg => sg.id)).apply(sgIds => ({
 				config: {
@@ -527,8 +541,7 @@ const _parseVpcConfig = vpcConfig => {
 						return acc
 					}, securityGroupIds || [])
 				},
-				securityGroups,
-				allowAllResponsesSg
+				...common
 			}))
 	})
 }
