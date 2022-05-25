@@ -13,7 +13,7 @@ const aws = require('@pulumi/aws')
 const fs = require('fs')
 const path = require('path')
 const { Image } = require('./ecr')
-const { unwrap } = require('../utils')
+const { unwrap, keepResourcesOnly } = require('../utils')
 const { SecurityGroup } = require('./securityGroup')
 
 class Lambda extends aws.lambda.Function {
@@ -244,7 +244,7 @@ class Lambda extends aws.lambda.Function {
 						},
 					allowAllResponsesSg,
 					vpcConfig,
-					dependsOn: dependsOn.filter(d => d && (d instanceof pulumi.Resource || d instanceof pulumi.CustomResource))
+					dependsOn: keepResourcesOnly(dependsOn)
 				}
 			})
 		}))

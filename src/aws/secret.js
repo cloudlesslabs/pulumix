@@ -17,6 +17,7 @@ LICENSE file in the root directory of this source tree.
 
 require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
+const { keepResourcesOnly } = require('../utils')
 
 class Secret extends aws.secretsmanager.Secret {
 	/**
@@ -61,7 +62,11 @@ class Secret extends aws.secretsmanager.Secret {
 			secretId: this.id,
 			..._serializeValue(value),
 			tags
-		}, { protect, dependsOn, parent })
+		}, { 
+			protect, 
+			dependsOn: keepResourcesOnly(dependsOn), 
+			parent 
+		})
 
 		// Link a rotation lambda to this secret: https://www.pulumi.com/docs/reference/pkg/aws/secretsmanager/secretrotation/
 		const secretRotation = !rotation || !rotation.lambdaArn ? null : new aws.secretsmanager.SecretRotation(name, {

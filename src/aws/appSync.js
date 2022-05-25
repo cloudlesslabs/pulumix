@@ -9,7 +9,7 @@ LICENSE file in the root directory of this source tree.
 const pulumi = require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
 const { parse } = require('graphql')
-const { unwrap } = require('../utils')
+const { unwrap, keepResourcesOnly } = require('../utils')
 
 class Api extends aws.appsync.GraphQLApi {
 	/**
@@ -140,7 +140,7 @@ class Api extends aws.appsync.GraphQLApi {
 					}
 				}, {
 					protect,
-					dependsOn,
+					dependsOn: keepResourcesOnly(dependsOn),
 					parent
 				})
 
@@ -204,7 +204,7 @@ class DataSource extends aws.appsync.DataSource {
 			}
 		}, {
 			parent, 
-			dependsOn, 
+			dependsOn: keepResourcesOnly(dependsOn),
 			protect
 		})
 	}
@@ -270,7 +270,7 @@ class Resolver extends aws.appsync.Resolver {
 			}
 		}, {
 			parent, 
-			dependsOn, 
+			dependsOn: keepResourcesOnly(dependsOn),
 			protect
 		})
 	}

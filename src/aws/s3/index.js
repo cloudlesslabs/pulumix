@@ -11,7 +11,7 @@ LICENSE file in the root directory of this source tree.
 const pulumi = require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
 const { error: { mergeErrors } } = require('puffy')
-const { resolve, unwrap } = require('../../utils')
+const { resolve, unwrap, keepResourcesOnly } = require('../../utils')
 const { getWebsiteProps, syncFiles, getDiffFiles } = require('./utils')
 const { distribution: { invalidate:invalidateDistribution, exists:distributionExists } } = require('../cloudfront/utils')
 
@@ -174,7 +174,7 @@ const Website = function (input) {
 					}
 				}, { 
 					parent, 
-					dependsOn, 
+					dependsOn: keepResourcesOnly(dependsOn),
 					protect 
 				})
 

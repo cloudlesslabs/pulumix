@@ -10,6 +10,7 @@ LICENSE file in the root directory of this source tree.
 // Doc: https://www.pulumi.com/docs/reference/pkg/aws/ec2/instance/
 
 const aws = require('@pulumi/aws')
+const { keepResourcesOnly } = require('../utils')
 
 class EC2 extends aws.ec2.Instance {
 	/**
@@ -170,7 +171,7 @@ class EC2 extends aws.ec2.Instance {
 		}, {
 			protect, 
 			parent, 
-			dependsOn
+			dependsOn: keepResourcesOnly(dependsOn)
 		})
 
 		this.keyPair = keyPair

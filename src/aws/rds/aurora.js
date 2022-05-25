@@ -12,7 +12,7 @@ LICENSE file in the root directory of this source tree.
 const pulumi = require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
 const { SecurityGroup } = require('../securityGroup')
-const { DatabaseCredentials } = require('../utils')
+const { DatabaseCredentials, keepResourcesOnly } = require('../utils')
 
 class Aurora extends aws.rds.Cluster {
 	/**
@@ -229,7 +229,7 @@ class Aurora extends aws.rds.Cluster {
 				}
 			}, {
 				protect,
-				dependsOn,
+				dependsOn: keepResourcesOnly(dependsOn),
 				parent
 			})
 

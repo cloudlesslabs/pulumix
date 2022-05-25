@@ -181,6 +181,13 @@ const getStack = ({ org, project, stack, backend }) => {
 	return new pulumi.StackReference(`${project}.${stack}`)
 }
 
+const keepResourcesOnly = data => {
+	if (!data || !Array.isArray(data))
+		return 
+	else
+		return data.filter(d => d && (d instanceof pulumi.Resource || d instanceof pulumi.CustomResource))
+}
+
 module.exports = {
 	resolve,
 	unwrap,
@@ -190,5 +197,6 @@ module.exports = {
 		list: listFiles,
 		remove: deleteFile,
 		read: readFile
-	}
+	},
+	keepResourcesOnly
 }

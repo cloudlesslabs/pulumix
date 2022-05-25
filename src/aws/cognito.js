@@ -8,6 +8,7 @@ LICENSE file in the root directory of this source tree.
 
 const pulumi = require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
+const { keepResourcesOnly } = require('../utils')
 
 const REGION = aws.config.region
 const GRANT_TYPES = ['code', 'implicit', 'client_credentials', 'password', 'refresh_token']
@@ -159,7 +160,7 @@ class UserPool extends aws.cognito.UserPool {
 		tags = tags || {}
 		const domainOn = domain && domain.name
 		const domainName = domainOn ? domain.name.replace(/\/*$/,'') : null
-		const options = { protect, parent, dependsOn }
+		const options = { protect, parent, dependsOn:keepResourcesOnly(dependsOn) }
 
 		// User pool doc: https://www.pulumi.com/docs/reference/pkg/aws/cognito/userpool/
 		super(name, {

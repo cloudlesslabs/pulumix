@@ -11,7 +11,7 @@ LICENSE file in the root directory of this source tree.
 const pulumi = require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
 const crypto = require('crypto')
-const { unwrap } = require('../utils')
+const { unwrap, keepResourcesOnly } = require('../utils')
 
 class SecurityGroup extends aws.ec2.SecurityGroup {
 	/**
@@ -72,7 +72,7 @@ class SecurityGroup extends aws.ec2.SecurityGroup {
 			}
 		}, {
 			protect,
-			dependsOn,
+			dependsOn: keepResourcesOnly(dependsOn),
 			parent
 		})
 
