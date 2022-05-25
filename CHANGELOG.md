@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.5.7](https://github.com/cloudlesslabs/pulumix/compare/v0.5.6...v0.5.7) (2022-05-25)
+
+
+### Bug Fixes
+
+* Lambda - The 'vpcConfig.subnets' resources are not added in the lambda's dependsOn list ([c3c1fa6](https://github.com/cloudlesslabs/pulumix/commit/c3c1fa6aca8e8da894abdaf5f9ab449a4b6cac5e))
+
 ### [0.5.6](https://github.com/cloudlesslabs/pulumix/compare/v0.5.5...v0.5.6) (2022-05-24)
 
 
