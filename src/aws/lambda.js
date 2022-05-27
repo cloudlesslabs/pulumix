@@ -115,7 +115,7 @@ class Lambda extends aws.lambda.Function {
 	 * 	detail: {}
 	 * }
 	 */
-	constructor({ name, description, architecture, fn, layers, timeout=3, memorySize=128, handler, policies, vpcConfig:_vpcConfig, fileSystemConfig, schedule, publish, cloudWatch, cloudwatch, logsRetentionInDays, tags, parent, dependsOn:_dependsOn, protect }) {
+	constructor({ name, description, architecture, fn, layers, timeout=3, memorySize=128, handler, policies:_policies, vpcConfig:_vpcConfig, fileSystemConfig, schedule, publish, cloudWatch, cloudwatch, logsRetentionInDays, tags, parent, dependsOn:_dependsOn, protect }) {
 		tags = tags || {}
 		if (cloudWatch !== undefined && cloudwatch === undefined)
 			cloudwatch = cloudWatch
@@ -174,8 +174,9 @@ class Lambda extends aws.lambda.Function {
 			_fn.args, 
 			_fn.env,
 			_parseVpcConfig({ ...(_vpcConfig||{}), name, tags }),
-			_dependsOn
-		]).apply(([fnDirFound, dockerFileFound, dir, type, runtime, args, env, { config:vpcConfig, securityGroups, subnets, allowAllResponsesSg }, dependsOn]) => {
+			_dependsOn,
+			_policies
+		]).apply(([fnDirFound, dockerFileFound, dir, type, runtime, args, env, { config:vpcConfig, securityGroups, subnets, allowAllResponsesSg }, dependsOn, policies]) => {
 			dependsOn = dependsOn || []
 			if (!fnDirFound)
 				throw new Error(`Function folder '${dir}' not found.`)	
