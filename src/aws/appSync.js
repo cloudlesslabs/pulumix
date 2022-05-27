@@ -9,7 +9,7 @@ LICENSE file in the root directory of this source tree.
 const pulumi = require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
 const { parse } = require('graphql')
-const { unwrap, keepResourcesOnly } = require('../utils')
+const { keepResourcesOnly } = require('../utils')
 
 class Api extends aws.appsync.GraphQLApi {
 	/**
@@ -48,105 +48,109 @@ class Api extends aws.appsync.GraphQLApi {
 	 * @return {Output<Object>}			.uris
 	 * @return {Output<String>}				.GRAPHQL			HTTPS endpoint (e.g., 'https://1234.appsync-api.ap-southeast-2.amazonaws.com/graphql')
 	 * @return {Output<String>}				.REALTIME			Websocket endpoint for subscriptions (e.g., 'wss://1234.appsync-realtime-api.ap-southeast-2.amazonaws.com/graphql')
-	 * @return {Output<String>}			.roleArn		
+	 * @return {Output<Policy>}			.invokeLambdaPolicy	
+	 * @return {Output<Role>}			.role		
 	 *
 	 * (1) AuthConfig:
 	 * 		- type: Default ['API_KEY']. Valid values: 'API_KEY', 'AWS_IAM', 'AMAZON_COGNITO_USER_POOLS', 'OPENID_CONNECT' 
 	 * 		- openidConnectConfig: https://www.pulumi.com/docs/reference/pkg/aws/appsync/graphqlapi/#graphqlapiadditionalauthenticationprovideropenidconnectconfig
 	 * 		- userPoolConfig: https://www.pulumi.com/docs/reference/pkg/aws/appsync/graphqlapi/#graphqlapiadditionalauthenticationprovideruserpoolconfig 		
 	 */
-	constructor(input) {
-		return unwrap(input).apply(({ name, description, schema, resolver, authConfig, cloudwatch, tags, parent, dependsOn, protect }) => {
-			tags = tags || {}
-			dependsOn = dependsOn || []
-			
-			if (!name)
-				throw new Error('Missing required argument \'name\'.')
-			
-			const canonicalName = `${name}-appsync`
-			// IAM role. Doc: https://www.pulumi.com/docs/reference/pkg/aws/iam/role/
-			const appSyncRole = new aws.iam.Role(canonicalName, {
-				name: canonicalName,
-				description: `Role for AppSync '${name}'`,
-				assumeRolePolicy: {
-					Version: '2012-10-17',
-					Statement: [{
-						Action: 'sts:AssumeRole',
-						Principal: {
-							Service: 'appsync.amazonaws.com',
-						},
-						Effect: 'Allow',
-						Sid: ''
-					}],
-				},
-				tags: {
-					...tags,
-					Name: canonicalName
-				}
-			})
+	constructor({ name, description, schema, resolver, authConfig, cloudwatch, tags, parent, dependsOn, protect }) {
+		tags = tags || {}
+		dependsOn = dependsOn || []
+		
+		if (!name)
+			throw new Error('Missing required argument \'name\'.')
+		
+		const canonicalName = `appsync-${name}`
+		// IAM role. Doc: https://www.pulumi.com/docs/reference/pkg/aws/iam/role/
+		const appSyncRole = new aws.iam.Role(canonicalName, {
+			name: canonicalName,
+			description: `Role for AppSync '${name}'`,
+			assumeRolePolicy: {
+				Version: '2012-10-17',
+				Statement: [{
+					Action: 'sts:AssumeRole',
+					Principal: {
+						Service: 'appsync.amazonaws.com',
+					},
+					Effect: 'Allow',
+					Sid: ''
+				}],
+			},
+			tags: {
+				...tags,
+				Name: canonicalName
+			}
+		})
 
-			// cloudwatch
-			let logConfig
-			if (cloudwatch) {
-				logConfig = {
-					cloudwatchLogsRoleArn: appSyncRole.arn,
-					fieldLogLevel: 'ALL'
-				}
-				dependsOn.push(new aws.iam.RolePolicyAttachment(`${canonicalName}-cloudwatch`, {
+		// cloudwatch
+		let logConfig
+		if (cloudwatch) {
+			logConfig = {
+				cloudwatchLogsRoleArn: appSyncRole.arn,
+				fieldLogLevel: 'ALL'
+			}
+			dependsOn.push(new aws.iam.RolePolicyAttachment(`cloudwatch-${canonicalName}`, {
+				role: appSyncRole.name,
+				policyArn: 'arn:aws:iam::aws:policy/service-role/AWSAppSyncPushToCloudWatchLogs'
+			}))
+		}
+
+		const asyncData = pulumi.output((resolver||{}).lambdaArns || []).apply(lambdaArns => {
+			// Creates a policy that allows to invoke Lambdas
+			let invokeLambdaPolicy = null
+			if (lambdaArns && lambdaArns.length) {
+				if (lambdaArns.some(arn => typeof(arn) != 'string'))
+					throw new Error('\'resolver.lambdaArns\' must be strings.')
+				
+				invokeLambdaPolicy = new aws.iam.Policy(`invoke-lambdas-${canonicalName}`, {
+					path: '/',
+					description: `Allows AppSync API '${name}' to invoke AWS Lambdas`,
+					policy: JSON.stringify({
+						Version: '2012-10-17',
+						Statement: [{
+							Action: [
+								'lambda:InvokeFunction'
+							],
+							Resource: lambdaArns,
+							Effect: 'Allow'
+						}]
+					}),
+					tags
+				})
+				dependsOn.push(new aws.iam.RolePolicyAttachment(`invoke-lambdas-${canonicalName}`, {
 					role: appSyncRole.name,
-					policyArn: 'arn:aws:iam::aws:policy/service-role/AWSAppSyncPushToCloudWatchLogs'
+					policyArn: invokeLambdaPolicy.arn
 				}))
 			}
 
-			const _lambdaArns = (resolver||{}).lambdaArns || []
-
-			return pulumi.all(_lambdaArns).apply(lambdaArns => {
-				// Creates a policy that allows to invoke Lambdas
-				if (lambdaArns && lambdaArns.length) {
-					if (lambdaArns.some(arn => typeof(arn) != 'string'))
-						throw new Error('\'resolver.lambdaArns\' must be strings.')
-					
-					const invokeLambdaPolicy = new aws.iam.Policy(`${canonicalName}-invoke-lambdas`, {
-						path: '/',
-						description: `Allows AppSync API '${name}' to invoke AWS Lambdas`,
-						policy: JSON.stringify({
-							Version: '2012-10-17',
-							Statement: [{
-								Action: [
-									'lambda:InvokeFunction'
-								],
-								Resource: lambdaArns,
-								Effect: 'Allow'
-							}]
-						}),
-						tags
-					})
-					dependsOn.push(new aws.iam.RolePolicyAttachment(`${canonicalName}-invoke-lambdas-attach`, {
-						role: appSyncRole.name,
-						policyArn: invokeLambdaPolicy.arn
-					}))
-				}
-
-				// GraphQL API doc: https://www.pulumi.com/docs/reference/pkg/aws/appsync/graphqlapi/
-				super(name, {
-					name,
-					description,
-					..._getAuth(authConfig),
-					schema,
-					logConfig,
-					tags: {
-						...tags,
-						Name: name
-					}
-				}, {
-					protect,
-					dependsOn: keepResourcesOnly(dependsOn),
-					parent
-				})
-
-				this.roleArn = appSyncRole.arn
-			})
+			return {
+				invokeLambdaPolicy,
+				dependsOn: keepResourcesOnly(dependsOn)
+			}
 		})
+
+		// GraphQL API doc: https://www.pulumi.com/docs/reference/pkg/aws/appsync/graphqlapi/
+		super(name, {
+			name,
+			description,
+			..._getAuth(authConfig),
+			schema,
+			logConfig,
+			tags: {
+				...tags,
+				Name: name
+			}
+		}, {
+			protect,
+			dependsOn: asyncData.dependsOn,
+			parent
+		})
+
+		this.invokeLambdaPolicy = asyncData.invokeLambdaPolicy
+		this.role = appSyncRole
 	}
 }
 
