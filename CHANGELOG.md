@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.5.10](https://github.com/cloudlesslabs/pulumix/compare/v0.5.9...v0.5.10) (2022-05-27)
+
+
+### Bug Fixes
+
+* Lambda constructor does not accept Output policies ([bd730fa](https://github.com/cloudlesslabs/pulumix/commit/bd730fa65aefb63b24593131165aa6f461026bc5))
+
 ### [0.5.9](https://github.com/cloudlesslabs/pulumix/compare/v0.5.8...v0.5.9) (2022-05-27)
 
 ### [0.5.8](https://github.com/cloudlesslabs/pulumix/compare/v0.5.7...v0.5.8) (2022-05-25)
