@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.5.11](https://github.com/cloudlesslabs/pulumix/compare/v0.5.10...v0.5.11) (2022-05-30)
+
+
+### Bug Fixes
+
+* keepResourcesOnly is not a function in aurora.js ([afa9768](https://github.com/cloudlesslabs/pulumix/commit/afa9768214d2d0624cf9ad293fa7f4b3310b369c))
+
 ### [0.5.10](https://github.com/cloudlesslabs/pulumix/compare/v0.5.9...v0.5.10) (2022-05-27)
 
 
