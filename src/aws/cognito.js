@@ -51,11 +51,9 @@ class UserPool extends aws.cognito.UserPool {
 	 * @param  {String}							.configurationSet 				Configuration set.
 	 * @param  {String}							.arn 							SES ARN.
 	 * @param  {Object}						.verification
-	 * @param  {String}  						.subject 							 		
-	 * @param  {String}  						.subjectByLink 					
-	 * @param  {String}  						.message 							
-	 * @param  {String}  						.messageByLink 	
-	 * @param  {String}  						.confirmType					Valid values: 'code', 'link' (default)
+	 * @param  {String}							.confirmType					Valid values: 'code', 'link' (default)
+	 * @param  {String}							.subject
+	 * @param  {String}							.message						(3) WARNING: The text must contain certain characters based on the 'confirmType' value.
 	 * @param  {Object}					sms	
 	 * @param  {Object}						.verification						 
 	 * @param  {String}  						.message
@@ -120,12 +118,15 @@ class UserPool extends aws.cognito.UserPool {
 	 * @return {[Output<UserGroup>]}		.userGroups
 	 * @return {[Output<Permission>]}		.permissions
 	 *
-	 * (1) If 'domain.certArn' is not provided, then 'domain.name' is used as prefix with the 'amazoncognito.com' domain 
-	 *     (e.g., 'my-project.auth.ap-southeast-2.amazoncognito.com') 
+	 * (1)	If 'domain.certArn' is not provided, then 'domain.name' is used as prefix with the 'amazoncognito.com' domain 
+	 * 		(e.g., 'my-project.auth.ap-southeast-2.amazoncognito.com') 
 	 *
-	 * (2) A Lambda object has 2 required properties:
-	 * 		- {String} name
-	 * 		- {String} arn
+	 * (2)	A Lambda object has 2 required properties:
+	 * 			- {String} name
+	 * 		 	- {String} arn
+	 *
+	 * (3)	If email.verification.confirmType is 'code', than the message must contain '{####}'. If it is 'email', the 
+	 * 		message must contain '{##Your custom hyperlink message here##}'
 	 */
 	constructor(input) {
 		let { 
@@ -739,36 +740,48 @@ const _getSmsConfiguration = ({ sms, mfa, recoveryMechanisms }) => {
 
 /**
  * 
- * @param  {String}  email.verification.subject 							
- * @param  {String}  email.verification.subjectByLink 					
- * @param  {String}  email.verification.message 							
- * @param  {String}  email.verification.messageByLink 	
- * @param  {String}  email.verification.confirmType									Valid values: 'code', 'link' (default)
- * @param  {String}  sms.verification.message 
+ * @param  {Object}	input
+ * @param  {Object}		.email
+ * @param  {Object}			.verification
+ * @param  {String}				.confirmType		Valid values: 'code', 'link' (default)
+ * @param  {String}				.subject
+ * @param  {String}				.message			(1) WARNING: The text must contain certain characters based on the 'confirmType' value.
+ * @param  {Object}		.sms
+ * @param  {Object}			.verification
+ * @param  {String}				.message
  * 											
- * @return {String}  verificationMessageTemplate.defaultEmailOption		Allowed values: 'CONFIRM_WITH_CODE', 'CONFIRM_WITH_LINK'
- * @return {String}  verificationMessageTemplate.emailMessage
- * @return {String}  verificationMessageTemplate.emailMessageByLink
- * @return {String}  verificationMessageTemplate.emailSubject
- * @return {String}  verificationMessageTemplate.emailSubjectByLink
- * @return {String}  verificationMessageTemplate.smsMessage
+ * @return {object}	verificationMessageTemplate
+ * @return {String}  	.defaultEmailOption			Allowed values: 'CONFIRM_WITH_CODE', 'CONFIRM_WITH_LINK'
+ * @return {String}  	.emailMessage
+ * @return {String}  	.emailMessageByLink
+ * @return {String}  	.emailSubject
+ * @return {String}  	.emailSubjectByLink
+ * @return {String}  	.smsMessage
+ *
+ * (1)	If email.verification.confirmType is 'code', than the message must contain '{####}'. If it is 'email', the 
+ * 		message must contain '{##Your custom hyperlink message here##}'
+ * 
  */
 const _getVerificationMessageTemplate = ({ email, sms }) => {
-	const { message, messageByLink, subject, subjectByLink, confirmType } = (email || {}).verification||{}
-	const emailVerificationOn = (message || messageByLink) && (subject || subjectByLink)
+	const { message, subject, confirmType } = (email || {}).verification||{}
+	const emailVerificationOn = message && subject
 	const smsVerificationOn = sms && sms.verification && sms.verification.message
+	const emailCodeConfirm = confirmType === 'code'
 	const verificationMessageTemplate = {
-		defaultEmailOption: confirmType === 'code' ? 'CONFIRM_WITH_CODE' : 'CONFIRM_WITH_LINK'
+		defaultEmailOption: emailCodeConfirm ? 'CONFIRM_WITH_CODE' : 'CONFIRM_WITH_LINK'
 	}
 
 	if (!emailVerificationOn && !smsVerificationOn)
 		return verificationMessageTemplate
 
 	if (emailVerificationOn) {
-		verificationMessageTemplate.emailMessage = message
-		verificationMessageTemplate.emailMessageByLink = messageByLink
-		verificationMessageTemplate.emailSubject = subject
-		verificationMessageTemplate.emailSubjectByLink = subjectByLink
+		if (emailCodeConfirm) {
+			verificationMessageTemplate.emailSubject = subject
+			verificationMessageTemplate.emailMessage = message
+		} else {
+			verificationMessageTemplate.emailSubjectByLink = subject
+			verificationMessageTemplate.emailMessageByLink = message
+		}
 	}
 	if (smsVerificationOn)
 		verificationMessageTemplate.smsMessage = sms.verification.message
