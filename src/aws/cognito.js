@@ -36,7 +36,7 @@ class UserPool extends aws.cognito.UserPool {
 	 * @param  {[String]}					.aliases							Allowed: 'email', 'phone', 'preferred_username'. When set, those mutable values can be used as username on top of the unique immutable username.
 	 * @param  {[String]}					.use								Allowed values: 'email', 'phone'. When set, only those immutable values can be used as username.
 	 * @param  {Boolean}					.caseSensitive						Default true.
-	 * @param  {Object}					attributes								Default null
+	 * @param  {Object}					attributes								(4) Default null. 
 	 * @param  {Object}						.[name]
 	 * @param  {String}							.type							Allowed values: 'string', 'number', 'boolean', 'date'
 	 * @param  {Boolean}						.required						Default false.
@@ -127,6 +127,10 @@ class UserPool extends aws.cognito.UserPool {
 	 *
 	 * (3)	If email.verification.confirmType is 'code', than the message must contain '{####}'. If it is 'email', the 
 	 * 		message must contain '{##Your custom hyperlink message here##}'
+	 *
+	 * (4)	There are 2 types of attributes:
+	 * 			- Standard (i.e., used by the OIDC): e.g., given_name, family_name, address, ... (full list at https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-settings-attributes.html).
+	 * 			- Custom: Non-standard attributes: e.g., hello_world. WARNING: Non-standard cannot be set to required.
 	 */
 	constructor(input) {
 		let { 
