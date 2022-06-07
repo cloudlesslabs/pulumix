@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.6.1](https://github.com/cloudlesslabs/pulumix/compare/v0.6.0...v0.6.1) (2022-06-07)
+
+
+### Bug Fixes
+
+* 1 high severity vulnerability: node_modules/protobufjs ([f2904ff](https://github.com/cloudlesslabs/pulumix/commit/f2904ff00fef00401de8a7ef3ceebc5b7b0e8492))
+
 ## [0.6.0](https://github.com/cloudlesslabs/pulumix/compare/v0.5.11...v0.6.0) (2022-06-01)
 
 ### [0.5.11](https://github.com/cloudlesslabs/pulumix/compare/v0.5.10...v0.5.11) (2022-05-30)
