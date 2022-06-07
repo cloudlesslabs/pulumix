@@ -137,23 +137,33 @@ const SUPPORTED_BACKENDS = ['pulumi', 's3', 'azblob', 'gs', 'file']
  * Gets the project and stack name. Manages cases where the backend is not Pulumi.
  * 
  * @param  {Object}	options
- * @param  {String}		.backend	Valid values: 'pulumi' (default), 's3', 'azblob', 'gs', 'file'.
+ * @param  {String}		.backend			Valid values: 'pulumi' (default), 's3', 'azblob', 'gs', 'file'.
  * 
  * @return {Object}	output
- * @return {String}		.project	e.g., 'my-project'
- * @return {String}		.stack		e.g., 'prod'
- * @return {String}		.fullStack	e.g., 'prod' or 'my-project.prod'
+ * @return {String}		.project			e.g., 'my-project'
+ * @return {String}		.stack				e.g., 'prod'
+ * @return {String}		.fullStack			e.g., 'prod' or 'my-project.prod'
+ * @return {Function}	.createResourceName	e.g., createResourceName('lambda') -> 'my-project-lambda-prod'
  */
 const getProject = options => {
 	const { backend } = options || {}
 	const project = pulumi.getProject()
 	const stack = pulumi.getStack()
 
-	if (backend === undefined || backend === null || backend === 'pulumi')
-		return { project, stack, fullStack:stack }
-	else if (SUPPORTED_BACKENDS.indexOf(backend) < 0)
+	const stackData = backend === undefined || backend === null || backend === 'pulumi'
+		? { stack, fullStack:stack }
+		: SUPPORTED_BACKENDS.indexOf(backend) < 0
+			? null
+			: { stack:stack.replace(`${project}.`,''), fullStack:stack }
+
+	if (!stackData)
 		throw new Error(`Unsupported 'backend' value. Expecting one of those values: ${SUPPORTED_BACKENDS}. Found '${backend}' instead.`)
-	return { project, stack:stack.replace(`${project}.`,''), fullStack:stack }
+
+	return {
+		project,
+		...stackData,
+		createResourceName: name => `${project}-${name}-${stackData.stack}`
+	}
 }
 
 /**
