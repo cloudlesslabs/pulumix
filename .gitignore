@@ -1,6 +1,6 @@
 *.DS_Store
 *.orig
 node_modules/
-Pulumi.yaml
-Pulumi.*.yaml
-index.js
+/Pulumi.yaml
+/Pulumi.*.yaml
+/index.js
