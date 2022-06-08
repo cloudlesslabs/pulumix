@@ -1,1 +1,4 @@
 test/
+Pulumi.yaml
+Pulumi.*.yaml
+index.js
