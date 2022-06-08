@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.6.7](https://github.com/cloudlesslabs/pulumix/compare/v0.6.6...v0.6.7) (2022-06-08)
+
+
+### Bug Fixes
+
+* The entry point is incorrect ([4b2aa77](https://github.com/cloudlesslabs/pulumix/commit/4b2aa7747df5e21a0d18dd2d110eb6210008cdea))
+
 ### [0.6.6](https://github.com/cloudlesslabs/pulumix/compare/v0.6.5...v0.6.6) (2022-06-08)
 
 

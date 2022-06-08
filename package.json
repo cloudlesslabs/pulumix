@@ -1,6 +1,6 @@
 {
   "name": "@cloudlessopenlabs/pulumix",
-  "version": "0.6.6",
+  "version": "0.6.7",
   "description": "NodeJS Pulumi helpers.",
   "main": "src/index.js",
   "repository": {
