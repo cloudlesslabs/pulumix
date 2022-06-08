@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.6.6](https://github.com/cloudlesslabs/pulumix/compare/v0.6.5...v0.6.6) (2022-06-08)
+
+
+### Bug Fixes
+
+* unable to validate AWS AccessKeyID and/or SecretAccessKey ([5bc8bd4](https://github.com/cloudlesslabs/pulumix/commit/5bc8bd4168a7bebf973109e6b54d06a96f9d9f7e))
+
 ### [0.6.5](https://github.com/cloudlesslabs/pulumix/compare/v0.6.4...v0.6.5) (2022-06-08)
 
 
