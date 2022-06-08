@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.6.5](https://github.com/cloudlesslabs/pulumix/compare/v0.6.4...v0.6.5) (2022-06-08)
+
+
+### Bug Fixes
+
+* The ./aws/index.js file is missing ([f1c2fad](https://github.com/cloudlesslabs/pulumix/commit/f1c2fadcf6110955b776bddd6189baa17d1be9a1))
+
 ### [0.6.4](https://github.com/cloudlesslabs/pulumix/compare/v0.6.3...v0.6.4) (2022-06-08)
 
 ### [0.6.3](https://github.com/cloudlesslabs/pulumix/compare/v0.6.2...v0.6.3) (2022-06-07)
