@@ -8,6 +8,7 @@ LICENSE file in the root directory of this source tree.
 
 const pulumi = require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
+const crypto = require('crypto')
 const apiGatIntegrations = require('./integrations')
 const { Snapshot } = require('./snapshot')
 
@@ -21,40 +22,44 @@ class RestApi extends aws.apigateway.RestApi {
 	 * 
 	 * @param	{String}						name
 	 * @param	{String}						description
-	 * @param	{String}						type						Default: 'egde'. Valid values: 'egde', 'regional', 'private'
-	 * @param	{Object}						resources					e.g., { '/':{...}, 'dogs':{...}, 'blog/tech':{...} }
-	 * @param	{Object}							.[name|methodName]		If name is '/', this means root resource.
-	 * @param	{Object}								.[methodName]		e.g., 'GET', 'POST'
+	 * @param	{String}						type							Default: 'egde'. Valid values: 'egde', 'regional', 'private'
+	 * @param	{Object}						resources						e.g., { '/':{...}, 'dogs':{...}, 'blog/tech':{...} }
+	 * @param	{Object}							.[name|methodName]			If name is '/', this means root resource.
+	 * @param	{Object}								.[methodName]			e.g., 'GET', 'POST'
 	 * @param	{Object}									.authorizer
-	 * @param	{Object}										.type		Valid values: 'NONE', 'CUSTOM', 'AWS_IAM', 'COGNITO_USER_POOLS'
+	 * @param	{Object}										.type			Valid values: 'NONE', 'CUSTOM', 'AWS_IAM', 'COGNITO_USER_POOLS'
 	 * @param	{Object}									.sns
 	 * @param	{Output<Topic>}									.topic
-	 * @param	{Output<String>}									.arn	Required. 
-	 * @param	{String}										.region		Default is the Pulumi AWS region from the stack config
+	 * @param	{Output<String>}									.arn		Required. 
+	 * @param	{String}										.region			Default is the Pulumi AWS region from the stack config
 	 * @param	{Object}									.sqs
-	 * @param	{String}										.region		Default is the Pulumi AWS region from the stack config
+	 * @param	{String}										.region			Default is the Pulumi AWS region from the stack config
 	 * @param	{Object}									.http
-	 * @param	{String}										.region		Default is the Pulumi AWS region from the stack config
+	 * @param	{String}										.region			Default is the Pulumi AWS region from the stack config
 	 * @param	{Object}									.http_proxy
-	 * @param	{String}										.region		Default is the Pulumi AWS region from the stack config
+	 * @param	{String}										.region			Default is the Pulumi AWS region from the stack config
 	 * @param	{Object}									.s3
-	 * @param	{String}										.region		Default is the Pulumi AWS region from the stack config
+	 * @param	{String}										.region			Default is the Pulumi AWS region from the stack config
 	 * @param	{Object}									.lambda
-	 * @param	{String}										.region		Default is the Pulumi AWS region from the stack config
+	 * @param	{String}										.region			Default is the Pulumi AWS region from the stack config
 	 * @param	{Object}									.lambda_proxy
 	 * @param	{Output<Lambda>}								.lambda
 	 * @param	{Output<String>}									.name
 	 * @param	{Output<String>}									.invokeArn
-	 * @param	{String}										.region		Default is the Pulumi AWS region from the stack config
+	 * @param	{String}										.region			Default is the Pulumi AWS region from the stack config
 	 * @param	{Object}									.kinesis
-	 * @param	{String}										.region		Default is the Pulumi AWS region from the stack config
-	 * @param	{Object}						stages					 
-	 * @param	{Object}							.[stageName]			e.g., 'dev', 'staging'					
-	 * @param	{Object}								.snapshot			e.g., { hello:'world' }. Map of arbitrary keys and values that, when changed, will trigger a redeployment.
-	 * @param	{String}									.version
-	 * @param	{String}									.description
-	 * @param	{Object}								.variables
-	 * @param	{Boolean|Object}						.cloudwatch			(1) Default false. Toggles logging for that stage.
+	 * @param	{String}										.region			Default is the Pulumi AWS region from the stack config
+	 * @param	{[Object]}						stages[]				 
+	 * @param	{Object}							.name						e.g., 'dev', 'staging'					
+	 * @param	{Object}							.snapshot					e.g., { hello:'world' }. Map of arbitrary keys and values that, when changed, will trigger a redeployment.
+	 * @param	{String}								.version
+	 * @param	{String}								.description
+	 * @param	{Object}							.variables
+	 * @param	{Boolean|Object}					.cloudwatch					(1) Default false. Toggles logging for that stage.
+	 * @param	{[Object]}						domains[]
+	 * @param	{String}							.name						e.g., 'example.com'
+	 * @param	{String}							.validationMethod			Default 'DNS'. Valid values: 'DNS', 'EMAIL' or 'NONE'
+	 * @param	{[String|Object]}					.stages						(2)
 	 * @param	{Object}						tags		
 	 * @param	{Output<Resource>}				parent
 	 * @param	{Output<[Resource]>}			dependsOn
@@ -78,7 +83,7 @@ class RestApi extends aws.apigateway.RestApi {
 	 * @return	{Output<Deployment>}					.snapshot
 	 * @return	{Output<StageSetting>}					.settings
 	 *
-	 * (1) The 'stages[stageName].cloudwatch' property can be a boolean or a setting object. The setting object is structured as follow:
+	 * (1) The 'stages[0].cloudwatch' property can be a boolean or a setting object. The setting object is structured as follow:
 	 * 	{
 	 *  	level: 'INFO',					// Default is 'INFO'. Valid values: 'INFO', 'ERROR' or 'OFF'.
 	 *  	metrics: false,					// Default true.
@@ -86,13 +91,15 @@ class RestApi extends aws.apigateway.RestApi {
 	 *  	logsRetentionInDays: 7			// Default 0, which means NEVER EXPIRES.
 	 *	}
 	 *
-	 * 	When 'stages[stageName].cloudwatch' is set to true, this is equivalent to:
+	 * 	When 'stages[0].cloudwatch' is set to true, this is equivalent to:
 	 * 	{
 	 *  	level: 'INFO',
 	 *  	metrics: true,
 	 *  	fullRequestResponse: false,
 	 *  	logsRetentionInDays: 0
 	 *	}
+	 *
+	 *  (2) ['dev'] or [{ name:'dev' }] or [{ name:'dev', path:'/hello' }]
 	 * 
 	 */
 	constructor({ 
@@ -101,14 +108,54 @@ class RestApi extends aws.apigateway.RestApi {
 		type, 
 		resources,
 		stages,
+		domains,
 		tags, 
 		protect, 
 		dependsOn, 
 		parent 
 	}) {
+		if (!name)
+			throw new Error('Missing required argument \'name\'')
 		type = type ? type.toLowerCase().trim() : type
 		if (type && REST_API_TYPES.indexOf(type) < 0)
 			throw new Error(`'type' value unsupported. Supported values are ${REST_API_TYPES}. Found ${type} instead.`)
+		
+		// Gets the unique stage names
+		const stageNames = (stages||[]).reduce((acc,s,idx) => {
+			if (!s || !s.name)
+				throw new Error(`Missing required property 'name' in stages[${idx}].name`)
+			if (acc.indexOf(s.name) < 0)
+				acc.push(s.name)
+			else
+				throw new Error(`Stage '${s.name}' defined more than once`)
+			return acc
+		}, [])
+
+		// Validates that the stages defined in the domains are valid.
+		const domainsExist = domains && domains.length
+		if (domainsExist) {
+			if (!stageNames.length)
+				throw new Error('Cannot provision domains if no stages are defined.')
+
+			for (let i=0;i<domains.length;i++) {
+				const d = domains[i]||{}
+				if (!d.name)
+					throw new Error(`Missing required 'name' in domains[${i}].name`)
+				if (!d.stages || !d.stages.length)
+					throw new Error(`Missing required 'name' in domains[${i}].stages`)
+				const invalidStageIdx = d.stages.findIndex(s => {
+					if (typeof(s) == 'string')
+						return stageNames.indexOf(s) < 0
+					else if (s.name)
+						return stageNames.indexOf(s.name) < 0
+					else
+						return true
+				})
+				if (invalidStageIdx >= 0)
+					throw new Error(`Stage '${d.stages[invalidStageIdx]}' located under domains[${i}].stages[${invalidStageIdx}] is not defined in the 'stages' property.`)
+			}
+		}
+
 
 		const endpointConfiguration = type ? { types:type.toUpperCase() } : { types:'EDGE' }
 		tags = tags || {}
@@ -185,11 +232,11 @@ class RestApi extends aws.apigateway.RestApi {
 			}
 		}
 
-		const _stages = Object.keys(stages||{}).map(stageName => ({ ...stages[stageName], name:stageName }))
-		if (_stages.length) {
+		const stageResourceNames = []
+		if (stages.length) {
 			this.stages = []
-			for (let i=0;i<_stages.length;i++) {
-				const stageConfig = _stages[i]
+			for (let i=0;i<stages.length;i++) {
+				const stageConfig = stages[i]
 				const stageName = _sanitizeName(stageConfig.name)
 				const stageResourceName = `${stageName}-${name}`
 				if (!stageConfig.snapshot)
@@ -278,7 +325,77 @@ class RestApi extends aws.apigateway.RestApi {
 					stage.settings = stageSettings
 				}
 
+				stageResourceNames.push({
+					refName: stageConfig.name,
+					name: stageResourceName,
+					stageName
+				})
 				this.stages.push(stage)
+			}
+		}
+
+		// Adds custom domain
+		if (domainsExist) {
+			this.domains = []
+			for (let j=0;j<domains.length;j++) {
+				const domainConfig = domains[j]
+				const domainHash = crypto.createHash('sha1').update(domainConfig.name).digest('hex').substring(0,8)
+				// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/acm/certificate/
+				const certName = `cert-for-${domainHash}-${name}`
+				const cert = new aws.acm.Certificate(certName, {
+					name: certName,
+					domainName: domainConfig.name,
+					validationMethod: domainConfig.validationMethod || 'DNS',
+					tags: {
+						...tags,
+						Name: certName
+					}
+				}, {
+					protect,
+					dependsOn: [...this.stages],
+					provider: new aws.Provider('temp-provider', { region: 'us-east-1' })
+				})
+
+				// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/apigateway/domainname/
+				const domainResourceName = `domain-for-${domainHash}-${name}`
+				const domain = new aws.apigateway.DomainName(domainResourceName, {
+					name: domainResourceName,
+					certificateArn: cert.arn,
+					domainName: domainConfig.name,
+					tags: {
+						...tags,
+						Name: domainResourceName
+					}
+				}, {
+					protect,
+					dependsOn: [...this.stages]
+				})
+
+				const mappings = []
+				for (let k=0;k<domainConfig.stages.length;k++) {
+					const stage = domainConfig.stages[k]
+					const [sName, basePath] = typeof(stage) == 'string' ? [stage] : [stage.name, stage.path]
+					const stageResource = stageResourceNames.find(s => s.refName == sName)
+					const mapName = `map-for-${domainHash}-${stageResource.name}`
+					// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/apigateway/basepathmapping/
+					mappings.push(new aws.apigateway.BasePathMapping(mapName, {
+						name: mapName,
+						restApi: this.id,
+						stageName: stageResource.stageName,
+						domainName: domain.domainName,
+						basePath,
+						tags: {
+							...tags,
+							Name: domainResourceName
+						}
+					}, {
+						protect
+					}))
+				}
+
+				domain.mappings = mappings
+
+				this.domains.push(domain)
 			}
 		}
 	}
