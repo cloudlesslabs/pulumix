@@ -4,7 +4,7 @@ const util = require('util')
 const { join } = require('path')
 const cp = require('child_process')
 const { LocalWorkspace } = require('@pulumi/pulumi/automation')
-const { error:{ catchErrors, wrapErrors }, promise:{ delay } } = require('puffy')
+const { error:{ catchErrors, wrapErrors }, time:{ delay } } = require('puffy')
 const { files } = require('./utils')
 
 const exec = util.promisify(cp.exec)
