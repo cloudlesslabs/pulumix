@@ -7,6 +7,7 @@ LICENSE file in the root directory of this source tree.
 */
 
 module.exports = {
+	apiGateway: require('./apiGateway'),
 	appSync: require('./appSync'),
 	cognito: require('./cognito'),
 	...require('./ec2'),
