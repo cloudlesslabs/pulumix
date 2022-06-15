@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.7.2](https://github.com/cloudlesslabs/pulumix/compare/v0.7.1...v0.7.2) (2022-06-15)
+
+
+### Bug Fixes
+
+* Cannot read properties of undefined (reading 'delay') ([6337bfd](https://github.com/cloudlesslabs/pulumix/commit/6337bfd78aae05275af5a30a16f871bd0cccd339))
+
 ### [0.7.1](https://github.com/cloudlesslabs/pulumix/compare/v0.7.0...v0.7.1) (2022-06-15)
 
 
