@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.7.1](https://github.com/cloudlesslabs/pulumix/compare/v0.7.0...v0.7.1) (2022-06-15)
+
+
+### Features
+
+* API gateway - Add support for custom domain ([d44ea8c](https://github.com/cloudlesslabs/pulumix/commit/d44ea8cb5ad881f32746ac9bfe5e1d3499feac3a))
+
 ## [0.7.0](https://github.com/cloudlesslabs/pulumix/compare/v0.6.7...v0.7.0) (2022-06-15)
 
 
