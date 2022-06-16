@@ -440,17 +440,18 @@ class WebSocketApi extends aws.apigatewayv2.Api {
  * 
  * @return	{Output<Account>}	account
  */
-const enableCloudwatch = options => {
+const enableCloudwatch = (name, options) => {
 	// To enable CloudWatch logging on API Gateway, an IAM role with access to CloudWatch must be added to the 
 	// singleton API Gateway account. This is a global setting.
+	
+	if (!name)
+		throw new Error('Missing required argument \'name\'.')
 
 	const { tags, protect } = options||{}
-	const accountName = 'api-gateway-account-settings'
 
 	// Creates an IAM role for allowing API Gateways to send logs to CloudWatch
-	const accountRoleName = `role-for-${accountName}`
-	const accountRole = new aws.iam.Role(accountRoleName, {
-		name: accountRoleName,
+	const accountRole = new aws.iam.Role(name, {
+		name,
 		assumeRolePolicy: JSON.stringify({
 			Version: '2012-10-17',
 			Statement: [{
@@ -464,7 +465,7 @@ const enableCloudwatch = options => {
 		}, null, '  '),
 		tags: {
 			...tags,
-			Name: accountRoleName
+			Name: name
 		}
 	}, {
 		retainOnDelete: true,
@@ -472,7 +473,7 @@ const enableCloudwatch = options => {
 	})
 
 	// Creates the policy that allows that role to access cloudwatch.
-	const cloudwatchPolicyName = `allow-cloudwatch-for-${accountRoleName}`
+	const cloudwatchPolicyName = `allow-cloudwatch-for-${name}`
 	const cloudwatchRolePolicy = new aws.iam.RolePolicy(cloudwatchPolicyName, {
 		name: cloudwatchPolicyName,
 		role: accountRole.id,
@@ -502,12 +503,12 @@ const enableCloudwatch = options => {
 	})
 
 	// Creates an account to configure attach the cloudwatch role to the any API Gateways. Doc: https://www.pulumi.com/registry/packages/aws/api-docs/apigateway/account/
-	const account = new aws.apigateway.Account(accountName, {
-		name: accountName,
+	const account = new aws.apigateway.Account(name, {
+		name,
 		cloudwatchRoleArn: accountRole.arn,
 		tags: {
 			...tags,
-			Name: accountName
+			Name: name
 		}
 	}, {
 		retainOnDelete: true,
