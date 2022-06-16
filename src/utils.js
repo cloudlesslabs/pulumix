@@ -162,7 +162,7 @@ const getProject = options => {
 	return {
 		project,
 		...stackData,
-		createResourceName: name => `${project}-${name}-${stackData.stack}`
+		createResourceName: name => `${project}${name ? `-${name}` : ''}-${stackData.stack}`
 	}
 }
 
