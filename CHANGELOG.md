@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.7.4](https://github.com/cloudlesslabs/pulumix/compare/v0.7.3...v0.7.4) (2022-06-16)
+
+
+### Bug Fixes
+
+* the createResourceName API does not manage empty input ([430104e](https://github.com/cloudlesslabs/pulumix/commit/430104e0e7c912d6cb1308982128bf406cb57d26))
+
 ### [0.7.3](https://github.com/cloudlesslabs/pulumix/compare/v0.7.2...v0.7.3) (2022-06-16)
 
 
