@@ -23,6 +23,7 @@ const RESPONSE_CODES = [null,200,400,401,404] // null is the default response, w
  * @param	{Object}							.tags
  * @param	{String}						resourcePrefix
  * @param	{String}						resourcePath
+ * @param	{String}						passthroughBehavior		Valid values: 'WHEN_NO_MATCH' (default), 'WHEN_NO_TEMPLATES', 'NEVER'
  * @param	{[String]}						contentTypes			Supported content types. Default ['application/json']
  * @param	{Output<Topic>}					topic
  * @param	{String}						region
@@ -37,7 +38,7 @@ const RESPONSE_CODES = [null,200,400,401,404] // null is the default response, w
  * @return	{[Output<IntegrationResponse>]}		.integrationResponses
  * @return	{[Output<MethodResponse>]}			.methodResponses
  */
-const create = ({ baseDef, restApi, topic, region, resourcePrefix, contentTypes, apiGatewayRole, protect }) => {
+const create = ({ baseDef, restApi, topic, region, resourcePrefix, contentTypes, passthroughBehavior, apiGatewayRole, protect }) => {
 	if (!topic || !topic.arn)
 		throw new Error('Missing required argument \'topic.arn\'. This argument is required when the integration type is \'sns\'.')
 
@@ -58,6 +59,7 @@ const create = ({ baseDef, restApi, topic, region, resourcePrefix, contentTypes,
 		requestParameters: {
 			'integration.request.header.Content-Type': '\'application/x-www-form-urlencoded\''
 		},
+		passthroughBehavior: passthroughBehavior||'WHEN_NO_MATCH',
 		requestTemplates
 	}
 

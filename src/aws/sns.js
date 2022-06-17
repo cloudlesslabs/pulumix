@@ -34,6 +34,19 @@ class Topic extends aws.sns.Topic {
 		})
 	}
 
+	/**
+	 * Creates a new SNS TopicSubscription
+	 * 
+	 * @param  {Output<Topic>}				topic
+	 * @param  {Object}						subscriber
+	 * @param  {String}							.name
+	 * @param  {Output<Resource>}				.[type]		Valid values: 'sqs', 'sms', 'lambda', 'firehose', 'application', 'email', 'email-json', 'http', 'https'
+	 * @param  {Object}							.tags
+	 * @param  {Boolean}						.protect
+	 * @param  {[Object]}						.dependsOn
+	 * 
+	 * @return {Output<TopicSubscription>}	subscription
+	 */
 	static createTopicSubscription(topic, subscriber) { 
 		if (!topic)
 			throw new Error('Missing required argument \'topic\'')
@@ -50,15 +63,16 @@ class Topic extends aws.sns.Topic {
 /**
  * Creates a new SNS TopicSubscription
  * 
- * @param  {Output<Topic>}	topic
- * @param  {Object}			subscriber
- * @param  {String}				.name
- * @param  {String}				.[type]		Valid values: 'sqs', 'sms', 'lambda', 'firehose', 'application', 'email', 'email-json', 'http', 'https'
- * @param  {Object}				.tags
- * @param  {Boolean}			.protect
- * @param  {[Object]}			.dependsOn
+ * @param  {Output<Topic>}				topic
+ * @param  {Object}						subscriber
+ * @param  {String}							.name
+ * @param  {Output<Resource>}				.[type]							Valid values: 'sqs', 'sms', 'lambda', 'firehose', 'application', 'email', 'email-json', 'http', 'https'
+ * @param  {Number}							.confirmationTimeoutInMinutes	Only valid for 'http' or 'https'.
+ * @param  {Object}							.tags
+ * @param  {Boolean}						.protect
+ * @param  {[Object]}						.dependsOn
  * 
- * @return {[type]}            [description]
+ * @return {Output<TopicSubscription>}	subscription
  */
 const _createTopicSubscription = (topic, subscriber) => {
 	if (!topic)
@@ -113,7 +127,7 @@ const _createTopicSubscription = (topic, subscriber) => {
 			name: subscriber.name,
 			endpoint: subscriber[protocol],
 			protocol,
-			confirmationTimeoutInMinutes: 30, // You have 30 minutes to confirm
+			confirmationTimeoutInMinutes: subscriber.confirmationTimeoutInMinutes||30, // You have 30 minutes to confirm
 			topic: topic.arn,
 			...rest,
 			tags: {

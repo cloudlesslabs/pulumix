@@ -725,7 +725,8 @@ const _sanitizeName = name => (name||'').toLowerCase().replace(/[^0-9a-z-_]/g,''
  * Extract the integration config from the httpMethodConfig
  * 
  * @param	{Object}		httpMethodConfig
- * @param	{[String]}			.contentTypes	Supported content types. Default ['application/json']
+ * @param	{[String]}			.contentTypes			Supported content types. Default ['application/json']
+ * @param	{String}			.passthroughBehavior	Valid values: 'WHEN_NO_MATCH' (default), 'WHEN_NO_TEMPLATES', 'NEVER'
  * @param	{Object}			.sns
  * @param	{Output<Topic>}			.topic		
  * @param	{Output<String>}			.arn	Required. 
@@ -762,7 +763,12 @@ const _getIntegrationConfig = httpMethodConfig => {
 	if (!type)
 		throw new Error(`Missing required integration config. Supported types: ${keys}.`)
 
-	return { config:httpMethodConfig[type], type, contentTypes: httpMethodConfig.contentTypes  }
+	return { 
+		config:httpMethodConfig[type], 
+		type, 
+		contentTypes: httpMethodConfig.contentTypes,
+		passthroughBehavior: httpMethodConfig.passthroughBehavior 
+	}
 }
 
 /**
@@ -776,6 +782,7 @@ const _getIntegrationConfig = httpMethodConfig => {
  * @param	{String}				type					Valid values: 'sns', 'sqs', 'http', 'http_proxy', 's3', 'lambda', 'lambda_proxy', 'kinesis'
  * @param	{Object}				config					Config specific to the 'type'
  * @param	{[String]}				contentTypes			Supported content types. Default ['application/json']
+ * @param	{String}				passthroughBehavior		Valid values: 'WHEN_NO_MATCH' (default), 'WHEN_NO_TEMPLATES', 'NEVER'
  * @param	{String}				resourcePrefix
  * @param	{Output<String>}		resourceId
  * @param	{Output<String>}		resourcePath
@@ -788,7 +795,7 @@ const _getIntegrationConfig = httpMethodConfig => {
  * @return	{[Output<Integration>]}   	.methodResponses
  */
 const _createIntegrationsAndResponses = input => {
-	const { restApi, apiGatewayRole, type, config, contentTypes, name, httpMethod, resourcePrefix, resourceId, resourcePath, protect } = input || {}
+	const { restApi, apiGatewayRole, type, config, contentTypes, passthroughBehavior, name, httpMethod, resourcePrefix, resourceId, resourcePath, protect } = input || {}
 
 	if (!restApi)
 		throw new Error('Missing required argument \'restApi\'')
@@ -837,6 +844,7 @@ const _createIntegrationsAndResponses = input => {
 		resourcePrefix, 
 		resourcePath,
 		contentTypes,
+		passthroughBehavior,
 		protect
 	})
 

@@ -20,6 +20,7 @@ const aws = require('@pulumi/aws')
  * @param	{Object}							.tags
  * @param	{String}						resourcePrefix
  * @param	{String}						resourcePath
+ * @param	{String}						passthroughBehavior		Valid values: 'WHEN_NO_MATCH' (default), 'WHEN_NO_TEMPLATES', 'NEVER'
  * @param	{[String]}						contentTypes			Supported content types. Default ['application/json']
  * @param	{Output<Topic>}					topic
  * @param	{String}						region
