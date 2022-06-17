@@ -22,7 +22,7 @@ class Topic extends aws.sns.Topic {
 				nativeInput.name = `${nativeInput.name}.fifo`
 		}
 
-		super({ 
+		super(nativeInput.name, { 
 			...nativeInput,
 			tags: {
 				...(tags||{}),
