@@ -17,12 +17,13 @@ const RESPONSE_CODES = [null,200,400,401,404] // null is the default response, w
  * 
  * @param	{Object}						baseDef
  * @param	{String}							.name,
- * @param	{Output<String>}					.restApi		REST api ID
+ * @param	{Output<String>}					.restApi			REST api ID
  * @param	{Output<String>}					.resourceId
  * @param	{String}							.httpMethod
  * @param	{Object}							.tags
  * @param	{String}						resourcePrefix
  * @param	{String}						resourcePath
+ * @param	{[String]}						contentTypes			Supported content types. Default ['application/json']
  * @param	{Output<Topic>}					topic
  * @param	{String}						region
  * @param	{Output<Role>}					apiGatewayRole
@@ -36,9 +37,16 @@ const RESPONSE_CODES = [null,200,400,401,404] // null is the default response, w
  * @return	{[Output<IntegrationResponse>]}		.integrationResponses
  * @return	{[Output<MethodResponse>]}			.methodResponses
  */
-const create = ({ baseDef, restApi, topic, region, resourcePrefix, apiGatewayRole, protect }) => {
+const create = ({ baseDef, restApi, topic, region, resourcePrefix, contentTypes, apiGatewayRole, protect }) => {
 	if (!topic || !topic.arn)
 		throw new Error('Missing required argument \'topic.arn\'. This argument is required when the integration type is \'sns\'.')
+
+	const _contentTypes = contentTypes && contentTypes.length ? contentTypes : ['application/json']
+	const requestTemplate = pulumi.interpolate `Action=Publish&TopicArn=$util.urlEncode('${topic.arn}')&Message=$util.urlEncode($input.body)`
+	const requestTemplates = _contentTypes.reduce((acc,t) => {
+		acc[t] = requestTemplate
+		return acc
+	}, {})
 
 	// Configure the integration
 	const def = {
@@ -50,9 +58,7 @@ const create = ({ baseDef, restApi, topic, region, resourcePrefix, apiGatewayRol
 		requestParameters: {
 			'integration.request.header.Content-Type': '\'application/x-www-form-urlencoded\''
 		},
-		requestTemplates: {
-			'application/json': pulumi.interpolate `Action=Publish&TopicArn=$util.urlEncode('${topic.arn}')&Message=$util.urlEncode($input.body)`
-		}
+		requestTemplates
 	}
 
 	// Creates API Gateway policy to publish to SNS topic

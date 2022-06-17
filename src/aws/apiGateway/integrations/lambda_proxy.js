@@ -14,12 +14,13 @@ const aws = require('@pulumi/aws')
  * 
  * @param	{Object}						baseDef
  * @param	{String}							.name,
- * @param	{Output<String>}					.restApi		REST api ID
+ * @param	{Output<String>}					.restApi			REST api ID
  * @param	{Output<String>}					.resourceId
  * @param	{String}							.httpMethod
  * @param	{Object}							.tags
  * @param	{String}						resourcePrefix
  * @param	{String}						resourcePath
+ * @param	{[String]}						contentTypes			Supported content types. Default ['application/json']
  * @param	{Output<Topic>}					topic
  * @param	{String}						region
  * @param	{Output<Role>}					apiGatewayRole

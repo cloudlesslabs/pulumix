@@ -26,6 +26,7 @@ class RestApi extends aws.apigateway.RestApi {
 	 * @param	{Object}						resources						e.g., { '/':{...}, 'dogs':{...}, 'blog/tech':{...} }
 	 * @param	{Object}							.[name|methodName]			If name is '/', this means root resource.
 	 * @param	{Object}								.[methodName]			e.g., 'GET', 'POST'
+	 * @param	{[String]}									.contentTypes		Supported content types. Default ['application/json']
 	 * @param	{Object}									.authorizer
 	 * @param	{Object}										.type			Valid values: 'NONE', 'CUSTOM', 'AWS_IAM', 'COGNITO_USER_POOLS'
 	 * @param	{Object}									.sns
@@ -537,6 +538,7 @@ const enableCloudwatch = (name, options) => {
  * @param	{Object}						resources					e.g., { '/':{...}, 'dogs':{...}, 'blog/tech':{...} }
  * @param	{Object}							.[name|methodName]		If name is '/', this means root resource.
  * @param	{Object}								.[methodName]		e.g., 'GET', 'POST'
+ * @param	{[String]}									.contentTypes		Supported content types. Default ['application/json']
  * @param	{Object}									.authorizer
  * @param	{Object}										.type		Valid values: 'NONE', 'CUSTOM', 'AWS_IAM', 'COGNITO_USER_POOLS'
  * @param	{Object}									.sns
@@ -723,6 +725,7 @@ const _sanitizeName = name => (name||'').toLowerCase().replace(/[^0-9a-z-_]/g,''
  * Extract the integration config from the httpMethodConfig
  * 
  * @param	{Object}		httpMethodConfig
+ * @param	{[String]}			.contentTypes	Supported content types. Default ['application/json']
  * @param	{Object}			.sns
  * @param	{Output<Topic>}			.topic		
  * @param	{Output<String>}			.arn	Required. 
@@ -748,6 +751,7 @@ const _sanitizeName = name => (name||'').toLowerCase().replace(/[^0-9a-z-_]/g,''
  * @return	{Object}		config
  * @return	{String}			.type
  * @return	{Object}			.config
+ * @return	{[String]}			.contentTypes
  */
 const _getIntegrationConfig = httpMethodConfig => {
 	if (!httpMethodConfig)
@@ -758,12 +762,12 @@ const _getIntegrationConfig = httpMethodConfig => {
 	if (!type)
 		throw new Error(`Missing required integration config. Supported types: ${keys}.`)
 
-	return { config:httpMethodConfig[type], type }
+	return { config:httpMethodConfig[type], type, contentTypes: httpMethodConfig.contentTypes  }
 }
 
 /**
  * @param	{Object}				restApi
- * @param	{String}					.name					e.g., 'my-rest-api'
+ * @param	{String}					.name				e.g., 'my-rest-api'
  * @param	{Output<String>}			.id
  * @param	{Output<String>}			.executionArn
  * @param	{Output<Role>}			apiGatewayRole
@@ -771,6 +775,7 @@ const _getIntegrationConfig = httpMethodConfig => {
  * @param	{String}				method					Valid values: 'DELETE', 'GET', 'HEAD', 'OPTIONS', 'PATCH', 'POST', 'PUT', 'ANY'
  * @param	{String}				type					Valid values: 'sns', 'sqs', 'http', 'http_proxy', 's3', 'lambda', 'lambda_proxy', 'kinesis'
  * @param	{Object}				config					Config specific to the 'type'
+ * @param	{[String]}				contentTypes			Supported content types. Default ['application/json']
  * @param	{String}				resourcePrefix
  * @param	{Output<String>}		resourceId
  * @param	{Output<String>}		resourcePath
@@ -783,7 +788,7 @@ const _getIntegrationConfig = httpMethodConfig => {
  * @return	{[Output<Integration>]}   	.methodResponses
  */
 const _createIntegrationsAndResponses = input => {
-	const { restApi, apiGatewayRole, type, config, name, httpMethod, resourcePrefix, resourceId, resourcePath, protect } = input || {}
+	const { restApi, apiGatewayRole, type, config, contentTypes, name, httpMethod, resourcePrefix, resourceId, resourcePath, protect } = input || {}
 
 	if (!restApi)
 		throw new Error('Missing required argument \'restApi\'')
@@ -831,6 +836,7 @@ const _createIntegrationsAndResponses = input => {
 		apiGatewayRole, 
 		resourcePrefix, 
 		resourcePath,
+		contentTypes,
 		protect
 	})
 
