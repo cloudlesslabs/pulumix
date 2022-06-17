@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.8.1](https://github.com/cloudlesslabs/pulumix/compare/v0.8.0...v0.8.1) (2022-06-17)
+
+
+### Bug Fixes
+
+* The sns.Topic class cannot be created ([29826e2](https://github.com/cloudlesslabs/pulumix/commit/29826e233f1062647ffecc2e3a64e42d7c255b15))
+
 ## [0.8.0](https://github.com/cloudlesslabs/pulumix/compare/v0.7.5...v0.8.0) (2022-06-17)
 
 
