@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.8.0](https://github.com/cloudlesslabs/pulumix/compare/v0.7.5...v0.8.0) (2022-06-17)
+
+
+### Features
+
+* Add support for SNS ([ba64534](https://github.com/cloudlesslabs/pulumix/commit/ba64534c0a220f272f24e57f48a62ce55ca6b9e1))
+
 ### [0.7.5](https://github.com/cloudlesslabs/pulumix/compare/v0.7.4...v0.7.5) (2022-06-17)
 
 
