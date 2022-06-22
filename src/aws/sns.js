@@ -138,6 +138,22 @@ const _createTopicSubscription = (topic, subscriber) => {
 			protect,
 			dependsOn
 		})
+	} else if (protocol == 'sqs') {
+		// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/sns/topicsubscription/
+		return new aws.sns.TopicSubscription(subscriber.name, {
+			name: subscriber.name,
+			endpoint: subscriber[protocol],
+			protocol,
+			topic: topic.arn,
+			...rest,
+			tags: {
+				...(tags||{}),
+				Name: subscriber.name
+			}
+		}, {
+			protect,
+			dependsOn
+		})
 	} else 
 		throw new Error(`Type '${protocol}' is supported but Pulumix has not yet had time to implement it. Coming soon...`)
 
