@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.8.3](https://github.com/cloudlesslabs/pulumix/compare/v0.8.2...v0.8.3) (2022-06-22)
+
+
+### Features
+
+* SNS - Add support for SQS subscriptions ([d154b02](https://github.com/cloudlesslabs/pulumix/commit/d154b02646f4f558e9ed5fd38334ddd1bf47ed04))
+
 ### [0.8.2](https://github.com/cloudlesslabs/pulumix/compare/v0.8.1...v0.8.2) (2022-06-17)
 
 
