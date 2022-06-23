@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.9.0](https://github.com/cloudlesslabs/pulumix/compare/v0.8.4...v0.9.0) (2022-06-23)
+
+
+### Bug Fixes
+
+* The Lambda failed to be created when using SQS event source mapping ([5dd39cb](https://github.com/cloudlesslabs/pulumix/commit/5dd39cb29e7be8977ba94079f0d1af60a383833a))
+
 ### [0.8.4](https://github.com/cloudlesslabs/pulumix/compare/v0.8.3...v0.8.4) (2022-06-23)
 
 
