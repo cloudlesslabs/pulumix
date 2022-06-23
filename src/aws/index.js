@@ -19,6 +19,7 @@ module.exports = {
 	...require('./secret'),
 	...require('./securityGroup'),
 	sns: require('./sns'),
+	sqs: require('./sqs'),
 	ssm: require('./ssm'),
 	stepFunction: require('./stepFunction'),
 	...require('./vpc')

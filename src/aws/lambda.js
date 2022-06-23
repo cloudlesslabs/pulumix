@@ -16,6 +16,9 @@ const { Image } = require('./ecr')
 const { unwrap, keepResourcesOnly } = require('../utils')
 const { SecurityGroup } = require('./securityGroup')
 
+const VALID_EVENT_SOURCES = ['schedule', 'sqs', 'dynamodb', 'kinesis', 'msk', 'kafka', 'aws_mq']
+const SUPPORTED_EVENT_SOURCES = ['schedule', 'sqs'] // this list should eventually match what AWS supports, i.e., the VALID_EVENT_SOURCES list
+
 class Lambda extends aws.lambda.Function {
 	/**
 	 * Creates an AWS Lambda. Doc: https://www.pulumi.com/docs/reference/pkg/aws/lambda/function/
@@ -52,9 +55,10 @@ class Lambda extends aws.lambda.Function {
 	 * @param  {Output<Object>}				fileSystemConfig
 	 * @param  {Output<String>}					.arn							Used to mount an AWS EFS access point.
 	 * @param  {Output<String>}					.localMountPath					Used to mount an AWS EFS access point.
-	 * @param  {Object}						schedule					
+	 * @param  {Object}						schedule							DEPRECATED. Use the 'eventSources'				
 	 * @param  {String}							.expression						e.g., 'rate(1 minute)'. Full doc at https://docs.aws.amazon.com/AmazonCloudWatch/latest/events/ScheduledEvents.html
-	 * @param  {Object}							.payload						Optional. When specified, the object is passed to the Lambda's event. Otherwise, the default object is passed as the event (4)
+	 * @param  {Object}							.payload						(4) Optional. When specified, the object is passed to the Lambda's event. Otherwise, the default object is passed as the event.
+	 * @param  {[EventSource]}				eventSources[]						(5)
 	 * @param  {Boolean}					publish								Default false. True publishes the lambda to a new version.
 	 * @param  {Boolean}					cloudwatch 							Default false. When true, cloudwatch is enabled.
 	 * @param  {Boolean}					cloudWatch 							Deprecated. Use 'cloudwatch' instead.
@@ -114,8 +118,22 @@ class Lambda extends aws.lambda.Function {
 	 * 	],
 	 * 	detail: {}
 	 * }
+	 * (5) EventSource object example:
+	 * 	- schedule: 
+	 * 		{
+	 * 			name: 'schedule',
+	 * 			expression: 'rate(1 minute)', // e.g., 'rate(1 minute)'. Full doc at https://docs.aws.amazon.com/AmazonCloudWatch/latest/events/ScheduledEvents.html
+	 * 			payload: { hello:'world' }	// (4) Optional. When specified, the object is passed to the Lambda's event. Otherwise, the default object is passed as the event.
+	 * 		}
+	 * 	- sqs: 
+	 * 		{
+	 * 			name: 'sqs',
+	 * 			sqsArn: sqs.arn,
+	 * 			// sqs: sqs, // Also support sqs resource.
+	 * 			// filterCriteria: ... // Optional. Refer to doc: https://www.pulumi.com/registry/packages/aws/api-docs/lambda/eventsourcemapping/#sqs-with-event-filter
+	 * 		}
 	 */
-	constructor({ name, description, architecture, fn, layers, timeout=3, memorySize=128, handler, policies:_policies, vpcConfig:_vpcConfig, fileSystemConfig, schedule, publish, cloudWatch, cloudwatch, logsRetentionInDays, tags, parent, dependsOn:_dependsOn, protect }) {
+	constructor({ name, description, architecture, fn, layers, timeout=3, memorySize=128, handler, policies:_policies, vpcConfig:_vpcConfig, fileSystemConfig, schedule, eventSources, publish, cloudWatch, cloudwatch, logsRetentionInDays, tags, parent, dependsOn:_dependsOn, protect }) {
 		tags = tags || {}
 		if (cloudWatch !== undefined && cloudwatch === undefined)
 			cloudwatch = cloudWatch
@@ -126,8 +144,21 @@ class Lambda extends aws.lambda.Function {
 			throw new Error('Missing required argument \'fn\'.')
 		if (!fn.dir)
 			throw new Error('Missing required argument \'fn.dir\'.')
+		if (eventSources && eventSources.length) {
+			const missingNameIndex = eventSources.findIndex(e => !e || !e.name)
+			if (missingNameIndex >= 0)
+				throw new Error(`Missing required 'eventSources[${missingNameIndex}].name'`)
+
+			const invalidEventSources = eventSources.filter(e => VALID_EVENT_SOURCES.indexOf(e.name) < 0).map(e => e.name)
+			if (invalidEventSources.length)
+				throw new Error(`The following event sources are invalid: ${invalidEventSources}. Valid Lambda event sources are: ${VALID_EVENT_SOURCES}. WARNING: At this time, pulumix only supports ${SUPPORTED_EVENT_SOURCES}. More coming soon...`)
+			const notSupportedEventSources = eventSources.filter(e => SUPPORTED_EVENT_SOURCES.indexOf(e.name) < 0).map(e => e.name)
+			if (notSupportedEventSources.length)
+				throw new Error(`Unfortunatelly, Pulumix does not support the following event sources yet: ${notSupportedEventSources}. Currently supported event sources are: ${SUPPORTED_EVENT_SOURCES}.`)
+		}
 		
 		const canonicalName = `${name}-lambda`
+		const sqsEventSource = eventSources && eventSources.some(e => e && e.name == 'sqs')
 
 		// IAM role. Doc: https://www.pulumi.com/docs/reference/pkg/aws/iam/role/
 		const lambdaRole = new aws.iam.Role(canonicalName, {
@@ -209,7 +240,7 @@ class Lambda extends aws.lambda.Function {
 			const imageUri = image ? image.imageValues[0] : null
 
 			// Attach policies
-			const updatedPolicies = _configurePolicies(policies, canonicalName, { cloudwatch, vpcConfig, fileSystemConfig })
+			const updatedPolicies = _configurePolicies(policies, canonicalName, { cloudwatch, vpcConfig, fileSystemConfig, sqsEventSource })
 
 			return pulumi.all([imageUri, ...updatedPolicies.map(p => unwrap(p))]).apply(([_imageUri, ..._policies]) => {
 
@@ -279,6 +310,10 @@ class Lambda extends aws.lambda.Function {
 
 		// Create schedule trigger
 		let _schedule = null
+		// Supporting legacy 'schedule' input.
+		const scheduleEventSource = (eventSources||[]).find(e => e && e.name == 'schedule')
+		if (!schedule && scheduleEventSource)
+			schedule = scheduleEventSource
 		if (schedule && schedule.expression) {
 			// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/cloudwatch/eventrule/
 			const eventRuleName = `${name}-eventrule`
@@ -331,6 +366,34 @@ class Lambda extends aws.lambda.Function {
 				eventRule,
 				eventTarget,
 				permission
+			}
+		}
+
+		this.eventSources = []
+		const sqsEventSources = (eventSources||[]).filter(e => e && e.name == 'sqs')
+		if (sqsEventSources && sqsEventSources.length) {
+			for (let i=0;i<sqsEventSources.length;i++) {
+				const { sqsArn, sqs, filterCriteria } = sqsEventSources[i]||{}
+				if (!sqsArn && (!sqs || !sqs.arn))
+					throw new Error('Missing required eventSources[name=\'sqs\'].sqsArn or eventSources[name=\'sqs\'].sqs.arn')
+				
+				const eventSourceArn = sqsArn || (sqs||{}).arn
+				// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/lambda/eventsourcemapping/
+				const eventSourceName = `sqs-eventsource-for-${name}`
+				const eventSourceMapping = new aws.lambda.EventSourceMapping(eventSourceName, {
+					name: eventSourceName,
+					eventSourceArn,
+					functionName: this.arn,
+					filterCriteria,
+					tags: {
+						...tags,
+						Name: eventSourceName
+					}
+				}, {
+					protect
+				})
+
+				this.eventSources.push(eventSourceMapping)
 			}
 		}
 
@@ -577,6 +640,7 @@ const _leanifyImage = resource => {
  * @param  {Output<[SecurityGroup]>}			.securityGroups
  * @param  {Output<[String]>}					.securityGroupIds				Not recommended. 
  * @param  {Boolean}						.fileSystemConfig
+ * @param  {Boolean}						.sqsEventSource
  * 
  * @return {[Policy]}					updatedPolicies
  */
@@ -584,9 +648,10 @@ const _configurePolicies = (policies, prefix, config) => {
 	const AWSLambdaVPCAccessExecutionRole = 'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
 	const AWSLambdaBasicExecutionRole = 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
 	const AmazonElasticFileSystemClientFullAccess = 'arn:aws:iam::aws:policy/AmazonElasticFileSystemClientFullAccess'
+	const AWSLambdaSQSQueueExecutionRole = 'arn:aws:iam::aws:policy/service-role/AWSLambdaSQSQueueExecutionRole'
 
 	const updatedPolicies = [...(policies || [])]
-	const { cloudwatch, fileSystemConfig, vpcConfig } = config || {}
+	const { cloudwatch, fileSystemConfig, vpcConfig, sqsEventSource } = config || {}
 
 	const efsAccess = fileSystemConfig && fileSystemConfig.arn
 	const vpcAccess = efsAccess || (vpcConfig && vpcConfig.subnetIds)
@@ -609,6 +674,12 @@ const _configurePolicies = (policies, prefix, config) => {
 		updatedPolicies.push({
 			name: `${prefix}-efs-access`,
 			arn: AmazonElasticFileSystemClientFullAccess
+		})
+
+	if (sqsEventSource && !updatedPolicies.some(p => p.arn == AWSLambdaSQSQueueExecutionRole))
+		updatedPolicies.push({
+			name: `${prefix}-sqs-access`,
+			arn: AWSLambdaSQSQueueExecutionRole
 		})
 
 	return updatedPolicies
