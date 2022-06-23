@@ -128,8 +128,7 @@ class Lambda extends aws.lambda.Function {
 	 * 	- sqs: 
 	 * 		{
 	 * 			name: 'sqs',
-	 * 			sqsArn: sqs.arn,
-	 * 			// sqs: sqs, // Also support sqs resource.
+	 * 			queue: queue, // This can be the actual Queue resource or an object as long as that object contains an 'arn' property
 	 * 			// filterCriteria: ... // Optional. Refer to doc: https://www.pulumi.com/registry/packages/aws/api-docs/lambda/eventsourcemapping/#sqs-with-event-filter
 	 * 		}
 	 */
@@ -158,7 +157,6 @@ class Lambda extends aws.lambda.Function {
 		}
 		
 		const canonicalName = `${name}-lambda`
-		const sqsEventSource = eventSources && eventSources.some(e => e && e.name == 'sqs')
 
 		// IAM role. Doc: https://www.pulumi.com/docs/reference/pkg/aws/iam/role/
 		const lambdaRole = new aws.iam.Role(canonicalName, {
@@ -209,6 +207,7 @@ class Lambda extends aws.lambda.Function {
 			_policies
 		]).apply(([fnDirFound, dockerFileFound, dir, type, runtime, args, env, { config:vpcConfig, securityGroups, subnets, allowAllResponsesSg }, dependsOn, policies]) => {
 			dependsOn = dependsOn || []
+			dependsOn.push(...(eventSources||[]).filter(e => e.queue).map(e => e.queue))
 			if (!fnDirFound)
 				throw new Error(`Function folder '${dir}' not found.`)	
 
@@ -240,7 +239,12 @@ class Lambda extends aws.lambda.Function {
 			const imageUri = image ? image.imageValues[0] : null
 
 			// Attach policies
-			const updatedPolicies = _configurePolicies(policies, canonicalName, { cloudwatch, vpcConfig, fileSystemConfig, sqsEventSource })
+			const updatedPolicies = _configurePolicies(policies, canonicalName, { 
+				cloudwatch, 
+				vpcConfig, 
+				fileSystemConfig, 
+				sqsEventSource: eventSources && eventSources.some(e => e && e.name == 'sqs')
+			})
 
 			return pulumi.all([imageUri, ...updatedPolicies.map(p => unwrap(p))]).apply(([_imageUri, ..._policies]) => {
 
@@ -370,19 +374,22 @@ class Lambda extends aws.lambda.Function {
 		}
 
 		this.eventSources = []
+		
+		// Provisions the event source mappings
 		const sqsEventSources = (eventSources||[]).filter(e => e && e.name == 'sqs')
 		if (sqsEventSources && sqsEventSources.length) {
 			for (let i=0;i<sqsEventSources.length;i++) {
-				const { sqsArn, sqs, filterCriteria } = sqsEventSources[i]||{}
-				if (!sqsArn && (!sqs || !sqs.arn))
-					throw new Error('Missing required eventSources[name=\'sqs\'].sqsArn or eventSources[name=\'sqs\'].sqs.arn')
+				const { queue, filterCriteria } = sqsEventSources[i]||{}
+				if (!queue)
+					throw new Error('Missing required eventSources[name=\'sqs\'].queue')
+				if (!queue.arn)
+					throw new Error('Missing required eventSources[name=\'sqs\'].queue.arn')
 				
-				const eventSourceArn = sqsArn || (sqs||{}).arn
 				// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/lambda/eventsourcemapping/
 				const eventSourceName = `sqs-eventsource-for-${name}`
 				const eventSourceMapping = new aws.lambda.EventSourceMapping(eventSourceName, {
 					name: eventSourceName,
-					eventSourceArn,
+					eventSourceArn: queue.arn,
 					functionName: this.arn,
 					filterCriteria,
 					tags: {

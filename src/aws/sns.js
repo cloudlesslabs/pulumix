@@ -9,7 +9,7 @@ LICENSE file in the root directory of this source tree.
 const pulumi = require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
 
-const SUBSCRIBER_TYPES = ['sqs', 'sqsArn', 'sms', 'lambda', 'firehose', 'application', 'email', 'email-json', 'http', 'https']
+const SUBSCRIBER_TYPES = ['queue', 'sms', 'lambda', 'firehose', 'application', 'email', 'email-json', 'http', 'https']
 
 class Topic extends aws.sns.Topic {
 	constructor(input) {
@@ -174,7 +174,7 @@ const _createTopicSubscription = (topic, subscriber) => {
 		// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/sns/topicsubscription/
 		return new aws.sns.TopicSubscription(subscriber.name, {
 			..._input,
-			endpoint: protocol == type ? subscriber[protocol].arn : subscriber[protocol],
+			endpoint: subscriber[type].arn,
 		}, {
 			protect,
 			dependsOn
@@ -190,7 +190,7 @@ const _getSubscriberProtocol = sub => {
 		throw new Error(`Subscriber's type not supported. Supported types: ${SUBSCRIBER_TYPES}.`)
 
 	return { 
-		protocol: type.replace('Arn',''), 
+		protocol: type == 'queue' ? 'sqs' : type, 
 		type 
 	}
 }
