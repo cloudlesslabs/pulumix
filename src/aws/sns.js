@@ -8,6 +8,7 @@ LICENSE file in the root directory of this source tree.
 
 const pulumi = require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
+const { keepResourcesOnly } = require('../utils')
 
 const SUBSCRIBER_TYPES = ['queue', 'sms', 'lambda', 'firehose', 'application', 'email', 'email-json', 'http', 'https']
 
@@ -43,6 +44,8 @@ class Topic extends aws.sns.Topic {
 	 * @param  {String}							.name
 	 * @param  {Object}							.deadLetterQueue	(1) This can be a boolean, an object or an Output<Queue>
 	 * @param  {Output<Resource>}				.[type]				Valid values: 'sqs', 'sqsArn', 'sms', 'lambda', 'firehose', 'application', 'email', 'email-json', 'http', 'https'
+	 * @param  {Object}							.filterPolicy
+	 * @param  {Object}							.deliveryPolicy 
 	 * @param  {Object}							.tags
 	 * @param  {Boolean}						.protect
 	 * @param  {[Object]}						.dependsOn
@@ -51,7 +54,7 @@ class Topic extends aws.sns.Topic {
 	 *
 	 * (1) 'deadLetterQueue' values:
 	 * 		- true: This means create a new Queue on the fly and use it for the DLQ
-	 * 		- Object: It must contain an 'arn' field
+	 * 		- Object: It must contain an 'arn' and 'id' field
 	 * 		- Output<Queue>: Self-explanatory
 	 */
 	static createTopicSubscription(topic, subscriber) { 
@@ -76,6 +79,8 @@ class Topic extends aws.sns.Topic {
  * @param  {Object}							.deadLetterQueue				(1) This can be a boolean, an object or an Output<Queue>
  * @param  {Output<Resource>}				.[type]							Valid values: 'sqs', 'sqsArn', 'sms', 'lambda', 'firehose', 'application', 'email', 'email-json', 'http', 'https'
  * @param  {Number}							.confirmationTimeoutInMinutes	Only valid for 'http' or 'https'.
+ * @param  {Object}							.filterPolicy
+ * @param  {Object}							.deliveryPolicy 
  * @param  {Object}							.tags
  * @param  {Boolean}						.protect
  * @param  {[Object]}						.dependsOn
@@ -84,7 +89,7 @@ class Topic extends aws.sns.Topic {
  *
  * (1) 'deadLetterQueue' values:
  * 		- true: This means create a new Queue on the fly and use it for the DLQ
- * 		- Object: It must contain an 'arn' field
+ * 		- Object: It must contain an 'arn' and 'id' field
  * 		- Output<Queue>: Self-explanatory
  * 
  */
@@ -100,7 +105,8 @@ const _createTopicSubscription = (topic, subscriber) => {
 
 	const { protocol, type } = _getSubscriberProtocol(subscriber)
 	const { deadLetterQueue, tags, protect, dependsOn, deliveryPolicy, endpointAutoConfirms, filterPolicy, rawMessageDelivery, redrivePolicy, subscriptionRoleArn } = subscriber
-	const rest = { deliveryPolicy, endpointAutoConfirms, filterPolicy, rawMessageDelivery, redrivePolicy, subscriptionRoleArn }
+	const rest = { deliveryPolicy:_convertToString(deliveryPolicy), endpointAutoConfirms, filterPolicy:_convertToString(filterPolicy), rawMessageDelivery, redrivePolicy, subscriptionRoleArn }
+	const _dependsOn = dependsOn || []
 
 	const _input = {
 		name: subscriber.name,
@@ -117,7 +123,7 @@ const _createTopicSubscription = (topic, subscriber) => {
 	if (deadLetterQueue) {
 		const dlqName = `ddl-for-sns-sub-${subscriber.name}`
 		// doc: https://www.pulumi.com/registry/packages/aws/api-docs/sqs/queue/
-		const deadLetterQueue = deadLetterQueue === true ? new aws.sqs.Queue(dlqName, {
+		const dlq = deadLetterQueue === true ? new aws.sqs.Queue(dlqName, {
 			dlqName,
 			description: `Dead-letter queue for SNS subscription ${subscriber.name}`,
 			tags: {
@@ -126,12 +132,17 @@ const _createTopicSubscription = (topic, subscriber) => {
 			}
 		}, { protect }) : deadLetterQueue
 		
-		if (!deadLetterQueue.arn)
-			throw new Error('Missing required \'deadLetterQueue.arn\'. When \'deadLetterQueue\' is specified and is an object, its \'arn\' property is required.')
+		if (!dlq.arn)
+			throw new Error('Missing required \'deadLetterQueue.arn\'. When \'deadLetterQueue\' is specified as an object, its \'arn\' property is required.')
+		if (!dlq.id)
+			throw new Error('Missing required \'deadLetterQueue.id\'. When \'deadLetterQueue\' is specified as an object, its \'id\' property is required.')
 
 		_input.redrivePolicy = pulumi.interpolate `{
-			"deadLetterTargetArn": "${deadLetterQueue.arn}"
+			"deadLetterTargetArn": "${dlq.arn}"
 		}`
+
+		// Adds a policy on the dead-letter queue so SNS can send messages (sqs:SendMessage) to it
+		_dependsOn.push(_createQueuePolicyToEnableSNSToSendMessages(dlqName, dlq, topic, tags, protect))
 	}
 
 	if (protocol == 'lambda') {
@@ -149,7 +160,7 @@ const _createTopicSubscription = (topic, subscriber) => {
 			}
 		}, {
 			protect,
-			dependsOn
+			dependsOn: keepResourcesOnly(_dependsOn)
 		})
 
 		// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/sns/topicsubscription/
@@ -158,7 +169,7 @@ const _createTopicSubscription = (topic, subscriber) => {
 			endpoint: subscriber[protocol].arn
 		}, {
 			protect,
-			dependsOn:[snsLambdaInvokePermission, ...(dependsOn||[])]
+			dependsOn: keepResourcesOnly([snsLambdaInvokePermission, ...(_dependsOn||[])])
 		})
 	} else if (protocol == 'http' || protocol == 'https') {
 		// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/sns/topicsubscription/
@@ -168,16 +179,18 @@ const _createTopicSubscription = (topic, subscriber) => {
 			confirmationTimeoutInMinutes: subscriber.confirmationTimeoutInMinutes||30, // You have 30 minutes to confirm
 		}, {
 			protect,
-			dependsOn
+			dependsOn: keepResourcesOnly(_dependsOn)
 		})
 	} else if (protocol == 'sqs') {
+		// Adds a policy on the queue so SNS can send messages (sqs:SendMessage) to it
+		_dependsOn.push(_createQueuePolicyToEnableSNSToSendMessages(`push-msg-for-${subscriber.name}`, subscriber[type], topic, tags, protect))
 		// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/sns/topicsubscription/
 		return new aws.sns.TopicSubscription(subscriber.name, {
 			..._input,
 			endpoint: subscriber[type].arn,
 		}, {
 			protect,
-			dependsOn
+			dependsOn: keepResourcesOnly(_dependsOn)
 		})
 	} else 
 		throw new Error(`Type '${protocol}' is supported but Pulumix has not yet had time to implement it. Coming soon...`)
@@ -193,6 +206,56 @@ const _getSubscriberProtocol = sub => {
 		protocol: type == 'queue' ? 'sqs' : type, 
 		type 
 	}
+}
+
+/**
+ * Creates a new Queue policy. Doc: https://www.pulumi.com/registry/packages/aws/api-docs/sqs/queuepolicy/
+ * 
+ * @param  {String}					name			
+ * @param  {Object}					queue
+ * @param  {Output<String>}				.id
+ * @param  {Output<String>}				.arn
+ * @param  {Object}					topic
+ * @param  {Output<String>}				.arn
+ * @param  {Object}					tags			
+ * @param  {Boolean}				protect		
+ * 
+ * @return {Output<QueuePolicy>}	queue
+ */
+const _createQueuePolicyToEnableSNSToSendMessages = (name, queue, topic, tags, protect) => new aws.sqs.QueuePolicy(name, {
+	queueUrl: queue.id,
+	policy: pulumi.all([queue.arn, topic.arn]).apply(([dlqArn, topicArn]) => JSON.stringify({
+		Version: '2012-10-17',
+		Id: 'sqspolicy',
+		Statement: [{
+			Effect: 'Allow',
+			Principal: {
+				Service: 'sns.amazonaws.com'
+			},
+			Action: 'sqs:SendMessage',
+			Resource: dlqArn,
+			Condition: {
+				ArnEquals: {
+					'aws:SourceArn': topicArn
+				}
+			}
+		}]
+	})),
+	tags: {
+		...(tags||{}),
+		Name: name
+	}
+}, {
+	protect
+})
+
+const _convertToString = o => {
+	if (!o)
+		return o
+	if (typeof(o) == 'object')
+		return JSON.stringify(o)
+	else
+		return `${o}`
 }
 
 module.exports = {

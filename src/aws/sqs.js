@@ -74,6 +74,10 @@ class Queue extends aws.sqs.Queue {
 					"deadLetterTargetArn": "${deadLetterQueue.arn}",
 					"maxReceiveCount": "${redrivePolicy.maxReceiveCount||10}"
 				}`
+				_input.redriveAllowPolicy = pulumi.interpolate `{
+					"redrivePermission": "byQueue",
+					"sourceQueueArns": ["${deadLetterQueue.arn}"]
+				}` 
 			}
 		}
 
