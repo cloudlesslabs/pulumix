@@ -8,6 +8,7 @@ LICENSE file in the root directory of this source tree.
 
 const pulumi = require('@pulumi/pulumi')
 const aws = require('@pulumi/aws')
+const { keepResourcesOnly } = require('../utils')
 
 // Doc: https://www.pulumi.com/registry/packages/aws/api-docs/sqs/queue/
 class Queue extends aws.sqs.Queue {
@@ -40,6 +41,8 @@ class Queue extends aws.sqs.Queue {
 				nativeInput.name = `${nativeInput.name}.fifo`
 		}
 
+		const _dependsOn = dependsOn || []
+
 		const _input = { 
 			...nativeInput,
 			tags: {
@@ -70,6 +73,8 @@ class Queue extends aws.sqs.Queue {
 				if (!deadLetterQueue.arn)
 					throw new Error('Missing required \'redrivePolicy.deadLetterQueue.arn\'. When \'redrivePolicy.deadLetterQueue\' is specified and is an object, its \'arn\' property is required.')
 
+				_dependsOn.push(deadLetterQueue)
+
 				_input.redrivePolicy = pulumi.interpolate `{
 					"deadLetterTargetArn": "${deadLetterQueue.arn}",
 					"maxReceiveCount": "${redrivePolicy.maxReceiveCount||10}"
@@ -84,7 +89,7 @@ class Queue extends aws.sqs.Queue {
 		// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/sqs/queue/
 		super(nativeInput.name, _input, {  
 			protect,
-			dependsOn
+			dependsOn: keepResourcesOnly(_dependsOn)
 		})
 	}
 }
