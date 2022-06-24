@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.9.3](https://github.com/cloudlesslabs/pulumix/compare/v0.9.2...v0.9.3) (2022-06-24)
+
+
+### Bug Fixes
+
+* Adding a DLQ to an SQS throw an 'waiting for SQS Queue' error ([119e159](https://github.com/cloudlesslabs/pulumix/commit/119e159c2f02e98d266813f9c9e62c4268ad4f16))
+
 ### [0.9.2](https://github.com/cloudlesslabs/pulumix/compare/v0.9.1...v0.9.2) (2022-06-24)
 
 
