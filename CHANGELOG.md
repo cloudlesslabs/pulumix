@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.9.4](https://github.com/cloudlesslabs/pulumix/compare/v0.9.3...v0.9.4) (2022-06-29)
+
+
+### Features
+
+* API Gateway - Add support for required headers and query strings ([c5717d5](https://github.com/cloudlesslabs/pulumix/commit/c5717d5ba1ad04c41927edc0a3d4eaa3a1bfa906))
+
 ### [0.9.3](https://github.com/cloudlesslabs/pulumix/compare/v0.9.2...v0.9.3) (2022-06-24)
 
 
