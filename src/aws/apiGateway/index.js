@@ -27,6 +27,8 @@ class RestApi extends aws.apigateway.RestApi {
 	 * @param	{Object}							.[name|methodName]			If name is '/', this means root resource.
 	 * @param	{Object}								.[methodName]			e.g., 'GET', 'POST'
 	 * @param	{[String]}									.contentTypes		Supported content types. Default ['application/json']
+	 * @param	{Object}									.headers			Defines the required headers.
+	 * @param	{Object}									.queryStrings		Defines the required query strings
 	 * @param	{Object}									.authorizer
 	 * @param	{Object}										.type			Valid values: 'NONE', 'CUSTOM', 'AWS_IAM', 'COGNITO_USER_POOLS'
 	 * @param	{Object}									.sns
@@ -539,6 +541,8 @@ const enableCloudwatch = (name, options) => {
  * @param	{Object}							.[name|methodName]		If name is '/', this means root resource.
  * @param	{Object}								.[methodName]		e.g., 'GET', 'POST'
  * @param	{[String]}									.contentTypes		Supported content types. Default ['application/json']
+ * @param	{Object}									.headers			Defines the required headers.
+ * @param	{Object}									.queryStrings		Defines the required query strings
  * @param	{Object}									.authorizer
  * @param	{Object}										.type		Valid values: 'NONE', 'CUSTOM', 'AWS_IAM', 'COGNITO_USER_POOLS'
  * @param	{Object}									.sns
@@ -624,6 +628,7 @@ const _createResourcesMethodsAndIntegrations = ({ restApi, apiGatewayRole, paren
 				name: methodName,
 				authorization: !authorizer || !authorizer.type ? 'NONE' : authorizer.type,
 				restApi: restApi.id,
+				requestParameters: _getRequestParameters(httpMethodConfig),
 				resourceId: parentResource.id,
 				httpMethod,
 				tags: {
@@ -720,6 +725,34 @@ const _createResourcesMethodsAndIntegrations = ({ restApi, apiGatewayRole, paren
 }
 
 const _sanitizeName = name => (name||'').toLowerCase().replace(/[^0-9a-z-_]/g,'')
+
+/**
+ * 
+ * @param	{Object}	config
+ * @param	{Object}		.headers			Defines the required headers.
+ * @param	{Object}		.queryStrings		Defines the required query strings
+ * 
+ * @return	{Object}	requestParameters
+ */
+const _getRequestParameters = config => {
+	const { headers, queryStrings } = config || {}
+	if (!headers && !queryStrings)
+		return
+
+	let requestParameters
+	if (headers && typeof(headers) == 'object')
+		requestParameters = Object.keys(headers).reduce((acc,key) => {
+			acc[`method.request.header.${key}`] = headers[key] ? true : false
+			return acc
+		}, {})
+	if (queryStrings && typeof(queryStrings) == 'object')
+		requestParameters = Object.keys(queryStrings).reduce((acc,key) => {
+			acc[`method.request.querystring.${key}`] = queryStrings[key] ? true : false
+			return acc
+		}, {})
+
+	return requestParameters
+}
 
 /**
  * Extract the integration config from the httpMethodConfig
