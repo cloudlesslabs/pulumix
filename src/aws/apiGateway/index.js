@@ -210,6 +210,39 @@ class RestApi extends aws.apigateway.RestApi {
 					dependsOn
 				})
 
+				// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/apigateway/requestvalidator/
+				const bodyValidatorName = `body-validator-for-${name}`
+				const bodyValidator = new aws.apigateway.RequestValidator(bodyValidatorName, {
+					name: bodyValidatorName,
+					restApi: this.id,
+					validateRequestBody: true,
+					tags: {
+						...tags,
+						Name: bodyValidatorName
+					}
+				})
+				const reqValidatorName = `req-validator-for-${name}`
+				const reqValidator = new aws.apigateway.RequestValidator(reqValidatorName, {
+					name: reqValidatorName,
+					restApi: this.id,
+					validateRequestParameters: true,
+					tags: {
+						...tags,
+						Name: reqValidatorName
+					}
+				})
+				const validatorName = `validator-for-${name}`
+				const validator = new aws.apigateway.RequestValidator(validatorName, {
+					name: validatorName,
+					restApi: this.id,
+					validateRequestBody: true,
+					validateRequestParameters: true,
+					tags: {
+						...tags,
+						Name: validatorName
+					}
+				})
+
 				const result = _createResourcesMethodsAndIntegrations({ 
 					restApi: {
 						id: this.id,
@@ -223,6 +256,11 @@ class RestApi extends aws.apigateway.RestApi {
 						path: ''
 					}, 
 					resources: _resources,
+					validators: {
+						request: reqValidator,
+						body: bodyValidator,
+						all: validator
+					},
 					protect,
 					tags
 				})
@@ -566,6 +604,10 @@ const enableCloudwatch = (name, options) => {
  * @param	{String}										.region		Default is the Pulumi AWS region from the stack config
  * @param	{Object}									.kinesis
  * @param	{String}										.region		Default is the Pulumi AWS region from the stack config
+ * @param	{Object}						validators
+ * @param	{Output<RequestValidator>}			.request
+ * @param	{Output<RequestValidator>}			.body
+ * @param	{Output<RequestValidator>}			.all		
  * @param	{Object}						tags		
  * @param	{Boolean}						protect	
  * 
@@ -576,7 +618,7 @@ const enableCloudwatch = (name, options) => {
  * @return {[Output<IntegrationResponse>]}		.integrationResponses
  * @return {[Output<MethodResponse>]}			.methodResponses
  */
-const _createResourcesMethodsAndIntegrations = ({ restApi, apiGatewayRole, parentResource, resources, tags, protect }) => {
+const _createResourcesMethodsAndIntegrations = ({ restApi, apiGatewayRole, parentResource, resources, validators, tags, protect }) => {
 	if (!restApi)
 		throw new Error('Missing required argument \'restApi\'')
 	if (!restApi.id)
@@ -623,12 +665,15 @@ const _createResourcesMethodsAndIntegrations = ({ restApi, apiGatewayRole, paren
 				throw new Error(`Missing required integration config for method '${methodName}'.`)
 
 			const authorizer = httpMethodConfig.authorizer
+			const { requestParameters, required } = _getRequestParameters(httpMethodConfig)
+
 			// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/apigateway/method/
 			const method = new aws.apigateway.Method(methodName, {
 				name: methodName,
 				authorization: !authorizer || !authorizer.type ? 'NONE' : authorizer.type,
 				restApi: restApi.id,
-				requestParameters: _getRequestParameters(httpMethodConfig),
+				requestParameters,
+				requestValidatorId: required ? ((validators||{}).request||{}).id : undefined,
 				resourceId: parentResource.id,
 				httpMethod,
 				tags: {
@@ -701,6 +746,7 @@ const _createResourcesMethodsAndIntegrations = ({ restApi, apiGatewayRole, paren
 							path: result.parentResourcePath
 						},
 						resources: resourceConfig,
+						validators,
 						tags, 
 						protect
 					})
@@ -732,26 +778,34 @@ const _sanitizeName = name => (name||'').toLowerCase().replace(/[^0-9a-z-_]/g,''
  * @param	{Object}		.headers			Defines the required headers.
  * @param	{Object}		.queryStrings		Defines the required query strings
  * 
- * @return	{Object}	requestParameters
+ * @return	{Object}	output
+ * @return	{Object}		.requestParameters
+ * @return	{Boolean}		.required
  */
 const _getRequestParameters = config => {
 	const { headers, queryStrings } = config || {}
 	if (!headers && !queryStrings)
-		return
+		return {}
 
-	let requestParameters
+	let requestParameters, required = false
 	if (headers && typeof(headers) == 'object')
 		requestParameters = Object.keys(headers).reduce((acc,key) => {
-			acc[`method.request.header.${key}`] = headers[key] ? true : false
+			const r = headers[key] ? true : false
+			acc[`method.request.header.${key}`] = r
+			if (r)
+				required = true
 			return acc
 		}, {})
 	if (queryStrings && typeof(queryStrings) == 'object')
 		requestParameters = Object.keys(queryStrings).reduce((acc,key) => {
-			acc[`method.request.querystring.${key}`] = queryStrings[key] ? true : false
+			const r = queryStrings[key] ? true : false
+			acc[`method.request.querystring.${key}`] = r
+			if (r)
+				required = true
 			return acc
 		}, {})
 
-	return requestParameters
+	return { requestParameters, required }
 }
 
 /**
