@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.9.6](https://github.com/cloudlesslabs/pulumix/compare/v0.9.5...v0.9.6) (2022-07-03)
+
+
+### Features
+
+* 'createResourceName' add support for 'prefix' option ([570aca0](https://github.com/cloudlesslabs/pulumix/commit/570aca00df34567b33ffec2e3cc1c2fe45dd17e9))
+
 ### [0.9.5](https://github.com/cloudlesslabs/pulumix/compare/v0.9.4...v0.9.5) (2022-06-29)
 
 
