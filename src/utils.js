@@ -162,7 +162,10 @@ const getProject = options => {
 	return {
 		project,
 		...stackData,
-		createResourceName: name => `${project}${name ? `-${name}` : ''}-${stackData.stack}`
+		createResourceName: (name, options) => {
+			const { prefix } = options || {}
+			return `${prefix||''}${project}${name ? `-${name}` : ''}-${stackData.stack}`
+		}
 	}
 }
 
