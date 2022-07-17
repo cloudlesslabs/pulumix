@@ -54,7 +54,7 @@ class Queue extends aws.sqs.Queue {
 		// Configures the DLQ (potentially create one one-the-fly)
 		if (redrivePolicy) {
 			if (!redrivePolicy.deadLetterQueue)
-				_input.redrivePolicy = `{"maxReceiveCount":"${redrivePolicy.maxReceiveCount||10}"}`
+				_input.redrivePolicy = `{"maxReceiveCount":${redrivePolicy.maxReceiveCount||10}}`
 			else {
 				const dlqName = `ddl-for-${nativeInput.name}`
 				// doc: https://www.pulumi.com/registry/packages/aws/api-docs/sqs/queue/
@@ -73,7 +73,7 @@ class Queue extends aws.sqs.Queue {
 
 				_dependsOn.push(deadLetterQueue)
 
-				_input.redrivePolicy = pulumi.interpolate `{"deadLetterTargetArn":"${deadLetterQueue.arn}","maxReceiveCount":"${redrivePolicy.maxReceiveCount||10}"}`
+				_input.redrivePolicy = pulumi.interpolate `{"deadLetterTargetArn":"${deadLetterQueue.arn}","maxReceiveCount":${redrivePolicy.maxReceiveCount||10}}`
 				_input.redriveAllowPolicy = pulumi.interpolate `{"redrivePermission":"byQueue","sourceQueueArns":["${deadLetterQueue.arn}"]}` 
 			}
 		}
