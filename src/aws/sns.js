@@ -137,9 +137,7 @@ const _createTopicSubscription = (topic, subscriber) => {
 		if (!dlq.id)
 			throw new Error('Missing required \'deadLetterQueue.id\'. When \'deadLetterQueue\' is specified as an object, its \'id\' property is required.')
 
-		_input.redrivePolicy = pulumi.interpolate `{
-			"deadLetterTargetArn": "${dlq.arn}"
-		}`
+		_input.redrivePolicy = pulumi.interpolate `{"deadLetterTargetArn":"${dlq.arn}"}`
 
 		// Adds a policy on the dead-letter queue so SNS can send messages (sqs:SendMessage) to it
 		_dependsOn.push(_createQueuePolicyToEnableSNSToSendMessages(dlqName, dlq, topic, tags, protect))
