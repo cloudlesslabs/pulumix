@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.9.8](https://github.com/cloudlesslabs/pulumix/compare/v0.9.7...v0.9.8) (2022-07-17)
+
+
+### Bug Fixes
+
+* The redrive policy of the SQS and SNS resource is always updating because of tabs ([ea0f0fc](https://github.com/cloudlesslabs/pulumix/commit/ea0f0fc21fad141898e1d14420115a081cc7017f))
+
 ### [0.9.7](https://github.com/cloudlesslabs/pulumix/compare/v0.9.6...v0.9.7) (2022-07-17)
 
 
