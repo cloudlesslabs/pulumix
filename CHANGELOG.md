@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.9.9](https://github.com/cloudlesslabs/pulumix/compare/v0.9.8...v0.9.9) (2022-08-15)
+
+
+### Bug Fixes
+
+* CloudFront cannot be configured with custom domains without an ACM cert ([2ad8061](https://github.com/cloudlesslabs/pulumix/commit/2ad806171643e58637c1bdab1c0f25e07685e7ed))
+
 ### [0.9.8](https://github.com/cloudlesslabs/pulumix/compare/v0.9.7...v0.9.8) (2022-07-17)
 
 
