@@ -180,8 +180,17 @@ const Website = function (input) {
 
 				let cloudfrontDistro = null
 				if (cloudfront) {
+					const customDomainOn = cloudfront.customDomains && cloudfront.customDomains[0]
+					const viewerCertificate = {}
+					if (customDomainOn) {
+						if (!cloudfront.acmCertificateArn)
+							throw new Error('Missing required property \'website.cloudfront.acmCertificateArn\'. When custom domains are set up, the ARN of an AWS Certificate Manager SSL certificate is required.')
+						viewerCertificate.acmCertificateArn = cloudfront.acmCertificateArn
+					} else
+						viewerCertificate.cloudfrontDefaultCertificate = true
+					
 					const cloudfrontName = `${name}-distro`
-					const originId = cloudfront.customDomains && cloudfront.customDomains[0] ? cloudfront.customDomains[0] : cloudfrontName
+					const originId = customDomainOn ? cloudfront.customDomains[0] : cloudfrontName
 					cloudfrontDistro = new aws.cloudfront.Distribution(cloudfrontName, {
 						name: cloudfrontName,
 						origins: [{
@@ -216,9 +225,7 @@ const Website = function (input) {
 							...tags,
 							Name: cloudfrontName
 						},
-						viewerCertificate: {
-							cloudfrontDefaultCertificate: true
-						}
+						viewerCertificate
 					}, {
 						protect,
 						dependsOn: [bucket]
