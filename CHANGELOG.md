@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.9.10](https://github.com/cloudlesslabs/pulumix/compare/v0.9.9...v0.9.10) (2022-08-15)
+
+
+### Bug Fixes
+
+* CloudFront fails with 'Member must satisfy enum value set: [static-ip, sni-only, vip]' ([c672a00](https://github.com/cloudlesslabs/pulumix/commit/c672a009da9044419cd9c63577eb1927d0dcfb88))
+
 ### [0.9.9](https://github.com/cloudlesslabs/pulumix/compare/v0.9.8...v0.9.9) (2022-08-15)
 
 
