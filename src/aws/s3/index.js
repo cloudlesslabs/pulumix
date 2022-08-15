@@ -101,7 +101,7 @@ const _uploadFiles = async ({ bucket, content, cloudfrontDistro, cloudfront }) =
  * @param  {Output<String>}					.indexDocument				e.g., 'index.html'	
  * @param  {Output<String>}					.errorDocument				e.g., 'error.html'
  * @param  {Output<String>}					.redirectAllRequestsTo		e.g., 'https://neap.co'
- * @param  {Output<Object>}					.routingRules
+ * @param  {Output<[Object]>}				.routingRules				https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-s3-websiteconfiguration-routingrules.html	
  * @param  {Output<[Object]>}				.cors						https://www.pulumi.com/docs/reference/pkg/aws/s3/bucket/#using-cors	
  * @param  {Output<Object>}					.content
  * @param  {Output<String>}						.dir					Local path to the content that should be moved to the bucket.
@@ -112,6 +112,8 @@ const _uploadFiles = async ({ bucket, content, cloudfrontDistro, cloudfront }) =
  * @param  {Output<Boolean>}					.remove					Default false. True means all files must be removed from the bucket.
  * @param  {Output<Object>}					.cloudfront
  * @param  {Output<[String]>}					.customDomains			e.g., ['www.example.com', 'example.com']
+ * @param  {Output<String>}						.acmCertificateArn
+ * @param  {Output<String>}						.sslSupportMethod		Valid values: 'sni-only' (default), 'static-ip' or 'vip'. WARNING: 'vip' incurs extra costs.
  * @param  {Output<[String]>}					.allowedMethods			Default ['GET', 'HEAD', 'OPTIONS']
  * @param  {Output<Boolean>}					.invalidateOnUpdate		Default false. True means that if 'website.content' is set and content updates are detected, then the distribution must be invalidated
  * @param  {Output<Boolean>}			versioning						Default false.		
@@ -186,8 +188,12 @@ const Website = function (input) {
 						if (!cloudfront.acmCertificateArn)
 							throw new Error('Missing required property \'website.cloudfront.acmCertificateArn\'. When custom domains are set up, the ARN of an AWS Certificate Manager SSL certificate is required.')
 						viewerCertificate.acmCertificateArn = cloudfront.acmCertificateArn
+						viewerCertificate.sslSupportMethod = cloudfront.sslSupportMethod || 'sni-only'
 					} else
 						viewerCertificate.cloudfrontDefaultCertificate = true
+
+					if (!viewerCertificate.sslSupportMethod && cloudfront.sslSupportMethod)
+						viewerCertificate.sslSupportMethod = cloudfront.sslSupportMethod
 					
 					const cloudfrontName = `${name}-distro`
 					const originId = customDomainOn ? cloudfront.customDomains[0] : cloudfrontName
