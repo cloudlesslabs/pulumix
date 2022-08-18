@@ -112,7 +112,11 @@ const _uploadFiles = async ({ bucket, content, cloudfrontDistro, cloudfront }) =
  * @param  {Output<Boolean>}					.remove					Default false. True means all files must be removed from the bucket.
  * @param  {Output<Object>}					.cloudfront
  * @param  {Output<[String]>}					.customDomains			e.g., ['www.example.com', 'example.com']
- * @param  {Output<String>}						.acmCertificateArn
+ * @param  {Output<Object>}						.acm					AWS ACM config
+ * @param  {Output<String>}							.arn				(2 )AWS ACM certificate's ARN or 'auto'
+ * @param  {Output<String>}							.region				Optional. AWS region where to provision the ACM cert. Only meaningfull if 'website.cloudfront.acm.arn' is set to 'auto'. 
+ * @param  {Output<Boolean>}						.validateChallenge	(3) Only meaningfull if 'website.cloudfront.acm.arn' is set to 'auto'
+ * @param  {Output<Boolean>}						.DomainZoneId		(4) Only required when 'website.cloudfront.acm.arn' is set to 'auto' and 'website.cloudfront.acm.validateChallenge' is set to true.
  * @param  {Output<String>}						.sslSupportMethod		Valid values: 'sni-only' (default), 'static-ip' or 'vip'. WARNING: 'vip' incurs extra costs.
  * @param  {Output<[String]>}					.allowedMethods			Default ['GET', 'HEAD', 'OPTIONS']
  * @param  {Output<Boolean>}					.invalidateOnUpdate		Default false. True means that if 'website.content' is set and content updates are detected, then the distribution must be invalidated
@@ -132,10 +136,18 @@ const _uploadFiles = async ({ bucket, content, cloudfrontDistro, cloudfront }) =
  * @return {Output<String>}						.domainName					URL where the website is hosted.
  * @return {Output<[Object]>}				.files[]
  * @return {Output<String>}						.key						Object's key in S3
- * @return {Output<String>}						.hash						MD5 file hash    
+ * @return {Output<String>}						.hash						MD5 file hash   
+ * @return {Output<Certificate>}			.acmCert						Not null when 'website.cloudfront.acm.arn' is set to 'auto'.
  * 
  */
-// (1) For example, to ignore the content under the node_modules folder: '**/node_modules/**'
+// (1)	For example, to ignore the content under the node_modules folder: '**/node_modules/**'
+// (2)	'auto' means a new AWS ACM certificate is automatically profisionned using the values from the 
+// 		'website.cloudfront.customDomains' properties. It uses the 'DNS' challenge.
+// (3)	When 'website.cloudfront.acm.validateChallenge' is true and 'website.cloudfront.acm.arn' is set to 'auto', a new 
+// 		Route 53 record is added to the 'website.cloudfront.acm.DomainZoneId' to validate the DNS challenge (WARNING:
+// 		this assumes that the Route 53 Zone ID is also managed in the same AWS account).
+// (4)	Zone ID in Route 53 which is required to validate DNS challenge.
+// 		
 // 
 const Website = function (input) {
 	const output = unwrap(input).apply(({ name, acl:_acl, website:__website, versioning, tags, parent, dependsOn, protect }) => {
@@ -150,7 +162,10 @@ const Website = function (input) {
 			const acl = _website ? 'public-read' : _acl
 			const { website, corsRules, content:_content, cloudfront:_cloudfront } = getWebsiteProps(_website)
 
-			return pulumi.all([unwrap(_content), unwrap(_cloudfront)]).apply(([content, cloudfront]) => {
+			return pulumi.all([
+				unwrap(_content), 
+				unwrap(_cloudfront).apply(cf => cf && cf.acm ? unwrap(cf.acm).apply(acm => ({ ...cf, acm })) : cf)
+			]).apply(([content, cloudfront]) => {
 				const policy = !website ? undefined : JSON.stringify({
 					Version: '2012-10-17',
 					Statement: [{
@@ -180,14 +195,63 @@ const Website = function (input) {
 					protect 
 				})
 
-				let cloudfrontDistro = null
+				let cloudfrontDistro = null, cert = null
 				if (cloudfront) {
+					const cfDependsOn = [bucket]
 					const customDomainOn = cloudfront.customDomains && cloudfront.customDomains[0]
 					const viewerCertificate = {}
 					if (customDomainOn) {
-						if (!cloudfront.acmCertificateArn)
-							throw new Error('Missing required property \'website.cloudfront.acmCertificateArn\'. When custom domains are set up, the ARN of an AWS Certificate Manager SSL certificate is required.')
-						viewerCertificate.acmCertificateArn = cloudfront.acmCertificateArn
+						if (!cloudfront.acm || !cloudfront.acm.arn)
+							throw new Error('Missing required property \'website.cloudfront.acm.arn\'. When custom domains are set up, the ARN of an AWS Certificate Manager SSL certificate is required.')
+						if (cloudfront.acm.arn == 'auto') {
+							if (cloudfront.acm.validateChallenge && !cloudfront.acm.DomainZoneId)
+								throw new Error('Missing required property \'website.cloudfront.acm.DomainZoneId\'. When the \'website.cloudfront.acm.arn\' is set to \'auto\' and \'website.cloudfront.acm.validateChallenge\' is set to true, a valid AWS Route 53 Zone ID is required in order to create a DNS record that can validate the DNS challenge.')
+							
+							const certOptions = {
+								protect
+							}
+							if (cloudfront.acm.region)
+								certOptions.provider = new aws.Provider(name, { region: cloudfront.acm.region })
+
+							// Creates a new SSL cert using AWS ACM. Doc: https://www.pulumi.com/registry/packages/aws/api-docs/acm/certificate/
+							const certName = `sslcert-for-${name}`
+							cert = new aws.acm.Certificate(certName, {
+								name: certName,
+								domainName: cloudfront.customDomains[0],
+								subjectAlternativeNames: cloudfront.customDomains.slice(1),
+								tags: {
+									...tags,
+									Name: certName
+								},
+								validationMethod: 'DNS'
+							}, certOptions)
+
+							viewerCertificate.acmCertificateArn = cert.arn
+							cfDependsOn.push(cert)
+
+							if (cloudfront.acm.validateChallenge) {
+								// Solves DNS challenge (WARNING: Only works if the DNS is also maintain in Route 53 in the same AWS account.)
+								// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/route53/record/
+								const challengeName = `dnsval-for-${name}`
+								const dnsChallengedRecord = new aws.route53.Record(challengeName, {
+									zoneId: cloudfront.acm.DomainZoneId,
+									name: cert.domainValidationOptions[0].resourceRecordName,
+									type: cert.domainValidationOptions[0].resourceRecordType,
+									ttl: 300,
+									records: [cert.domainValidationOptions[0].resourceRecordValue],
+									tags: {
+										...tags,
+										Name: challengeName
+									}
+								},{
+									protect,
+									dependsOn: [cert]
+								})
+
+								cfDependsOn.push(dnsChallengedRecord)
+							}
+						} else
+							viewerCertificate.acmCertificateArn = cloudfront.acm.arn
 						viewerCertificate.sslSupportMethod = cloudfront.sslSupportMethod || 'sni-only'
 					} else
 						viewerCertificate.cloudfrontDefaultCertificate = true
@@ -234,7 +298,7 @@ const Website = function (input) {
 						viewerCertificate
 					}, {
 						protect,
-						dependsOn: [bucket]
+						dependsOn: cfDependsOn
 					})
 				}
 
@@ -246,7 +310,8 @@ const Website = function (input) {
 				return {
 					bucket,
 					cloudfront: cloudfrontDistro,
-					files
+					files,
+					cert
 				}
 			})
 		})
@@ -255,6 +320,7 @@ const Website = function (input) {
 	this.bucket = output.bucket
 	this.cloudfront = output.cloudfront
 	this.files = output.files
+	this.acmCert = output.cert
 
 	return this
 }
