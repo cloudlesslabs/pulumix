@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.10.3](https://github.com/cloudlesslabs/pulumix/compare/v0.10.2...v0.10.3) (2022-08-18)
+
+
+### Bug Fixes
+
+* Typo ([8fb7965](https://github.com/cloudlesslabs/pulumix/commit/8fb7965e341619889348ca5ef8659e8c0094c85a))
+
 ### [0.10.2](https://github.com/cloudlesslabs/pulumix/compare/v0.10.1...v0.10.2) (2022-08-18)
 
 
