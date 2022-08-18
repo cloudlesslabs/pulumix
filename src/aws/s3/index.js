@@ -114,7 +114,6 @@ const _uploadFiles = async ({ bucket, content, cloudfrontDistro, cloudfront }) =
  * @param  {Output<[String]>}					.customDomains			e.g., ['www.example.com', 'example.com']
  * @param  {Output<Object>}						.acm					AWS ACM config
  * @param  {Output<String>}							.arn				(2 )AWS ACM certificate's ARN or 'auto'
- * @param  {Output<String>}							.region				Optional. AWS region where to provision the ACM cert. Only meaningfull if 'website.cloudfront.acm.arn' is set to 'auto'. 
  * @param  {Output<Boolean>}						.validateChallenge	(3) Only meaningfull if 'website.cloudfront.acm.arn' is set to 'auto'
  * @param  {Output<Boolean>}						.DomainZoneId		(4) Only required when 'website.cloudfront.acm.arn' is set to 'auto' and 'website.cloudfront.acm.validateChallenge' is set to true.
  * @param  {Output<String>}						.sslSupportMethod		Valid values: 'sni-only' (default), 'static-ip' or 'vip'. WARNING: 'vip' incurs extra costs.
@@ -210,8 +209,10 @@ const Website = function (input) {
 							const certOptions = {
 								protect
 							}
-							if (cloudfront.acm.region)
-								certOptions.provider = new aws.Provider(name, { region: cloudfront.acm.region })
+
+							// ACM's SSL certs provisionned for CloudFront must be hosted in 'us-east-1' (Virginia)
+							if (aws.config.region != 'us-east-1')
+								certOptions.provider = new aws.Provider(name, { region: 'us-east-1' })
 
 							// Creates a new SSL cert using AWS ACM. Doc: https://www.pulumi.com/registry/packages/aws/api-docs/acm/certificate/
 							const certName = `sslcert-for-${name}`
