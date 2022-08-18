@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.10.0](https://github.com/cloudlesslabs/pulumix/compare/v0.9.10...v0.10.0) (2022-08-18)
+
+
+### Features
+
+* Add support for automatic SSL cert provisionning for S3 website when custom domains are configured ([676e818](https://github.com/cloudlesslabs/pulumix/commit/676e81827c424be2b2f1b776f079a7e846d516d2))
+
 ### [0.9.10](https://github.com/cloudlesslabs/pulumix/compare/v0.9.9...v0.9.10) (2022-08-15)
 
 
