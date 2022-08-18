@@ -115,7 +115,7 @@ const _uploadFiles = async ({ bucket, content, cloudfrontDistro, cloudfront }) =
  * @param  {Output<Object>}						.acm					AWS ACM config
  * @param  {Output<String>}							.arn				(2 )AWS ACM certificate's ARN or 'auto'
  * @param  {Output<Boolean>}						.validateChallenge	(3) Only meaningfull if 'website.cloudfront.acm.arn' is set to 'auto'
- * @param  {Output<Boolean>}						.DomainZoneId		(4) Only required when 'website.cloudfront.acm.arn' is set to 'auto' and 'website.cloudfront.acm.validateChallenge' is set to true.
+ * @param  {Output<Boolean>}						.domainZoneId		(4) Only required when 'website.cloudfront.acm.arn' is set to 'auto' and 'website.cloudfront.acm.validateChallenge' is set to true.
  * @param  {Output<String>}						.sslSupportMethod		Valid values: 'sni-only' (default), 'static-ip' or 'vip'. WARNING: 'vip' incurs extra costs.
  * @param  {Output<[String]>}					.allowedMethods			Default ['GET', 'HEAD', 'OPTIONS']
  * @param  {Output<Boolean>}					.invalidateOnUpdate		Default false. True means that if 'website.content' is set and content updates are detected, then the distribution must be invalidated
@@ -143,7 +143,7 @@ const _uploadFiles = async ({ bucket, content, cloudfrontDistro, cloudfront }) =
 // (2)	'auto' means a new AWS ACM certificate is automatically profisionned using the values from the 
 // 		'website.cloudfront.customDomains' properties. It uses the 'DNS' challenge.
 // (3)	When 'website.cloudfront.acm.validateChallenge' is true and 'website.cloudfront.acm.arn' is set to 'auto', a new 
-// 		Route 53 record is added to the 'website.cloudfront.acm.DomainZoneId' to validate the DNS challenge (WARNING:
+// 		Route 53 record is added to the 'website.cloudfront.acm.domainZoneId' to validate the DNS challenge (WARNING:
 // 		this assumes that the Route 53 Zone ID is also managed in the same AWS account).
 // (4)	Zone ID in Route 53 which is required to validate DNS challenge.
 // 		
@@ -203,8 +203,8 @@ const Website = function (input) {
 						if (!cloudfront.acm || !cloudfront.acm.arn)
 							throw new Error('Missing required property \'website.cloudfront.acm.arn\'. When custom domains are set up, the ARN of an AWS Certificate Manager SSL certificate is required.')
 						if (cloudfront.acm.arn == 'auto') {
-							if (cloudfront.acm.validateChallenge && !cloudfront.acm.DomainZoneId)
-								throw new Error('Missing required property \'website.cloudfront.acm.DomainZoneId\'. When the \'website.cloudfront.acm.arn\' is set to \'auto\' and \'website.cloudfront.acm.validateChallenge\' is set to true, a valid AWS Route 53 Zone ID is required in order to create a DNS record that can validate the DNS challenge.')
+							if (cloudfront.acm.validateChallenge && !cloudfront.acm.domainZoneId)
+								throw new Error('Missing required property \'website.cloudfront.acm.domainZoneId\'. When the \'website.cloudfront.acm.arn\' is set to \'auto\' and \'website.cloudfront.acm.validateChallenge\' is set to true, a valid AWS Route 53 Zone ID is required in order to create a DNS record that can validate the DNS challenge.')
 							
 							const certOptions = {
 								protect
@@ -235,7 +235,7 @@ const Website = function (input) {
 								// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/route53/record/
 								const challengeName = `dnsval-for-${name}`
 								const dnsChallengedRecord = new aws.route53.Record(challengeName, {
-									zoneId: cloudfront.acm.DomainZoneId,
+									zoneId: cloudfront.acm.domainZoneId,
 									name: cert.domainValidationOptions[0].resourceRecordName,
 									type: cert.domainValidationOptions[0].resourceRecordType,
 									ttl: 300,
