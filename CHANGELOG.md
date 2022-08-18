@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.11.0](https://github.com/cloudlesslabs/pulumix/compare/v0.10.3...v0.11.0) (2022-08-18)
+
+
+### Features
+
+* Add support for creating new DNS records in Route 53 when configuring a custom domain on an S3 bucket connected to CloudFront ([aae97c4](https://github.com/cloudlesslabs/pulumix/commit/aae97c46b63f18367fba2a8d9f9072f8a560c35d))
+
 ### [0.10.3](https://github.com/cloudlesslabs/pulumix/compare/v0.10.2...v0.10.3) (2022-08-18)
 
 
