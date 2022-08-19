@@ -124,6 +124,11 @@ const _uploadFiles = async ({ bucket, content, cloudfrontDistro, cloudfront }) =
  * @param  {Output<String>}						.sslSupportMethod		Valid values: 'sni-only' (default), 'static-ip' or 'vip'. WARNING: 'vip' incurs extra costs.
  * @param  {Output<[String]>}					.allowedMethods			Default ['GET', 'HEAD', 'OPTIONS']
  * @param  {Output<Boolean>}					.invalidateOnUpdate		Default false. True means that if 'website.content' is set and content updates are detected, then the distribution must be invalidated
+ * @param  {Output<[Object]>}					.customErrorResponses[]
+ * @param  {Output<Number>}							.errorCode
+ * @param  {Output<Number>}							.ttl
+ * @param  {Output<Number>}							.responseCode
+ * @param  {Output<String>}							.responsePagePath
  * @param  {Output<Boolean>}			versioning						Default false.		
  * @param  {Output<String>}				tags
  * @param  {Output<Resource>}			parent
@@ -298,6 +303,12 @@ const Website = function (input) {
 							defaultTtl: 3600,
 							maxTtl: 86400
 						},
+						customErrorResponses: (cloudfront.customErrorResponses||[]).map(e => ({
+							errorCode: e.errorCode||404,
+							errorCachingMinTtl: e.ttl||0,
+							responseCode: e.responseCode||200,
+							responsePagePath: e.responsePagePath||'/'
+						})),
 						restrictions: {
 							geoRestriction: {
 								restrictionType: 'none'

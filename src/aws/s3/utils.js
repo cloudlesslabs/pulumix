@@ -550,9 +550,26 @@ const getWebsiteProps = website => {
 		return { website:{} }
 
 	const { cors, content, cloudfront, ...web } = website
+	if (web.routingRules) {
+		let routingRules = web.routingRules
+		if (typeof(web.routingRules) == 'string') {
+			try {
+				routingRules = JSON.parse(web.routingRules)
+			} catch(err) {
+				throw new Error(`Invalid property exception. String in 'website.routingRules' is not a valid JSON array. Details: ${err.message}`)
+			}
+		}
+		if (!Array.isArray(routingRules))
+			throw new Error('Wrong property exception. \'website.routingRules\' must represent an array (it can be a JSON string array).')
+		const missingConditionIdx = routingRules.findIndex(r => !r || !r.Condition)
+		if (missingConditionIdx >= 0)
+			throw new Error(`Missing required property 'website.routingRules[${missingConditionIdx}].Condition'`)
+		const missingRedirectIdx = routingRules.findIndex(r => !r || !r.Redirect)
+		if (missingRedirectIdx >= 0)
+			throw new Error(`Missing required property 'website.routingRules[${missingRedirectIdx}].Redirect'`)
 
-	if (web.routingRules && typeof(web.routingRules) != 'string')
-		web.routingRules = JSON.stringify(web.routingRules)
+		web.routingRules = JSON.stringify(routingRules)
+	}
 
 	return {
 		website: web,
