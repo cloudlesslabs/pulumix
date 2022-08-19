@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.11.1](https://github.com/cloudlesslabs/pulumix/compare/v0.11.0...v0.11.1) (2022-08-19)
+
+
+### Features
+
+* S3 website - Add support for CloudFront custom error redirection ([3ff9ca0](https://github.com/cloudlesslabs/pulumix/commit/3ff9ca0fbb03973ee1087e77080b645b746be230))
+
 ## [0.11.0](https://github.com/cloudlesslabs/pulumix/compare/v0.10.3...v0.11.0) (2022-08-18)
 
 
