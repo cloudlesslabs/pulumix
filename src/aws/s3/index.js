@@ -126,7 +126,7 @@ const _uploadFiles = async ({ bucket, content, cloudfrontDistro, cloudfront }) =
  * @param  {Output<Boolean>}					.invalidateOnUpdate		Default false. True means that if 'website.content' is set and content updates are detected, then the distribution must be invalidated
  * @param  {Output<[Object]>}					.customErrorResponses[]
  * @param  {Output<Number>}							.errorCode
- * @param  {Output<Number>}							.ttl
+ * @param  {Output<Number>}							.ttl				Unit is seconds
  * @param  {Output<Number>}							.responseCode
  * @param  {Output<String>}							.responsePagePath
  * @param  {Output<Boolean>}			versioning						Default false.		

@@ -591,6 +591,8 @@ const _getLambdaRequestResponseTemplate = input => {
 			args: '$utils.toJson($context.arguments)',
 			identity: '$utils.toJson($context.identity)',
 			info: '$utils.toJson($context.info)',
+			selectionSetList: '$utils.toJson($context.info.selectionSetList)', // This field must be explicitly serialized. This is a known issue: https://github.com/aws-amplify/amplify-cli/issues/4869
+			selectionSetGraphQL: '$utils.toJson($context.info.selectionSetGraphQL)', // This field must be explicitly serialized. This is a known issue: https://github.com/aws-amplify/amplify-cli/issues/4869
 			request: '$utils.toJson($context.request)'
 		}
 	}
@@ -602,6 +604,8 @@ const _getLambdaRequestResponseTemplate = input => {
 			.replace('"$utils.toJson($context.identity)"','$utils.toJson($context.identity)')
 			.replace('"$utils.toJson($context.info)"','$utils.toJson($context.info)')
 			.replace('"$utils.toJson($context.request)"','$utils.toJson($context.request)')
+			.replace('"$utils.toJson($context.info.selectionSetList)"','$utils.toJson($context.info.selectionSetList)')
+			.replace('"$utils.toJson($context.info.selectionSetGraphQL)"','$utils.toJson($context.info.selectionSetGraphQL)')
 	}
 
 	if (responseTemplate)
