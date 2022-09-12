@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.12.0](https://github.com/cloudlesslabs/pulumix/compare/v0.11.1...v0.12.0) (2022-09-12)
+
+
+### Features
+
+* AppSync - Add support for serializing the selectionSetList and selectionSetGraphQL in the payload ([f9b8d24](https://github.com/cloudlesslabs/pulumix/commit/f9b8d2478ca4ceb9711057414754c3ce9cc0b6dc))
+
 ### [0.11.1](https://github.com/cloudlesslabs/pulumix/compare/v0.11.0...v0.11.1) (2022-08-19)
 
 
