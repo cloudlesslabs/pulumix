@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.12.1](https://github.com/cloudlesslabs/pulumix/compare/v0.12.0...v0.12.1) (2022-12-15)
+
+
+### Bug Fixes
+
+* Cognito's SES configurationSet is not a required property. ([86953f3](https://github.com/cloudlesslabs/pulumix/commit/86953f35417bbb7efd300aca36b7d1dfecacbbb6))
+
 ## [0.12.0](https://github.com/cloudlesslabs/pulumix/compare/v0.11.1...v0.12.0) (2022-09-12)
 
 
