@@ -886,8 +886,6 @@ const _getSESconfig = config => {
 		throw new Error('Missing required \'email.ses.from\'' )
 	if (!config.ses.replyTo)
 		throw new Error('Missing required \'email.ses.replyTo\'' )
-	if (!config.ses.configurationSet)
-		throw new Error('Missing required \'email.ses.configurationSet\'' )
 	if (!config.ses.arn)
 		throw new Error('Missing required \'email.ses.arn\'' )
 
