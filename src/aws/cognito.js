@@ -13,6 +13,18 @@ const { keepResourcesOnly } = require('../utils')
 const REGION = aws.config.region
 const GRANT_TYPES = ['code', 'implicit', 'client_credentials', 'password', 'refresh_token']
 const DEFAULT_GRANT_TYPES = ['password', 'refresh_token']
+const HOOK_NAMES = [
+	{ name: 'preAuth', canonName: 'preAuthentication', permissionName: 'pre-auth-permission' }, 
+	{ name: 'postAuth', canonName: 'postAuthentication', permissionName: 'post-auth-permission' }, 
+	{ name: 'postConfirmation', canonName: null, permissionName: 'post-confirm-permission' }, 
+	{ name: 'preSignUp', canonName: null, permissionName: 'pre-signup-permission' }, 
+	{ name: 'preTokenGeneration', canonName: null, permissionName: 'pre-token-gen-permission' }, 
+	{ name: 'userMigration', canonName: null, permissionName: 'user-migration-permission' }, 
+	{ name: 'verifyAuthChallengeResponse', canonName: null, permissionName: 'verify-auth-resp-permission' },
+	{ name: 'customMessage', canonName: null, permissionName: 'cust-msg-permission' },
+	{ name: 'customSmsSender', canonName: null, permissionName: 'cust-sms-sendr-permission' },
+	{ name: 'customEmailSender', canonName: null, permissionName: 'cust-email-sendr-permission' }
+]
 
 class UserPool extends aws.cognito.UserPool {
 	/**
@@ -67,6 +79,9 @@ class UserPool extends aws.cognito.UserPool {
 	 * @param  {Object}  					.preTokenGeneration					(2) Lambda object.
 	 * @param  {Object}  					.userMigration						(2) Lambda object. 
 	 * @param  {Object}  					.verifyAuthChallengeResponse		(2) Lambda object.
+	 * @param  {Object}  					.customMessage						(2) Lambda object.
+	 * @param  {Object}  					.customSmsSender					(2) Lambda object.
+	 * @param  {Object}  					.customEmailSender					(2) Lambda object.
 	 * @param  {Object} 				mfa										Default null (i.e., MFA off)
 	 * @param  {[String]} 					.methods							Default null (i.e., MFA off). E.g., ['sms', 'totp'] Valid values: 'email', 'sms', 'totp'
 	 * @param  {Boolean} 					.optional							Default false. True means only for individual users who have MFA enabled.
@@ -908,6 +923,9 @@ const _getSESconfig = config => {
  * @param  {Object}		.preTokenGeneration					(1) Lambda object.
  * @param  {Object}		.userMigration						(1) Lambda object. 
  * @param  {Object}		.verifyAuthChallengeResponse		(1) Lambda object. 
+ * @param  {Object}  	.customMessage						(2) Lambda object.
+ * @param  {Object}  	.customSmsSender					(2) Lambda object.
+ * @param  {Object}  	.customEmailSender					(2) Lambda object.
  * 
  * @return {String} lambdaConfig.preAuthentication
  * @return {String} lambdaConfig.postAuthentication
@@ -916,6 +934,7 @@ const _getSESconfig = config => {
  * @return {String} lambdaConfig.preTokenGeneration
  * @return {String} lambdaConfig.userMigration
  * @return {String} lambdaConfig.verifyAuthChallengeResponse
+ * @return {String} lambdaConfig.customMessage
  *
  * (1) A Lambda object has 2 required properties:
  * 		- {String} name
@@ -928,40 +947,14 @@ const _getLambdaConfig = hooks => {
 
 	const lambdaConfig = {}
 
-	if (hooks.preAuth) {
-		if (!hooks.preAuth.arn)
-			throw new Error(`${errMsg}. Missing required 'hooks.preAuth.arn' property.`)
-		lambdaConfig.preAuthentication = hooks.preAuth.arn
-	}
-	if (hooks.postAuth) {
-		if (!hooks.postAuth.arn)
-			throw new Error(`${errMsg}. Missing required 'hooks.postAuth.arn' property.`)
-		lambdaConfig.postAuthentication = hooks.postAuth.arn
-	}
-	if (hooks.postConfirmation) {
-		if (!hooks.postConfirmation.arn)
-			throw new Error(`${errMsg}. Missing required 'hooks.postConfirmation.arn' property.`)
-		lambdaConfig.postConfirmation = hooks.postConfirmation.arn
-	}
-	if (hooks.preSignUp) {
-		if (!hooks.preSignUp.arn)
-			throw new Error(`${errMsg}. Missing required 'hooks.preSignUp.arn' property.`)
-		lambdaConfig.preSignUp = hooks.preSignUp.arn
-	}
-	if (hooks.preTokenGeneration) {
-		if (!hooks.preTokenGeneration.arn)
-			throw new Error(`${errMsg}. Missing required 'hooks.preTokenGeneration.arn' property.`)
-		lambdaConfig.preTokenGeneration = hooks.preTokenGeneration.arn
-	}
-	if (hooks.userMigration) {
-		if (!hooks.userMigration.arn)
-			throw new Error(`${errMsg}. Missing required 'hooks.userMigration.arn' property.`)
-		lambdaConfig.userMigration = hooks.userMigration.arn
-	}
-	if (hooks.verifyAuthChallengeResponse) {
-		if (!hooks.verifyAuthChallengeResponse.arn)
-			throw new Error(`${errMsg}. Missing required 'hooks.verifyAuthChallengeResponse.arn' property.`)
-		lambdaConfig.verifyAuthChallengeResponse = hooks.verifyAuthChallengeResponse.arn
+	for (let i =0;i<HOOK_NAMES.length;i++) {
+		const { name, canonName } = HOOK_NAMES[i]
+		if (hooks[name]) {
+			if (!hooks[name].arn)
+				throw new Error(`${errMsg}. Missing required 'hooks.${name}.arn' property.`)
+			
+			lambdaConfig[canonName||name] = hooks[name].arn
+		}
 	}
 
 	return lambdaConfig
@@ -995,20 +988,11 @@ const _createHookPermissions = (hooks, parentName, userPoolArn) => {
 	if (!userPoolArn)
 		throw new Error(`${errMsg}. Missing required argument 'userPoolArn'.`)
 
-	if (hooks.preAuth)
-		permissions.push(_createLambdaPermission(`${parentName}-pre-auth-permission`, hooks.preAuth.name, userPoolArn))
-	if (hooks.postAuth)
-		permissions.push(_createLambdaPermission(`${parentName}-post-auth-permission`, hooks.postAuth.name, userPoolArn))
-	if (hooks.postConfirmation)
-		permissions.push(_createLambdaPermission(`${parentName}-post-confirm-permission`, hooks.postConfirmation.name, userPoolArn))
-	if (hooks.preSignUp)
-		permissions.push(_createLambdaPermission(`${parentName}-pre-signup-permission`, hooks.preSignUp.name, userPoolArn))
-	if (hooks.preTokenGeneration)
-		permissions.push(_createLambdaPermission(`${parentName}-pre-token-gen-permission`, hooks.preTokenGeneration.name, userPoolArn))
-	if (hooks.userMigration)
-		permissions.push(_createLambdaPermission(`${parentName}-user-migration-permission`, hooks.userMigration.name, userPoolArn))
-	if (hooks.verifyAuthChallengeResponse)
-		permissions.push(_createLambdaPermission(`${parentName}-verify-auth-resp-permission`, hooks.verifyAuthChallengeResponse.name, userPoolArn))
+	for (let i=0;i<HOOK_NAMES.length;i++) {
+		const { name, permissionName } = HOOK_NAMES[i]
+		if (hooks[name])
+			permissions.push(_createLambdaPermission(`${parentName}-${permissionName}`, hooks[name].name, userPoolArn))
+	}
 
 	return permissions
 }
