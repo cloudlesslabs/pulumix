@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.13.0](https://github.com/cloudlesslabs/pulumix/compare/v0.12.1...v0.13.0) (2022-12-18)
+
+
+### Features
+
+* Add support for all cognito lambda hook trigger ([fe16560](https://github.com/cloudlesslabs/pulumix/commit/fe165606fa7a956bee92507984d2ae85555a6e2f))
+
 ### [0.12.1](https://github.com/cloudlesslabs/pulumix/compare/v0.12.0...v0.12.1) (2022-12-15)
 
 
