@@ -379,7 +379,7 @@ class Lambda extends aws.lambda.Function {
 		const sqsEventSources = (eventSources||[]).filter(e => e && e.name == 'sqs')
 		if (sqsEventSources && sqsEventSources.length) {
 			for (let i=0;i<sqsEventSources.length;i++) {
-				const { queue, filterCriteria } = sqsEventSources[i]||{}
+				const { queue, ...nativeProps } = sqsEventSources[i]||{}
 				if (!queue)
 					throw new Error('Missing required eventSources[name=\'sqs\'].queue')
 				if (!queue.arn)
@@ -391,7 +391,7 @@ class Lambda extends aws.lambda.Function {
 					name: eventSourceName,
 					eventSourceArn: queue.arn,
 					functionName: this.arn,
-					filterCriteria,
+					...nativeProps,
 					tags: {
 						...tags,
 						Name: eventSourceName
