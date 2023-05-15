@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.14.0](https://github.com/cloudlesslabs/pulumix/compare/v0.13.0...v0.14.0) (2023-05-15)
+
+
+### Features
+
+* Add support for native properties on the Lambda event source mapping ([7b94209](https://github.com/cloudlesslabs/pulumix/commit/7b94209a65fbcbaaf83ca2f4745a5df3f2d70061))
+
 ## [0.13.0](https://github.com/cloudlesslabs/pulumix/compare/v0.12.1...v0.13.0) (2022-12-18)
 
 
