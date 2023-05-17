@@ -13,7 +13,7 @@ const aws = require('@pulumi/aws')
 const fs = require('fs')
 const path = require('path')
 const { Image } = require('./ecr')
-const { unwrap, keepResourcesOnly } = require('../utils')
+const { unwrap, keepResourcesOnly, safeResourceName } = require('../utils')
 const { SecurityGroup } = require('./securityGroup')
 
 const VALID_EVENT_SOURCES = ['schedule', 'sqs', 'dynamodb', 'kinesis', 'msk', 'kafka', 'aws_mq']
@@ -156,7 +156,7 @@ class Lambda extends aws.lambda.Function {
 				throw new Error(`Unfortunatelly, Pulumix does not support the following event sources yet: ${notSupportedEventSources}. Currently supported event sources are: ${SUPPORTED_EVENT_SOURCES}.`)
 		}
 		
-		const canonicalName = `${name}-lambda`
+		const canonicalName = safeResourceName(`${name}-lambda`)
 
 		// IAM role. Doc: https://www.pulumi.com/docs/reference/pkg/aws/iam/role/
 		const lambdaRole = new aws.iam.Role(canonicalName, {
@@ -255,7 +255,7 @@ class Lambda extends aws.lambda.Function {
 					if (!policy.arn)
 						throw new Error(`Invalid argument exception. Some policies in lambda ${name} don't have an arn.`)	
 						
-					dependsOn.push(new aws.iam.RolePolicyAttachment(`${canonicalName}-${policy.name}`, {
+					dependsOn.push(new aws.iam.RolePolicyAttachment(safeResourceName(`${canonicalName}-${policy.name}`), {
 						role: lambdaRole.name,
 						policyArn: policy.arn
 					}))
@@ -320,7 +320,7 @@ class Lambda extends aws.lambda.Function {
 			schedule = scheduleEventSource
 		if (schedule && schedule.expression) {
 			// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/cloudwatch/eventrule/
-			const eventRuleName = `${name}-eventrule`
+			const eventRuleName = safeResourceName(`${name}-eventrule`)
 			const eventRule = new aws.cloudwatch.EventRule(eventRuleName, {
 				name: eventRuleName,
 				description: `Fire lambda ${name} on a schedule`,
@@ -335,7 +335,7 @@ class Lambda extends aws.lambda.Function {
 			})
 
 			// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/cloudwatch/eventtarget/
-			const eventTargetName = `${name}-eventtarget`
+			const eventTargetName = safeResourceName(`${name}-eventtarget`)
 			const eventTargetConfig = {
 				rule: eventRule.name,
 				arn: this.arn,
@@ -355,7 +355,7 @@ class Lambda extends aws.lambda.Function {
 			})
 
 			// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/lambda/permission/
-			const schedulePermissionName = `${name}-schedule-permission`
+			const schedulePermissionName = safeResourceName(`${name}-schedule-permission`)
 			const permission = new aws.lambda.Permission(schedulePermissionName, {
 				action: 'lambda:invokeFunction',
 				function: this.name,
@@ -386,7 +386,7 @@ class Lambda extends aws.lambda.Function {
 					throw new Error('Missing required eventSources[name=\'sqs\'].queue.arn')
 				
 				// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/lambda/eventsourcemapping/
-				const eventSourceName = `sqs-eventsource-for-${name}`
+				const eventSourceName = safeResourceName(`sqs-eventsource-for-${name}`)
 				const eventSourceMapping = new aws.lambda.EventSourceMapping(eventSourceName, {
 					name: eventSourceName,
 					eventSourceArn: queue.arn,
@@ -453,9 +453,9 @@ class Lambda extends aws.lambda.Function {
 			if (!role)
 				throw new Error('Missing required argument \'lambda.role.name\'')
 
-			const name = attachName && typeof(attachName) == 'string' 
+			const name = safeResourceName(attachName && typeof(attachName) == 'string' 
 				? attachName
-				: `${role}-${policyName}`
+				: `${role}-${policyName}`)
 			return {
 				policy,
 				rolePolicyAttachment: new aws.iam.RolePolicyAttachment(name, { 
@@ -510,6 +510,7 @@ class LambdaLayer extends aws.lambda.LayerVersion {
 				throw new Error(`Directory '${dir}' not found.`)
 		})
 
+		name = safeResourceName(name)
 		// Lambda layer doc: https://www.pulumi.com/docs/reference/pkg/aws/lambda/layerversion/
 		super(name, {
 			layerName: name,
@@ -576,7 +577,7 @@ const _parseVpcConfig = vpcConfig => {
 			securityGroups = securityGroups || []
 			// Creates new Security Group to allow all responses from the Lambda.
 			allowAllResponsesSg = new SecurityGroup({
-				name: `allow-all-response-sg-${vpcConfig.name}`, 
+				name: safeResourceName(`allow-all-response-sg-${vpcConfig.name}`), 
 				description: `Allow all responses for Lambda ${vpcConfig.name}.`, 
 				vpcId, 
 				egress: [{  
@@ -664,14 +665,14 @@ const _configurePolicies = (policies, prefix, config) => {
 	const vpcAccess = efsAccess || (vpcConfig && vpcConfig.subnetIds)
 	if (vpcAccess && !updatedPolicies.some(p => p.arn == AWSLambdaVPCAccessExecutionRole))
 		updatedPolicies.push({
-			name: `${prefix}-vpc-access`,
+			name: safeResourceName(`${prefix}-vpc-access`),
 			// 'AWSLambdaVPCAccessExecutionRole' contains 'AWSLambdaBasicExecutionRole'
 			arn: AWSLambdaVPCAccessExecutionRole
 		})
 	else if (cloudwatch && !updatedPolicies.some(p => p.arn == AWSLambdaBasicExecutionRole))
 		// Enables the lambda to send logs to cloudwatch
 		updatedPolicies.push({ 
-			name: `${prefix}-cloudwatch`, 
+			name: safeResourceName(`${prefix}-cloudwatch`), 
 			arn: AWSLambdaBasicExecutionRole
 		})
 
@@ -679,13 +680,13 @@ const _configurePolicies = (policies, prefix, config) => {
 		// To access EFS, the execution role for the lambda function must provide those two policies:
 		// Doc: https://aws.amazon.com/blogs/compute/using-amazon-efs-for-aws-lambda-in-your-serverless-applications/
 		updatedPolicies.push({
-			name: `${prefix}-efs-access`,
+			name: safeResourceName(`${prefix}-efs-access`),
 			arn: AmazonElasticFileSystemClientFullAccess
 		})
 
 	if (sqsEventSource && !updatedPolicies.some(p => p.arn == AWSLambdaSQSQueueExecutionRole))
 		updatedPolicies.push({
-			name: `${prefix}-sqs-access`,
+			name: safeResourceName(`${prefix}-sqs-access`),
 			arn: AWSLambdaSQSQueueExecutionRole
 		})
 
