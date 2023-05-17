@@ -11,7 +11,6 @@ const { join } = require('path')
 const fg = require('fast-glob')
 const fs = require('fs')
 const { error:{ catchErrors } } = require('puffy')
-const crypto = require('crypto')
 
 /**
  * Converts an Output<T> to a Promise<T>
@@ -165,7 +164,11 @@ const getProject = options => {
 		...stackData,
 		createResourceName: (name, options) => {
 			const { prefix } = options || {}
-			return `${prefix||''}${project}${name ? `-${name}` : ''}-${stackData.stack}`
+			const n = `${prefix||''}${project}${name ? `-${name}` : ''}-${stackData.stack}`
+			if (n.length > 56)
+				throw new Error(`Resource's name longer than 56. Pulumi's resource name cannot be longer than 64. Because Pulumi can add an 8 characters suffix, the maximum length allowed is 56. Your current resource name length is ${n.length} (${n}).`)
+			
+			return n
 		}
 	}
 }
@@ -202,27 +205,6 @@ const keepResourcesOnly = data => {
 		return data.filter(d => d && (d instanceof pulumi.Resource || d instanceof pulumi.CustomResource))
 }
 
-/**
- * Makes sure that the name is no longer than 64 characters, which is the Pulumi limit. 
- * 
- * @param	{String}	name
- * 
- * @return	{String}	safeName
- */
-const safeResourceName = name => {
-	if (!name)
-		throw new Error('Missing required \'name\' argument')
-
-	const maxSize = 56 // 56 because Pulumi often suffixes resource's name with a unique 7 digits identifier that starts with an hyphen.
-	if (name.length > maxSize) { 
-		const suffix = `-trc-${crypto.createHash('sha1').update(name).digest('hex').substring(0,7)}`
-		const suffixLength = suffix.length
-		const truncAmount = maxSize - suffixLength
-		return `${name.substring(0,truncAmount)}${suffix}`
-	} else
-		return name
-}
-
 module.exports = {
 	resolve,
 	unwrap,
@@ -233,6 +215,5 @@ module.exports = {
 		remove: deleteFile,
 		read: readFile
 	},
-	keepResourcesOnly,
-	safeResourceName
+	keepResourcesOnly
 }
