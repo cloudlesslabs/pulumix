@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.14.1](https://github.com/cloudlesslabs/pulumix/compare/v0.14.0...v0.14.1) (2023-05-17)
+
+
+### Bug Fixes
+
+* Lambda resources can endup with names that exceed the 64 char limit ([eab305c](https://github.com/cloudlesslabs/pulumix/commit/eab305c620729c7735ffed4aa48200f0f9a0cc5b))
+
 ## [0.14.0](https://github.com/cloudlesslabs/pulumix/compare/v0.13.0...v0.14.0) (2023-05-15)
 
 
