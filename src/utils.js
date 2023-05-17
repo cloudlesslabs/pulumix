@@ -215,7 +215,7 @@ const safeResourceName = name => {
 
 	const maxSize = 56 // 56 because Pulumi often suffixes resource's name with a unique 7 digits identifier that starts with an hyphen.
 	if (name.length > maxSize) { 
-		const suffix = `-trunc-${crypto.randomBytes(4).toString('hex').substring(0,7)}`
+		const suffix = `-trc-${crypto.createHash('sha1').update(name).digest('hex').substring(0,7)}`
 		const suffixLength = suffix.length
 		const truncAmount = maxSize - suffixLength
 		return `${name.substring(0,truncAmount)}${suffix}`
