@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.14.3](https://github.com/cloudlesslabs/pulumix/compare/v0.14.2...v0.14.3) (2023-05-17)
+
+
+### Bug Fixes
+
+* Random name for Lambda resource are too dangerous. Revert and replace with ability to override default instead ([212cf6d](https://github.com/cloudlesslabs/pulumix/commit/212cf6dbe12722d16ff28712c1302febdd2816a3))
+
 ### [0.14.2](https://github.com/cloudlesslabs/pulumix/compare/v0.14.1...v0.14.2) (2023-05-17)
 
 
