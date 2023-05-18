@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.15.0](https://github.com/cloudlesslabs/pulumix/compare/v0.14.3...v0.15.0) (2023-05-18)
+
+
+### Features
+
+* Add support for SNS event sourcing in the Lambda input ([7d18b20](https://github.com/cloudlesslabs/pulumix/commit/7d18b20a08c1d802110e75cda53e25c731f087da))
+
 ### [0.14.3](https://github.com/cloudlesslabs/pulumix/compare/v0.14.2...v0.14.3) (2023-05-17)
 
 
