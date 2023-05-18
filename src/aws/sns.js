@@ -44,8 +44,8 @@ class Topic extends aws.sns.Topic {
 	 * @param  {String}							.name
 	 * @param  {Object}							.deadLetterQueue	(1) This can be a boolean, an object or an Output<Queue>
 	 * @param  {Output<Resource>}				.[type]				Valid values: 'sqs', 'sqsArn', 'sms', 'lambda', 'firehose', 'application', 'email', 'email-json', 'http', 'https'
-	 * @param  {Object}							.filterPolicy
-	 * @param  {Object}							.deliveryPolicy 
+	 * @param  {Object}							.filterPolicy		Doc: https://docs.aws.amazon.com/sns/latest/dg/sns-message-filtering.html
+	 * @param  {Object}							.deliveryPolicy		Doc: https://docs.aws.amazon.com/sns/latest/dg/sns-message-delivery-retries.html
 	 * @param  {Object}							.tags
 	 * @param  {Boolean}						.protect
 	 * @param  {[Object]}						.dependsOn

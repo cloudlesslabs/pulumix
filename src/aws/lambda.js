@@ -15,9 +15,10 @@ const path = require('path')
 const { Image } = require('./ecr')
 const { unwrap, keepResourcesOnly } = require('../utils')
 const { SecurityGroup } = require('./securityGroup')
+const sns = require('./sns')
 
-const VALID_EVENT_SOURCES = ['schedule', 'sqs', 'dynamodb', 'kinesis', 'msk', 'kafka', 'aws_mq']
-const SUPPORTED_EVENT_SOURCES = ['schedule', 'sqs'] // this list should eventually match what AWS supports, i.e., the VALID_EVENT_SOURCES list
+const VALID_EVENT_SOURCES = ['schedule', 'sqs', 'dynamodb', 'kinesis', 'msk', 'kafka', 'aws_mq', 'sns']
+const SUPPORTED_EVENT_SOURCES = ['schedule', 'sqs', 'sns'] // this list should eventually match what AWS supports, i.e., the VALID_EVENT_SOURCES list
 
 class Lambda extends aws.lambda.Function {
 	/**
@@ -133,6 +134,15 @@ class Lambda extends aws.lambda.Function {
 	 * 			queue: queue, // This can be the actual Queue resource or an object as long as that object contains an 'arn' property
 	 * 			// filterCriteria: ... // Optional. Refer to doc: https://www.pulumi.com/registry/packages/aws/api-docs/lambda/eventsourcemapping/#sqs-with-event-filter
 	 * 		}
+	 * 	- sns: 
+	 * 		{
+	 * 			name: 'sns',
+	 * 			resourceName: 'hello', // Optional. Override the default Pulumi resource name. Useful when the default name is too long.
+	 * 			topic: topic, // This can be the actual Queue resource or an object as long as that object contains an 'arn' property
+	 * 			// deadLetterQueue: ... // Optional Boolean. Refer to doc: https://www.pulumi.com/registry/packages/aws/api-docs/lambda/eventsourcemapping/#sqs-with-event-filter
+	 * 			// filterPolicy: ... // Optional Object. Refer to doc: https://docs.aws.amazon.com/sns/latest/dg/sns-message-filtering.html
+	 * 			// deliveryPolicy: ... // Optional Object. Refer to doc: https://docs.aws.amazon.com/sns/latest/dg/sns-message-delivery-retries.html
+	 * 		}
 	 */
 	constructor({ name, description, architecture, fn, layers, timeout=3, memorySize=128, handler, policies:_policies, vpcConfig:_vpcConfig, fileSystemConfig, schedule, eventSources, publish, cloudWatch, cloudwatch, logsRetentionInDays, tags, parent, dependsOn:_dependsOn, protect }) {
 		tags = tags || {}
@@ -210,6 +220,7 @@ class Lambda extends aws.lambda.Function {
 		]).apply(([fnDirFound, dockerFileFound, dir, type, runtime, args, env, { config:vpcConfig, securityGroups, subnets, allowAllResponsesSg }, dependsOn, policies]) => {
 			dependsOn = dependsOn || []
 			dependsOn.push(...(eventSources||[]).filter(e => e.queue).map(e => e.queue))
+			dependsOn.push(...(eventSources||[]).filter(e => e.topic).map(e => e.topic))
 			if (!fnDirFound)
 				throw new Error(`Function folder '${dir}' not found.`)	
 
@@ -404,6 +415,34 @@ class Lambda extends aws.lambda.Function {
 				})
 
 				this.eventSources.push(eventSourceMapping)
+			}
+		}
+
+		// Subsribing to SNS topic
+		this.snsSubscriptions = []
+		const snsEventSources = (eventSources||[]).filter(e => e && e.name == 'sns')
+		if (snsEventSources && snsEventSources.length) {
+			for (let i=0;i<snsEventSources.length;i++) {
+				const { topic, resourceName, deadLetterQueue, ...nativeProps } = snsEventSources[i]||{}
+				if (!topic)
+					throw new Error('Missing required eventSources[name=\'sns\'].topic')
+				if (!topic.arn)
+					throw new Error('Missing required eventSources[name=\'sns\'].topic.arn')
+
+				const eventSourceName = resourceName || `snssub-${i}-${name}`
+				const subscription = sns.Topic.createTopicSubscription(topic, {
+					...nativeProps,
+					name: eventSourceName,
+					lambda: this,
+					deadLetterQueue,
+					tags:{
+						...tags,
+						Name: eventSourceName
+					},
+					protect
+				})
+
+				this.snsSubscriptions.push(subscription)
 			}
 		}
 
