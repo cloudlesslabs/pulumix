@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.16.0](https://github.com/cloudlesslabs/pulumix/compare/v0.15.0...v0.16.0) (2023-06-12)
+
+
+### Bug Fixes
+
+* No possible to add more than one event source of type 'schedule' ([9aa01b4](https://github.com/cloudlesslabs/pulumix/commit/9aa01b445018dfcd4ca6ff134ac1171c1b6492cb))
+
 ## [0.15.0](https://github.com/cloudlesslabs/pulumix/compare/v0.14.3...v0.15.0) (2023-05-18)
 
 
