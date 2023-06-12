@@ -78,7 +78,11 @@ class Lambda extends aws.lambda.Function {
 	 *                              		           							(attachName:String, policy: Output<Policy>) => Output<RolePolicyAttachment>				
 	 * @return {Output<Role>}					.role
 	 * @return {Output<LogGroup>}				.logGroup
-	 * @return {Object}							.schedule
+	 * @return {Object}							.schedule						DEPRECATED. Use the 'schedules'				
+	 * @return {Output<EventRule>}					.eventRule						
+	 * @return {Output<EventTarget>}				.eventTarget
+	 * @return {Output<Permission>}					.permission
+	 * @return {[Object]}						.schedules[]	
 	 * @return {Output<EventRule>}					.eventRule						
 	 * @return {Output<EventTarget>}				.eventTarget
 	 * @return {Output<Permission>}					.permission
@@ -326,64 +330,79 @@ class Lambda extends aws.lambda.Function {
 		})
 
 		// Create schedule trigger
-		let _schedule = null
 		// Supporting legacy 'schedule' input.
+		let _schedule = null
+		let _schedules = schedule ? [schedule] : []
+		const schedules = []
 		const scheduleEventSource = (eventSources||[]).find(e => e && e.name == 'schedule')
 		if (!schedule && scheduleEventSource)
 			schedule = scheduleEventSource
 		if (schedule && schedule.expression) {
-			// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/cloudwatch/eventrule/
-			const scheduleResourceName = schedule.resourceName
-			const eventRuleName = scheduleResourceName || `${name}-eventrule`
-			const eventRule = new aws.cloudwatch.EventRule(eventRuleName, {
-				name: eventRuleName,
-				description: `Fire lambda ${name} on a schedule`,
-				scheduleExpression: schedule.expression,
-				tags: {
-					...tags,
-					Name: eventRuleName
+			_schedules = _schedules.length ? _schedules : (eventSources||[]).filter(e => e && e.name == 'schedule')
+			for (let i=0;i<_schedules.length;i++) {
+				const sched = _schedules[i]
+				const schedSuffix = i ? `-${i}` : '' // This weird `i ? `-${i}` : ''` is to support legacy API
+				// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/cloudwatch/eventrule/
+				const scheduleResourceName = sched.resourceName
+				const eventRuleName = scheduleResourceName || `${name}-eventrule${schedSuffix}` 
+				const eventRule = new aws.cloudwatch.EventRule(eventRuleName, {
+					name: eventRuleName,
+					description: `Fire lambda ${name} on a schedule`,
+					scheduleExpression: sched.expression,
+					tags: {
+						...tags,
+						Name: eventRuleName
+					}
+				}, { 
+					protect, 
+					dependsOn:[this] 
+				})
+
+				// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/cloudwatch/eventtarget/
+				const eventTargetName = scheduleResourceName || `${name}-eventtarget${schedSuffix}`
+				const eventTargetConfig = {
+					rule: eventRule.name,
+					arn: this.arn,
+					tags: {
+						...tags,
+						Name: eventTargetName
+					}
 				}
-			}, { 
-				protect, 
-				dependsOn:[this] 
-			})
-
-			// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/cloudwatch/eventtarget/
-			const eventTargetName = scheduleResourceName || `${name}-eventtarget`
-			const eventTargetConfig = {
-				rule: eventRule.name,
-				arn: this.arn,
-				tags: {
-					...tags,
-					Name: eventTargetName
+				if (sched.payload) {
+					if (typeof(sched.payload) != 'object')
+						throw new Error(`Wrong argument exception. 'schedules[${i}].payload' is expecting an object. Found ${typeof(sched.payload)} instead.`)
+					eventTargetConfig.input = JSON.stringify(sched.payload)
 				}
-			}
-			if (schedule.payload) {
-				if (typeof(schedule.payload) != 'object')
-					throw new Error(`Wrong argument exception. 'schedule.payload' is expecting an object. Found ${typeof(schedule.payload)} instead.`)
-				eventTargetConfig.input = JSON.stringify(schedule.payload)
-			}
-			const eventTarget = new aws.cloudwatch.EventTarget(eventTargetName, eventTargetConfig, { 
-				protect, 
-				dependsOn:[this] 
-			})
+				const eventTarget = new aws.cloudwatch.EventTarget(eventTargetName, eventTargetConfig, { 
+					protect, 
+					dependsOn:[this] 
+				})
 
-			// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/lambda/permission/
-			const schedulePermissionName = scheduleResourceName || `${name}-schedule-permission`
-			const permission = new aws.lambda.Permission(schedulePermissionName, {
-				action: 'lambda:invokeFunction',
-				function: this.name,
-				principal: 'events.amazonaws.com',
-				sourceArn: eventRule.arn
-			}, { 
-				protect, 
-				dependsOn:[this] 
-			})
+				// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/lambda/permission/
+				const schedulePermissionName = scheduleResourceName || `${name}-schedule-permission${schedSuffix}`
+				const permission = new aws.lambda.Permission(schedulePermissionName, {
+					action: 'lambda:invokeFunction',
+					function: this.name,
+					principal: 'events.amazonaws.com',
+					sourceArn: eventRule.arn
+				}, { 
+					protect, 
+					dependsOn:[this] 
+				})
 
-			_schedule = {
-				eventRule,
-				eventTarget,
-				permission
+				schedules.push({
+					eventRule,
+					eventTarget,
+					permission
+				})
+
+				// Support legacy API
+				if (i == 0)
+					_schedule = {
+						eventRule,
+						eventTarget,
+						permission
+					}
 			}
 		}
 
@@ -450,6 +469,7 @@ class Lambda extends aws.lambda.Function {
 		this.role = lambdaRole
 		this.logGroup = logGroup
 		this.schedule = _schedule
+		this.schedules = schedules
 		this.allowAllResponsesSg = asyncData.allowAllResponsesSg
 	}
 
