@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.19.0](https://github.com/cloudlesslabs/pulumix/compare/v0.18.0...v0.19.0) (2023-08-25)
+
+
+### Features
+
+* Add comment in the CloudFront distro ([5038a50](https://github.com/cloudlesslabs/pulumix/commit/5038a50553c1c7aaf9699667cb5698b6ee4ca6ca))
+
 ## [0.18.0](https://github.com/cloudlesslabs/pulumix/compare/v0.17.0...v0.18.0) (2023-08-25)
 
 
