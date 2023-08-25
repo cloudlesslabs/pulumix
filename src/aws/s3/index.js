@@ -129,6 +129,7 @@ const _uploadFiles = async ({ bucket, content, cloudfrontDistro, cloudfront }) =
  * @param  {Output<Number>}							.ttl				Unit is seconds
  * @param  {Output<Number>}							.responseCode
  * @param  {Output<String>}							.responsePagePath
+ * @param  {Output<Boolean>}					.compress				Default false. When true, it uses gzip. To add support for brotli, you must add a cache behavior (coming soon...)
  * @param  {Output<Boolean>}			versioning						Default false.		
  * @param  {Output<String>}				tags
  * @param  {Output<Resource>}			parent
@@ -209,6 +210,7 @@ const Website = function (input) {
 				if (cloudfront) {
 					const cfDependsOn = [bucket]
 					const customDomainOn = cloudfront.customDomains && cloudfront.customDomains[0]
+					const compress = cloudfront.compress ? true : false
 					const viewerCertificate = {}
 					if (customDomainOn) {
 						if (!cloudfront.acmCertificateArn)
@@ -278,6 +280,7 @@ const Website = function (input) {
 					
 					const cloudfrontName = `${name}-distro`
 					const originId = customDomainOn ? cloudfront.customDomains[0] : cloudfrontName
+					// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/cloudfront/distribution/
 					cloudfrontDistro = new aws.cloudfront.Distribution(cloudfrontName, {
 						name: cloudfrontName,
 						origins: [{
@@ -301,7 +304,8 @@ const Website = function (input) {
 							viewerProtocolPolicy: 'redirect-to-https',
 							minTtl: 0,
 							defaultTtl: 3600,
-							maxTtl: 86400
+							maxTtl: 86400,
+							compress
 						},
 						customErrorResponses: (cloudfront.customErrorResponses||[]).map(e => ({
 							errorCode: e.errorCode||404,
