@@ -130,6 +130,12 @@ const _uploadFiles = async ({ bucket, content, cloudfrontDistro, cloudfront }) =
  * @param  {Output<Number>}							.responseCode
  * @param  {Output<String>}							.responsePagePath
  * @param  {Output<Boolean>}					.compress				Default false. When true, it uses gzip. To add support for brotli, you must add a cache behavior (coming soon...)
+ * @param  {Output<Object>}						.cacheTtl
+ * @param  {Output<Number>}							.min				Default 0 (ms).
+ * @param  {Output<Number>}							.max				Default 86400 (ms), i.e., 1 day.
+ * @param  {Output<Number>}							.default			Default 3600 (ms), i.e., 1 hour.
+ * @param  {Output<String>}							.cacheControl		Default null. Example: 'max-age=86400'
+ * @param  {Output<Object>}						.customHeaders			e.g., { hello:'world' }
  * @param  {Output<Boolean>}			versioning						Default false.		
  * @param  {Output<String>}				tags
  * @param  {Output<Resource>}			parent
@@ -144,6 +150,7 @@ const _uploadFiles = async ({ bucket, content, cloudfrontDistro, cloudfront }) =
  * @return {Output<String>}						.region						e.g., 'ap-southeast-2'
  * @return {Output<CloudFront>}				.cloudfront
  * @return {Output<String>}						.domainName					URL where the website is hosted.
+ * @return {Output<ResponseHeaderPolicy>}	.cloudfrontResponseHeaderPolicy
  * @return {Output<[Object]>}				.files[]
  * @return {Output<String>}						.key						Object's key in S3
  * @return {Output<String>}						.hash						MD5 file hash   
@@ -206,11 +213,10 @@ const Website = function (input) {
 					protect 
 				})
 
-				let cloudfrontDistro = null, cert = null, dnsRecords = []
+				let cloudfrontDistro = null, cloudfrontResponseHeaderPolicy = null, cert = null, dnsRecords = []
 				if (cloudfront) {
 					const cfDependsOn = [bucket]
 					const customDomainOn = cloudfront.customDomains && cloudfront.customDomains[0]
-					const compress = cloudfront.compress ? true : false
 					const viewerCertificate = {}
 					if (customDomainOn) {
 						if (!cloudfront.acmCertificateArn)
@@ -280,9 +286,55 @@ const Website = function (input) {
 					
 					const cloudfrontName = `${name}-distro`
 					const originId = customDomainOn ? cloudfront.customDomains[0] : cloudfrontName
+
 					// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/cloudfront/distribution/
+					const { min:minTtl=0, max:maxTtl=86400, default:defaultTtl=3600, cacheControl } = cloudfront.cacheTtl || {}
+					const defaultCacheBehavior = {
+						allowedMethods: cloudfront.allowedMethods && cloudfront.allowedMethods.length ? cloudfront.allowedMethods : ['GET', 'HEAD', 'OPTIONS'],
+						cachedMethods: ['GET', 'HEAD'],
+						targetOriginId: originId,
+						forwardedValues: {
+							queryString: false,
+							cookies: {
+								forward: 'none',
+							}
+						},
+						viewerProtocolPolicy: 'redirect-to-https',
+						minTtl,
+						defaultTtl,
+						maxTtl,
+						compress: cloudfront.compress ? true : false
+					}
+					const customHeadersOn = cloudfront.customHeaders && typeof(cloudfront.customHeaders) == 'object' && Object.keys(cloudfront.customHeaders).length
+					if (cacheControl || customHeadersOn) {
+						const headersName = customHeadersOn ? 'Custom headers' : '\'cache-control\' header'
+						const responseHeaderPolicyName = `default-${cloudfrontName}`
+						const items = cacheControl ? [{
+							header: 'cache-control',
+							override: true,
+							value: cacheControl
+						}] : []
+						if (customHeadersOn)
+							for(let header in cloudfront.customHeaders)
+								items.push({
+									header,
+									override: true,
+									value: cloudfront.customHeaders[header]
+								})
+						cloudfrontResponseHeaderPolicy = new aws.cloudfront.ResponseHeadersPolicy(responseHeaderPolicyName, {
+							name: responseHeaderPolicyName,
+							description: `${headersName} for distro ${cloudfrontName}`,
+							customHeadersConfig: { items },
+							tags: {
+								...tags,
+								Name: responseHeaderPolicyName
+							}
+						})
+						defaultCacheBehavior.responseHeadersPolicyId = cloudfrontResponseHeaderPolicy.id
+					}
 					cloudfrontDistro = new aws.cloudfront.Distribution(cloudfrontName, {
 						name: cloudfrontName,
+						description: cloudfront.description || `CDN for S3 bucket ${name}`,
 						origins: [{
 							domainName: bucket.bucketRegionalDomainName,
 							originId
@@ -291,22 +343,7 @@ const Website = function (input) {
 						isIpv6Enabled: true,
 						defaultRootObject: website.indexDocument || 'index.html',
 						aliases: cloudfront.customDomains,
-						defaultCacheBehavior: {
-							allowedMethods: cloudfront.allowedMethods && cloudfront.allowedMethods.length ? cloudfront.allowedMethods : ['GET', 'HEAD', 'OPTIONS'],
-							cachedMethods: ['GET', 'HEAD'],
-							targetOriginId: originId,
-							forwardedValues: {
-								queryString: false,
-								cookies: {
-									forward: 'none',
-								}
-							},
-							viewerProtocolPolicy: 'redirect-to-https',
-							minTtl: 0,
-							defaultTtl: 3600,
-							maxTtl: 86400,
-							compress
-						},
+						defaultCacheBehavior,
 						customErrorResponses: (cloudfront.customErrorResponses||[]).map(e => ({
 							errorCode: e.errorCode||404,
 							errorCachingMinTtl: e.ttl||0,
@@ -385,6 +422,7 @@ const Website = function (input) {
 				return {
 					bucket,
 					cloudfront: cloudfrontDistro,
+					cloudfrontResponseHeaderPolicy: cloudfrontResponseHeaderPolicy,
 					files,
 					cert,
 					dnsRecords
@@ -395,6 +433,7 @@ const Website = function (input) {
 
 	this.bucket = output.bucket
 	this.cloudfront = output.cloudfront
+	this.cloudfrontResponseHeaderPolicy = output.cloudfrontResponseHeaderPolicy
 	this.files = output.files
 	this.acmCert = output.cert
 	this.dnsRecords = output.dnsRecords
