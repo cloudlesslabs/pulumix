@@ -334,7 +334,7 @@ const Website = function (input) {
 					}
 					cloudfrontDistro = new aws.cloudfront.Distribution(cloudfrontName, {
 						name: cloudfrontName,
-						description: cloudfront.description || `CDN for S3 bucket ${name}`,
+						comment: cloudfront.description || `CDN for S3 bucket ${name}`,
 						origins: [{
 							domainName: bucket.bucketRegionalDomainName,
 							originId
