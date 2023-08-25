@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.17.0](https://github.com/cloudlesslabs/pulumix/compare/v0.16.0...v0.17.0) (2023-08-25)
+
+
+### Features
+
+* Add support for compressing cloudfront content with gzip ([3f0701e](https://github.com/cloudlesslabs/pulumix/commit/3f0701e30e67cdd4491962f1aea95678448285c4))
+
 ## [0.16.0](https://github.com/cloudlesslabs/pulumix/compare/v0.15.0...v0.16.0) (2023-06-12)
 
 
