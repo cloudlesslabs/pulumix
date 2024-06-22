@@ -67,7 +67,8 @@ class Lambda extends aws.lambda.Function {
 	 * @param  {String}						tags	
 	 * @param  {Output<Resource>}			parent
 	 * @param  {Output<[Resource]>}			dependsOn
-	 * @param  {Boolean}					protect		
+	 * @param  {Boolean}					protect	
+	 * @param  {Object}						...rest								All the other props that are not covered above
 	 * 				
 	 * @return {Output<Lambda>}				lambda
 	 * @return {Output<String>} 				.id
@@ -148,7 +149,7 @@ class Lambda extends aws.lambda.Function {
 	 * 			// deliveryPolicy: ... // Optional Object. Refer to doc: https://docs.aws.amazon.com/sns/latest/dg/sns-message-delivery-retries.html
 	 * 		}
 	 */
-	constructor({ name, description, architecture, fn, layers, timeout=3, memorySize=128, handler, policies:_policies, vpcConfig:_vpcConfig, fileSystemConfig, schedule, eventSources, publish, cloudWatch, cloudwatch, logsRetentionInDays, tags, parent, dependsOn:_dependsOn, protect }) {
+	constructor({ name, description, architecture, fn, layers, timeout=3, memorySize=128, handler, policies:_policies, vpcConfig:_vpcConfig, fileSystemConfig, schedule, eventSources, publish, cloudWatch, cloudwatch, logsRetentionInDays, tags, parent, dependsOn:_dependsOn, protect, ...rest }) {
 		tags = tags || {}
 		if (cloudWatch !== undefined && cloudwatch === undefined)
 			cloudwatch = cloudWatch
@@ -304,6 +305,7 @@ class Lambda extends aws.lambda.Function {
 
 		// Create tha Lambda. Doc: https://www.pulumi.com/docs/reference/pkg/aws/lambda/function/ 
 		super(name, {
+			...rest,
 			name,
 			description,
 			architectures: [architecture == 'x86_64' ? 'x86_64' : 'arm64'],
