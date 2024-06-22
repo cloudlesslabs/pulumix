@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.21.0](https://github.com/cloudlesslabs/pulumix/compare/v0.19.0...v0.21.0) (2024-06-22)
+
+
+### Features
+
+* Allows all supported Pulumi Lambda function properties to be added ([cec7688](https://github.com/cloudlesslabs/pulumix/commit/cec7688947f2709f38fd5767572747bee28f4e2b))
+
 ## [0.19.0](https://github.com/cloudlesslabs/pulumix/compare/v0.18.0...v0.19.0) (2023-08-25)
 
 
