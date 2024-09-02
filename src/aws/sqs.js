@@ -56,7 +56,7 @@ class Queue extends aws.sqs.Queue {
 			if (!redrivePolicy.deadLetterQueue)
 				_input.redrivePolicy = `{"maxReceiveCount":${redrivePolicy.maxReceiveCount||10}}`
 			else {
-				const dlqName = `ddl-for-${nativeInput.name}`
+				const dlqName = `ddl-for-${nativeInput.name.replace('.fifo','')}`
 				// doc: https://www.pulumi.com/registry/packages/aws/api-docs/sqs/queue/
 				const deadLetterQueue = redrivePolicy.deadLetterQueue === true ? new aws.sqs.Queue(dlqName, {
 					dlqName,
