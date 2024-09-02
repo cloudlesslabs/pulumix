@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.21.1](https://github.com/cloudlesslabs/pulumix/compare/v0.21.0...v0.21.1) (2024-09-02)
+
+
+### Bug Fixes
+
+* FIFO SQS queue with dead-letter queue fail ([8b0d235](https://github.com/cloudlesslabs/pulumix/commit/8b0d23590e4ce07bbe4075c30964b5b43f057404))
+
 ## [0.21.0](https://github.com/cloudlesslabs/pulumix/compare/v0.19.0...v0.21.0) (2024-06-22)
 
 
