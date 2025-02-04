@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.22.0](https://github.com/cloudlesslabs/pulumix/compare/v0.21.1...v0.22.0) (2025-02-04)
+
+
+### Features
+
+* Add support for Cognito Auth on the API Gateway ([ca5d8b2](https://github.com/cloudlesslabs/pulumix/commit/ca5d8b23bd46b3d22f972675602ca6f9e6d77d33))
+
 ### [0.21.1](https://github.com/cloudlesslabs/pulumix/compare/v0.21.0...v0.21.1) (2024-09-02)
 
 
