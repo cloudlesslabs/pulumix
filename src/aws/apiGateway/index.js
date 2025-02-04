@@ -23,6 +23,7 @@ class RestApi extends aws.apigateway.RestApi {
 	 * @param	{String}						name
 	 * @param	{String}						description
 	 * @param	{String}						type							Default: 'egde'. Valid values: 'egde', 'regional', 'private'
+	 * @param	{String}						userPoolArn						Only required if a resource uses an 'authorizer' of type 'COGNITO_USER_POOLS'	
 	 * @param	{Object}						resources						e.g., { '/':{...}, 'dogs':{...}, 'blog/tech':{...} }
 	 * @param	{Object}							.[name|methodName]			If name is '/', this means root resource.
 	 * @param	{Object}								.[methodName]			e.g., 'GET', 'POST'
@@ -109,6 +110,7 @@ class RestApi extends aws.apigateway.RestApi {
 		name, 
 		description, 
 		type, 
+		userPoolArn,
 		resources,
 		stages,
 		domains,
@@ -243,12 +245,21 @@ class RestApi extends aws.apigateway.RestApi {
 					}
 				})
 
+				// Create a Cognito Authorizer
+				const authorizer = userPoolArn ? new aws.apigateway.Authorizer(name, {
+					name,
+					restApi: this.id,
+					type: 'COGNITO_USER_POOLS',
+					providerArns: [userPoolArn], // Attach the Cognito User Pool
+				}) : null
+
 				const result = _createResourcesMethodsAndIntegrations({ 
 					restApi: {
 						id: this.id,
 						name,
 						executionArn: this.executionArn
 					}, 
+					authorizer,
 					apiGatewayRole: this.apiGatewayRole, 
 					parentResource: {
 						id: this.rootResourceId,
@@ -571,6 +582,8 @@ const enableCloudwatch = (name, options) => {
  * @param	{Output<String>}					.id
  * @param	{Output<String>}					.executionArn
  * @param	{Output<Role>}					apiGatewayRole
+ * @param	{Output<Authorizer>}			authorizer						Only required if a resource uses an 'authorizer' of type 'COGNITO_USER_POOLS'	
+apiGatewayRole
  * @param	{Object}						parentResource
  * @param	{String}							.name						e.g., 'blog' or '/' to indicate the root resource.
  * @param	{Output<String>}					.id
@@ -618,7 +631,7 @@ const enableCloudwatch = (name, options) => {
  * @return {[Output<IntegrationResponse>]}		.integrationResponses
  * @return {[Output<MethodResponse>]}			.methodResponses
  */
-const _createResourcesMethodsAndIntegrations = ({ restApi, apiGatewayRole, parentResource, resources, validators, tags, protect }) => {
+const _createResourcesMethodsAndIntegrations = ({ restApi, apiGatewayRole, authorizer:_authorizer, parentResource, resources, validators, tags, protect }) => {
 	if (!restApi)
 		throw new Error('Missing required argument \'restApi\'')
 	if (!restApi.id)
@@ -667,10 +680,15 @@ const _createResourcesMethodsAndIntegrations = ({ restApi, apiGatewayRole, paren
 			const authorizer = httpMethodConfig.authorizer
 			const { requestParameters, required } = _getRequestParameters(httpMethodConfig)
 
+			const is_cognito = (authorizer||{}).type == 'COGNITO_USER_POOLS'
+			if (is_cognito && (!_authorizer || !_authorizer.id))
+				throw new Error('Missing required argument \'authorizer\'. When "authorizer.type" is set to \'COGNITO_USER_POOLS\', a cognito authorizer is required.')
+
 			// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/apigateway/method/
 			const method = new aws.apigateway.Method(methodName, {
 				name: methodName,
 				authorization: !authorizer || !authorizer.type ? 'NONE' : authorizer.type,
+				authorizerId: (_authorizer||{}).id,
 				restApi: restApi.id,
 				requestParameters,
 				requestValidatorId: required ? ((validators||{}).request||{}).id : undefined,
@@ -740,6 +758,7 @@ const _createResourcesMethodsAndIntegrations = ({ restApi, apiGatewayRole, paren
 					const nestedResults = _createResourcesMethodsAndIntegrations({
 						restApi, 
 						apiGatewayRole,
+						authorizer:_authorizer,
 						parentResource: {
 							id: result.parentResourceId,
 							name: result.path,
