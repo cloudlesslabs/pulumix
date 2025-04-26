@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.23.0](https://github.com/cloudlesslabs/pulumix/compare/v0.22.1...v0.23.0) (2025-04-26)
+
+
+### Features
+
+* Add support for outputting VPC's subnets' CIDR block ([a271831](https://github.com/cloudlesslabs/pulumix/commit/a271831fc767ec34f9720bc6675065a1c02b0b68))
+
+
+### Bug Fixes
+
+* VPC ([607e30e](https://github.com/cloudlesslabs/pulumix/commit/607e30ed0024f80384eb273dfa26b1f71f22d5ba))
+
 ### [0.22.1](https://github.com/cloudlesslabs/pulumix/compare/v0.22.0...v0.22.1) (2025-04-26)
 
 ## [0.22.0](https://github.com/cloudlesslabs/pulumix/compare/v0.21.1...v0.22.0) (2025-02-04)
