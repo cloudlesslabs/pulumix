@@ -95,6 +95,7 @@ const VPC = function ({ name, cidrBlock, subnets, numberOfAvailabilityZones, num
 	const getSubnet = type => x => ({ 
 		id: x.subnet.id, 
 		name: x.subnetName, 
+		cidrBlock: x.subnet.cidrBlock,
 		availabilityZone: x.subnet.availabilityZone,
 		type
 	})
