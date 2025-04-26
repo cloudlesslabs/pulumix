@@ -84,8 +84,8 @@ const VPC = function ({ name, cidrBlock, subnets, numberOfAvailabilityZones, num
 	const vpc = new awsx.ec2.Vpc(name, { 
 		cidrBlock,
 		subnets,
-		numberOfAvailabilityZones: numberOfAvailabilityZones ? numberOfAvailabilityZones*1 : undefined,
-		numberOfNatGateways: numberOfNatGateways ? numberOfNatGateways*1 : undefined,
+		numberOfAvailabilityZones: numberOfAvailabilityZones ? numberOfAvailabilityZones*1 : 0,
+		numberOfNatGateways: numberOfNatGateways ? numberOfNatGateways*1 : 0,
 		tags: {
 			...tags,
 			Name: name
