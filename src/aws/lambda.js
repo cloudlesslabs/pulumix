@@ -34,6 +34,7 @@ class Lambda extends aws.lambda.Function {
 	 * 	
 	 * @param  {String}						name	
 	 * @param  {String}						description		
+	 * @param  {Object}						environment							Key value pairs for env. variables (e.g., { hello:'WORLD' })
 	 * @param  {String}						architecture						Valid values: 'x86_64', 'arm64'(default) WARNING (3)
 	 * @param  {Output<Object>}				fn
 	 * @param  {Output<String>}					.dir							The absolute path to the local folder containing the Lambda code that will be zipped.
@@ -149,7 +150,7 @@ class Lambda extends aws.lambda.Function {
 	 * 			// deliveryPolicy: ... // Optional Object. Refer to doc: https://docs.aws.amazon.com/sns/latest/dg/sns-message-delivery-retries.html
 	 * 		}
 	 */
-	constructor({ name, description, architecture, fn, layers, timeout=3, memorySize=128, handler, policies:_policies, vpcConfig:_vpcConfig, fileSystemConfig, schedule, eventSources, publish, cloudWatch, cloudwatch, logsRetentionInDays, tags, parent, dependsOn:_dependsOn, protect, ...rest }) {
+	constructor({ name, description, environment, architecture, fn, layers, timeout=3, memorySize=128, handler, policies:_policies, vpcConfig:_vpcConfig, fileSystemConfig, schedule, eventSources, publish, cloudWatch, cloudwatch, logsRetentionInDays, tags, parent, dependsOn:_dependsOn, protect, ...rest }) {
 		tags = tags || {}
 		if (cloudWatch !== undefined && cloudwatch === undefined)
 			cloudwatch = cloudWatch
@@ -303,11 +304,14 @@ class Lambda extends aws.lambda.Function {
 			})
 		}))
 
+		const environmentVariables = environment ? { variables:environment } : undefined
+
 		// Create tha Lambda. Doc: https://www.pulumi.com/docs/reference/pkg/aws/lambda/function/ 
 		super(name, {
 			...rest,
 			name,
 			description,
+			environment:environmentVariables,
 			architectures: [architecture == 'x86_64' ? 'x86_64' : 'arm64'],
 			packageType: asyncData.functionCode.packageType,
 			imageUri: asyncData.functionCode.imageUri,
