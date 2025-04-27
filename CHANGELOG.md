@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.24.0](https://github.com/cloudlesslabs/pulumix/compare/v0.23.0...v0.24.0) (2025-04-27)
+
+
+### Features
+
+* Add support for adding env vars to the Lambda ([5ca8a14](https://github.com/cloudlesslabs/pulumix/commit/5ca8a1402d112ad1d057b5abaefdbf7574a62267))
+
 ## [0.23.0](https://github.com/cloudlesslabs/pulumix/compare/v0.22.1...v0.23.0) (2025-04-26)
 
 
