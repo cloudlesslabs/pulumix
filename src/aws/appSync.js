@@ -302,12 +302,13 @@ class Resolver extends aws.appsync.Resolver {
  * @param  {[String]}				.includes			Default ['Query', 'Mutation', 'Subscription']. Examples: ['Query', 'Product', 'Person'].	
  * @param  {Output<String>}		functionArn	
  * @param  {Object}				tags	
+ * @param  {Object}				restOfResolverConfig	Please refer to doc at https://www.pulumi.com/registry/packages/aws/api-docs/appsync/resolver/
  * 								
  * @return {Object}				output
  * @return {Output<DataSource>}		.dataSource
  * @return {[Output<Resolver>]}		.resolvers
  */
-const createDataSourceResolvers = ({ name, api, schema, functionArn, tags }) => {
+const createDataSourceResolvers = ({ name, api, schema, functionArn, tags, ...restOfResolverConfig }) => {
 	tags = tags || {}
 	
 	if (!api)
@@ -349,6 +350,7 @@ const createDataSourceResolvers = ({ name, api, schema, functionArn, tags }) => 
 			const resolverName = `${name}-${type}-${field}`
 			const requestResponseTemplate = _getRequestResponseTemplate({ payload:{ field } })
 			const resolver = new aws.appsync.Resolver(resolverName, {
+				...restOfResolverConfig,
 				apiId: api.id,
 				name: resolverName,
 				field: field,
