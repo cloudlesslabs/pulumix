@@ -234,6 +234,7 @@ class Resolver extends aws.appsync.Resolver {
 	 * @param  {Output<Resource>}	parent
 	 * @param  {Output<[Resource]>}	dependsOn
 	 * @param  {Boolean}			protect	
+	 * @param  {Object}				restOfResolverConfig	Please refer to doc at https://www.pulumi.com/registry/packages/aws/api-docs/appsync/resolver/
 	 * 								
 	 * @return {Object}				resolver
 	 * @return {Output<String>}			.id
@@ -241,7 +242,7 @@ class Resolver extends aws.appsync.Resolver {
 	 * @return {Output<String>}			.name
 	 * @return {Output<Object>}			.tags
 	 */
-	constructor({ name, api, type, field, dataSource, mappingTemplate, tags, parent, dependsOn, protect }) {
+	constructor({ name, api, type, field, dataSource, mappingTemplate, tags, parent, dependsOn, protect, ...restOfResolverConfig }) {
 		tags = tags || {}
 		
 		if (!api)
@@ -262,6 +263,7 @@ class Resolver extends aws.appsync.Resolver {
 		// AppSync resolver doc: https://www.pulumi.com/docs/reference/pkg/aws/appsync/resolver/
 		const requestResponseTemplate = _getRequestResponseTemplate(mappingTemplate)
 		super(name, {
+			...restOfResolverConfig,
 			apiId: api.id,
 			name: name,
 			field: field,
