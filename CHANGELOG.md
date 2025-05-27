@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.26.0](https://github.com/cloudlesslabs/pulumix/compare/v0.25.0...v0.26.0) (2025-05-27)
+
+
+### Features
+
+* Add support to configure the more AppSync resolver props ([b5bfdaf](https://github.com/cloudlesslabs/pulumix/commit/b5bfdaff610f71db731f9cd939471b8032b8c0b8))
+* Add support to configure the more AppSync resolver props ([a9c4ac5](https://github.com/cloudlesslabs/pulumix/commit/a9c4ac58b646ae53d0c5922f6cd033cb027b9315))
+
 ## [0.25.0](https://github.com/cloudlesslabs/pulumix/compare/v0.24.0...v0.25.0) (2025-05-27)
 
 ## [0.24.0](https://github.com/cloudlesslabs/pulumix/compare/v0.23.0...v0.24.0) (2025-04-27)
