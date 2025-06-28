@@ -4,3 +4,4 @@ node_modules/
 /Pulumi.yaml
 /Pulumi.*.yaml
 /index.js
+/logs

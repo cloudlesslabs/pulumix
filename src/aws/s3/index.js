@@ -168,7 +168,7 @@ const _uploadFiles = async ({ bucket, content, cloudfrontDistro, cloudfront }) =
 // 		
 // 
 const Website = function (input) {
-	const output = unwrap(input).apply(({ name, acl:_acl, website:__website, versioning, tags, parent, dependsOn, protect }) => {
+	const output = unwrap(input).apply(({ name, website:__website, versioning, tags, parent, dependsOn, protect }) => {
 		if (!name)
 			throw new Error('Missing required argument \'name\'.')
 
@@ -177,31 +177,21 @@ const Website = function (input) {
 				throw new Error('Missing required arguments. When \'website\' is specified, \'website.indexDocument\' or \'website.redirectAllRequestsTo\' are required.')
 
 			tags = tags || {}
-			const acl = _website ? 'public-read' : _acl
 			const { website, corsRules, content:_content, cloudfront:_cloudfront } = getWebsiteProps(_website)
 
 			return pulumi.all([
 				unwrap(_content), 
 				unwrap(_cloudfront).apply(cf => cf && cf.dns ? unwrap(cf.dns).apply(dns => ({ ...cf, dns })) : cf)
 			]).apply(([content, cloudfront]) => {
-				const policy = !website ? undefined : JSON.stringify({
-					Version: '2012-10-17',
-					Statement: [{
-						Sid: 'PublicReadGetObject',
-						Effect: 'Allow',
-						Principal: '*',
-						Action: 's3:GetObject',
-						Resource: `arn:aws:s3:::${name}/*`
-					}]
-				})
+				// Policy will be set later to allow only CloudFront OAC access
 
 				// S3 bucket doc: https://www.pulumi.com/docs/reference/pkg/aws/s3/bucket/
 				const bucket = new aws.s3.Bucket(name, {
 					bucket: name,
-					acl,
+					// Remove ACL and use BucketOwnerEnforced instead
+					objectOwnership: 'BucketOwnerEnforced',
 					website,
 					corsRules,
-					policy,
 					versioning: !versioning ? undefined : { enabled:true },
 					tags: {
 						...tags,
@@ -213,7 +203,19 @@ const Website = function (input) {
 					protect 
 				})
 
-				let cloudfrontDistro = null, cloudfrontResponseHeaderPolicy = null, cert = null, dnsRecords = []
+				// Block all public access to the bucket
+				const bucketPublicAccessBlock = new aws.s3.BucketPublicAccessBlock(`${name}-pab`, {
+					bucket: bucket.id,
+					blockPublicAcls: true,
+					blockPublicPolicy: true,
+					ignorePublicAcls: true,
+					restrictPublicBuckets: true
+				}, {
+					parent: bucket,
+					protect
+				})
+
+				let cloudfrontDistro = null, cloudfrontResponseHeaderPolicy = null, cert = null, dnsRecords = [], originAccessControl = null
 				if (cloudfront) {
 					const cfDependsOn = [bucket]
 					const customDomainOn = cloudfront.customDomains && cloudfront.customDomains[0]
@@ -287,6 +289,17 @@ const Website = function (input) {
 					const cloudfrontName = `${name}-distro`
 					const originId = customDomainOn ? cloudfront.customDomains[0] : cloudfrontName
 
+					// Create Origin Access Control for secure S3 access
+					originAccessControl = new aws.cloudfront.OriginAccessControl(`${name}-oac`, {
+						name: `${name}-oac`,
+						description: `OAC for ${name} S3 bucket`,
+						originAccessControlOriginType: 's3',
+						signingBehavior: 'always',
+						signingProtocol: 'sigv4'
+					}, {
+						protect
+					})
+
 					// Doc: https://www.pulumi.com/registry/packages/aws/api-docs/cloudfront/distribution/
 					const { min:minTtl=0, max:maxTtl=86400, default:defaultTtl=3600, cacheControl } = cloudfront.cacheTtl || {}
 					const defaultCacheBehavior = {
@@ -337,7 +350,11 @@ const Website = function (input) {
 						comment: cloudfront.description || `CDN for S3 bucket ${name}`,
 						origins: [{
 							domainName: bucket.bucketRegionalDomainName,
-							originId
+							originId,
+							s3OriginConfig: {
+								originAccessIdentity: ''
+							},
+							originAccessControlId: originAccessControl.id
 						}],
 						enabled: true,
 						isIpv6Enabled: true,
@@ -411,6 +428,36 @@ const Website = function (input) {
 							dnsRecords.push(dnsRecord)
 							recordsStack.push(dnsRecord)
 						}
+					}
+
+					// Create bucket policy to allow only CloudFront OAC access
+					if (cloudfrontDistro) {
+						const bucketPolicyDocument = cloudfrontDistro.arn.apply(distributionArn => JSON.stringify({
+							Version: '2012-10-17',
+							Statement: [{
+								Sid: 'AllowCloudFrontServicePrincipal',
+								Effect: 'Allow',
+								Principal: {
+									Service: 'cloudfront.amazonaws.com'
+								},
+								Action: 's3:GetObject',
+								Resource: `arn:aws:s3:::${name}/*`,
+								Condition: {
+									StringEquals: {
+										'AWS:SourceArn': distributionArn
+									}
+								}
+							}]
+						}))
+
+						new aws.s3.BucketPolicy(`${name}-policy`, {
+							bucket: bucket.id,
+							policy: bucketPolicyDocument
+						}, {
+							parent: bucket,
+							dependsOn: [bucket, bucketPublicAccessBlock, cloudfrontDistro],
+							protect
+						})
 					}
 				}
 
