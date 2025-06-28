@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.27.0](https://github.com/cloudlesslabs/pulumix/compare/v0.26.0...v0.27.0) (2025-06-28)
+
+
+### Features
+
+* Implement new S3 AOC for static website ([767021f](https://github.com/cloudlesslabs/pulumix/commit/767021f99a3f3ad4645334b94bfb83f538a0de71))
+
 ## [0.26.0](https://github.com/cloudlesslabs/pulumix/compare/v0.25.0...v0.26.0) (2025-05-27)
 
 
