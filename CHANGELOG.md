@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.27.1](https://github.com/cloudlesslabs/pulumix/compare/v0.27.0...v0.27.1) (2025-06-28)
+
+
+### Bug Fixes
+
+* Missing aws-sdk ([2c2c395](https://github.com/cloudlesslabs/pulumix/commit/2c2c39551575a2dbd59b17c6aac3bec9e2092b5e))
+
 ## [0.27.0](https://github.com/cloudlesslabs/pulumix/compare/v0.26.0...v0.27.0) (2025-06-28)
 
 
