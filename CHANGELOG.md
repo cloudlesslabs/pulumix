@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.28.0](https://github.com/cloudlesslabs/pulumix/compare/v0.27.1...v0.28.0) (2025-08-11)
+
+
+### Bug Fixes
+
+* After upgrading pulumi, docker.buildAndPushImage is not supported anymore ([235f6f4](https://github.com/cloudlesslabs/pulumix/commit/235f6f4d1f0a3b992c608a78fd0d10443e05cf3d))
+
 ### [0.27.1](https://github.com/cloudlesslabs/pulumix/compare/v0.27.0...v0.27.1) (2025-06-28)
 
 
