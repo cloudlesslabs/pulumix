@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.29.0](https://github.com/cloudlesslabs/pulumix/compare/v0.28.0...v0.29.0) (2025-12-04)
+
+
+### Features
+
+* **s3:** Add support for S3 website cache control ([20416fb](https://github.com/cloudlesslabs/pulumix/commit/20416fb195405958630730c328ad56dddd73a94b))
+
 ## [0.28.0](https://github.com/cloudlesslabs/pulumix/compare/v0.27.1...v0.28.0) (2025-08-11)
 
 
