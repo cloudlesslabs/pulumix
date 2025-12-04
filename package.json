@@ -36,6 +36,7 @@
     "core-async": "^2.0.5",
     "fast-glob": "^3.2.7",
     "graphql": "^16.1.0",
+    "micromatch": "^4.0.8",
     "mime-types": "^2.1.33",
     "puffy": "^3.2.0"
   }

@@ -12,36 +12,84 @@ const { join, extname, sep, posix } = require('path')
 const { createHash } = require('crypto')
 const { utils: { throttle } } = require('core-async')
 const mime = require('mime-types')
+const micromatch = require('micromatch')
 const { error:{ catchErrors, wrapErrors } } = require('puffy')
 const AWS = require('aws-sdk')
 const s3 = new AWS.S3({ apiVersion: '2006-03-01', computeChecksums: true })
 
+/**
+ * Resolves the Cache-Control header value for a given file key based on the cacheControl configuration.
+ *
+ * @param  {String}				key						The file's S3 key (e.g., 'assets/js/app.js')
+ * @param  {String|Object}		cacheControl			Cache-Control configuration
+ * @param  {String}					.default			Default Cache-Control value for all files
+ * @param  {[Object]}				.rules[]			Rules to match specific files
+ * @param  {String}						.match			Glob pattern to match file keys 
+ * @param  {String}						.value			Cache-Control value for matched files
+ *
+ * @return {String|undefined}							The resolved Cache-Control header value, or undefined if not configured
+ */
+const getCacheControl = (key, cacheControl) => {
+	if (!cacheControl)
+		return undefined
+
+	// Simple string: apply to all files
+	if (typeof cacheControl === 'string')
+		return cacheControl
+
+	// Object with default and/or rules
+	if (typeof cacheControl === 'object') {
+		const { default: defaultValue, rules } = cacheControl
+
+		// Check rules first (more specific takes precedence)
+		if (rules && Array.isArray(rules)) {
+			for (const rule of rules) {
+				if (rule && rule.match && rule.value) {
+					if (micromatch.isMatch(key, rule.match))
+						return rule.value
+				}
+			}
+		}
+
+		// Fall back to default
+		if (defaultValue)
+			return defaultValue
+	}
+
+	return undefined
+}
+
 
 /**
- * Syncs files with an S3 bucket. Doc: 
+ * Syncs files with an S3 bucket. Doc:
  * 		- putObject: https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#putObject-property
  * 		- deleteObjects: https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#deleteObjects-property
  *
  * WARNING: This operation requires a the 's3:PutObject' permission. If the ACL is also set, then the 's3:PutObjectAcl'
  * permission is also required.
- * 
+ *
  * @param  {String}				bucket					Bucket name.
  * @param  {[Object]}			files[]
  * @param  {Buffer}					.content
- * @param  {String}					.path		
+ * @param  {String}					.path
  * @param  {String}					.key
- * @param  {String}					.contentType		
- * @param  {String}					.cacheControl		
- * @param  {String}					.hash			
- * @param  {Number}					.contentLength	
- * @param  {String}				dir		
- * @param  {String|[String]}	ignore					(1) Ignore patterns for files under 'dir' 
+ * @param  {String}					.contentType
+ * @param  {String}					.cacheControl
+ * @param  {String}					.hash
+ * @param  {Number}					.contentLength
+ * @param  {String}				dir
+ * @param  {String|[String]}	ignore					(1) Ignore patterns for files under 'dir'
+ * @param  {String|Object}		cacheControl			(3) Cache-Control configuration for S3 object metadata.
+ * @param  {String}					.default			Default Cache-Control value for all files.
+ * @param  {[Object]}				.rules[]			Rules to match specific files.
+ * @param  {String}						.match			Glob pattern to match file keys
+ * @param  {String}						.value			Cache-Control value for matched files.
  * @param  {[Object]}			existingObjects[]		Skip uploading files that match both the key AND the hash
  * @param  {String}					.key				Bucket object key
  * @param  {String}					.hash				Bucket object hash
  * @param  {Boolean}			remove					Default false. True means all files must be removed from the bucket.
  * @param  {Boolean}			noWarning				Default false.
- * 
+ *
  * @return {Boolean}			output.updated			True means at least one file was either uploaded or deleted.
  * @return {Boolean}			output.srcFiles			All files(2) in the local file system.
  * @return {Boolean}			output.uploadedFiles	Uploaded files(2) dues to being new or having changed
@@ -50,15 +98,24 @@ const s3 = new AWS.S3({ apiVersion: '2006-03-01', computeChecksums: true })
 // (1) For example, to ignore the content under the node_modules folder: '**/node_modules/**'
 // (2) A file object is structured as follow:
 //		{String} file				Absolute file path.
-//		{String} dir				Absolute folder path.	
+//		{String} dir				Absolute folder path.
 //		{String} key				Object's key in S3
-//		{String} path				Relative file path (relative to the folder).	
-//		{String} hash				MD5 file hash	
+//		{String} path				Relative file path (relative to the folder).
+//		{String} hash				MD5 file hash
 //		{String} contentType		e.g., 'application/javascript; charset=utf-8' or 'image/png'
-//		{Number} contentLength		File's size in bytes.	
+//		{String} cacheControl		e.g., 'max-age=3600, public'
+//		{Number} contentLength		File's size in bytes.
 //		{Buffer} content			Only set if 'includeContent' is set to true.
-// 
-const syncFiles = ({ bucket, files, dir, ignore, existingObjects, remove, noWarning }) => catchErrors((async () => {
+// (3) Example:
+//		cacheControl: {
+//			default: 'max-age=3600',
+//			rules: [
+//				{ match: '**/*.html', value: 'no-cache, no-store, must-revalidate' },
+//				{ match: '**/*.{js,css}', value: 'max-age=31536000, immutable' }
+//			]
+//		}
+//
+const syncFiles = ({ bucket, files, dir, ignore, cacheControl, existingObjects, remove, noWarning }) => catchErrors((async () => {
 	const errMsg = `Failed to sync files with S3 bucket '${bucket}'`
 	existingObjects = existingObjects || []
 
@@ -74,10 +131,10 @@ const syncFiles = ({ bucket, files, dir, ignore, existingObjects, remove, noWarn
 	let _files = files && files.length ? [...files] : []
 
 	if (dir) {
-		const [fileErrors, dirFiles] = await getFiles({ dir, includeContent:true, ignore })
+		const [fileErrors, dirFiles] = await getFiles({ dir, includeContent:true, ignore, cacheControl })
 		if (fileErrors)
-			throw wrapErrors(errMsg, dirFiles)	
-		
+			throw wrapErrors(errMsg, dirFiles)
+
 		_files.push(...dirFiles)
 	}
 
@@ -209,27 +266,27 @@ const uploadFiles = ({ bucket, files, dir, ignore, ignoreObjects }) => catchErro
 })())
 
 /**
- * Syncs files with an S3 bucket. Doc: 
- * 		- putObject: https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#putObject-property
- * 		- deleteObjects: https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#deleteObjects-property
+ * Gets the difference between local files and previously uploaded files.
  *
- * WARNING: This operation requires a the 's3:PutObject' permission. If the ACL is also set, then the 's3:PutObjectAcl'
- * permission is also required.
- * 
  * @param  {[Object]}			files[]
  * @param  {Buffer}					.content
- * @param  {String}					.path		
+ * @param  {String}					.path
  * @param  {String}					.key
- * @param  {String}					.contentType		
- * @param  {String}					.cacheControl		
- * @param  {String}					.hash			
- * @param  {Number}					.contentLength	
- * @param  {String}				dir		
- * @param  {String|[String]}	ignore					(1) Ignore patterns for files under 'dir' 
+ * @param  {String}					.contentType
+ * @param  {String}					.cacheControl
+ * @param  {String}					.hash
+ * @param  {Number}					.contentLength
+ * @param  {String}				dir
+ * @param  {String|[String]}	ignore					(1) Ignore patterns for files under 'dir'
+ * @param  {String|Object}		cacheControl			(3) Cache-Control configuration for S3 object metadata.
+ * @param  {String}					.default			Default Cache-Control value for all files.
+ * @param  {[Object]}				.rules[]			Rules to match specific files.
+ * @param  {String}						.match			Glob pattern to match file keys
+ * @param  {String}						.value			Cache-Control value for matched files.
  * @param  {[Object]}			previousFiles[]			Skip uploading files that match both the key AND the hash
  * @param  {String}					.key				Bucket object key
  * @param  {String}					.hash				Bucket object hash
- * 
+ *
  * @return {Boolean}			output.diff				True means at least one file has either changed(or had been created) or was deleted.
  * @return {Boolean}			output.srcFiles			All files(2) in the local file system.
  * @return {Boolean}			output.unchangedFiles	(2)
@@ -239,25 +296,34 @@ const uploadFiles = ({ bucket, files, dir, ignore, ignoreObjects }) => catchErro
 // (1) For example, to ignore the content under the node_modules folder: '**/node_modules/**'
 // (2) A file object is structured as follow:
 //		{String} file				Absolute file path.
-//		{String} dir				Absolute folder path.	
+//		{String} dir				Absolute folder path.
 //		{String} key				Object's key in S3
-//		{String} path				Relative file path (relative to the folder).	
-//		{String} hash				MD5 file hash	
+//		{String} path				Relative file path (relative to the folder).
+//		{String} hash				MD5 file hash
 //		{String} contentType		e.g., 'application/javascript; charset=utf-8' or 'image/png'
-//		{Number} contentLength		File's size in bytes.	
+//		{String} cacheControl		e.g., 'max-age=3600, public'
+//		{Number} contentLength		File's size in bytes.
 //		{Buffer} content			Only set if 'includeContent' is set to true.
-// 
-const getDiffFiles = ({ files, dir, ignore, previousFiles }) => catchErrors((async () => {
+// (3) Example:
+//		cacheControl: {
+//			default: 'max-age=3600',
+//			rules: [
+//				{ match: '**/*.html', value: 'no-cache, no-store, must-revalidate' },
+//				{ match: '**/*.{js,css}', value: 'max-age=31536000, immutable' }
+//			]
+//		}
+//
+const getDiffFiles = ({ files, dir, ignore, cacheControl, previousFiles }) => catchErrors((async () => {
 	const errMsg = 'Failed to get the difference between files'
 	previousFiles = previousFiles || []
 
 	const _files = files && files.length ? [...files] : []
 
 	if (dir) {
-		const [fileErrors, dirFiles] = await getFiles({ dir, includeContent:true, ignore })
+		const [fileErrors, dirFiles] = await getFiles({ dir, includeContent:true, ignore, cacheControl })
 		if (fileErrors)
-			throw wrapErrors(errMsg, dirFiles)	
-		
+			throw wrapErrors(errMsg, dirFiles)
+
 		_files.push(...dirFiles)
 	}
 
@@ -414,26 +480,32 @@ const getContentType = fileOrExt => !fileOrExt ? '' : (mime.contentType(fileOrEx
 
 //
 // Gets a flat list of all the files under a folder.
-// 
-// @param  {String}			dir		
+//
+// @param  {String}				dir
 // @param  {Boolean}			includeContent			Default false.
 // @param  {String|[String]}	ignore					e.g., Ignore the content under the node_modules folder: '**/node_modules/**'
-// 
-// @return {String}			data[].file				Absolute file path.	
-// @return {String}			data[].dir				Absolute folder path.	
-// @return {String}			data[].path				Relative file path (relative to the folder).	
-// @return {String}			data[].key				S3 key
-// @return {String}			data[].hash				MD5 file hash	
-// @return {String}			data[].contentType		e.g., 'application/javascript; charset=utf-8' or 'image/png'
-// @return {Number}			data[].contentLength	File's size in bytes.	
-// @return {Buffer}			data[].content			Only set if 'includeContent' is set to true.
+// @param  {String|Object}		cacheControl			Cache-Control configuration for S3 object metadata.
+// @param  {String}					.default			Default Cache-Control value for all files.
+// @param  {[Object]}				.rules[]			Rules to match specific files.
+// @param  {String}						.match			Glob pattern to match file keys (e.g., '**/*.html', '**/*.{js,css}')
+// @param  {String}						.value			Cache-Control value for matched files.
 //
-const getFiles = ({ dir, includeContent, ignore }) => catchErrors((async () => {
+// @return {String}				data[].file				Absolute file path.
+// @return {String}				data[].dir				Absolute folder path.
+// @return {String}				data[].path				Relative file path (relative to the folder).
+// @return {String}				data[].key				S3 key
+// @return {String}				data[].hash				MD5 file hash
+// @return {String}				data[].contentType		e.g., 'application/javascript; charset=utf-8' or 'image/png'
+// @return {String}				data[].cacheControl		e.g., 'max-age=3600, public'
+// @return {Number}				data[].contentLength	File's size in bytes.
+// @return {Buffer}				data[].content			Only set if 'includeContent' is set to true.
+//
+const getFiles = ({ dir, includeContent, ignore, cacheControl }) => catchErrors((async () => {
 	const errMsg = `Fail to get all files in folder '${dir}'`
 
 	const [listErrors, files] = await getLocalFiles(dir, { pattern:'**/*.*', ignore })
 	if (listErrors)
-		throw wrapErrors(errMsg, listErrors)	
+		throw wrapErrors(errMsg, listErrors)
 
 	if (!files || !files.length)
 		return []
@@ -449,14 +521,16 @@ const getFiles = ({ dir, includeContent, ignore }) => catchErrors((async () => {
 			const content = contentLength ? buf.toString() : ''
 			const hash = createHash('md5').update(content).digest('hex')
 			const path = file.replace(dir,'')
+			const key = path.split(sep).filter(x => x).join(posix.sep)
 
 			const output = {
 				file,
 				dir,
 				path,
-				key: path.split(sep).filter(x => x).join(posix.sep),
+				key,
 				hash,
 				contentType: getContentType(extname(file)),
+				cacheControl: getCacheControl(key, cacheControl),
 				contentLength
 			}
 
@@ -468,7 +542,7 @@ const getFiles = ({ dir, includeContent, ignore }) => catchErrors((async () => {
 	}),10)
 
 	if (allErrors.length)
-		throw wrapErrors(errMsg, allErrors)	
+		throw wrapErrors(errMsg, allErrors)
 
 	return filesData
 })())

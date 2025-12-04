@@ -18,11 +18,16 @@ const { distribution: { invalidate:invalidateDistribution, exists:distributionEx
 
 /**
  * Upload files and optionally invalidate the CloudFront distro if it exists.
- * 
- * @param  {Output<Bucket>}				bucket				
+ *
+ * @param  {Output<Bucket>}				bucket
  * @param  {Object} 					content
  * @param  {String}							.dir					Local path to the content that should be moved to the bucket.
- * @param  {String|[String]}				.ignore					(1) Ignore patterns for files under 'dir' 
+ * @param  {String|[String]}				.ignore					(1) Ignore patterns for files under 'dir'
+ * @param  {String|Object}					.cacheControl			(2) Cache-Control configuration for S3 object metadata.
+ * @param  {String}								.default			Default Cache-Control value for all files.
+ * @param  {[Object]}							.rules[]			Rules to match specific files.
+ * @param  {String}									.match			Glob pattern to match file keys
+ * @param  {String}									.value			Cache-Control value for matched files.
  * @param  {[Object]}						.existingContent[]		Skip uploading files that match both the key AND the hash
  * @param  {String}								.key				Bucket object key
  * @param  {String}								.hash				Bucket object hash
@@ -32,11 +37,21 @@ const { distribution: { invalidate:invalidateDistribution, exists:distributionEx
  * @param  {[String]}						.customDomains			e.g., ['www.example.com', 'example.com']
  * @param  {[String]}						.allowedMethods			Default ['GET', 'HEAD', 'OPTIONS']
  * @param  {Boolean}						.invalidateOnUpdate		Default false. True means that if 'website.content' is set and content updates are detected, then the distribution must be invalidated
- * 
+ *
  * @return {[Object]}					files[]
  * @return {String}							.key					Object's key in S3
- * @return {String}							.hash					MD5 file hash   
+ * @return {String}							.hash					MD5 file hash
  */
+// (1) For example, to ignore the content under the node_modules folder: '**/node_modules/**'
+// (2) Example:
+//		cacheControl: {
+//			default: 'max-age=3600',
+//			rules: [
+//				{ match: '**/*.html', value: 'no-cache, no-store, must-revalidate' },
+//				{ match: '**/*.{js,css}', value: 'max-age=31536000, immutable' }
+//			]
+//		}
+//
 const _uploadFiles = async ({ bucket, content, cloudfrontDistro, cloudfront }) => {
 	let files
 
@@ -44,9 +59,10 @@ const _uploadFiles = async ({ bucket, content, cloudfrontDistro, cloudfront }) =
 
 	if (pulumi.runtime.isDryRun()) { // if this is preview
 		if (!content.remove) {
-			const [errors, filesData] = await getDiffFiles({ 
-				dir: content.dir, 
+			const [errors, filesData] = await getDiffFiles({
+				dir: content.dir,
 				ignore: content.ignore,
+				cacheControl: content.cacheControl,
 				previousFiles: content.existingContent
 			})
 			if (errors)
@@ -56,10 +72,11 @@ const _uploadFiles = async ({ bucket, content, cloudfrontDistro, cloudfront }) =
 			files = (srcFiles||[]).map(file => ({ key:file.key, hash:file.hash }))
 		}
 	} else {
-		const [errors, filesData] = await syncFiles({ 
-			bucket: bucketName, 
-			dir: content.dir, 
+		const [errors, filesData] = await syncFiles({
+			bucket: bucketName,
+			dir: content.dir,
 			ignore: content.ignore,
+			cacheControl: content.cacheControl,
 			existingObjects: content.existingContent,
 			remove: content.remove,
 			noWarning: true
@@ -90,23 +107,28 @@ const _uploadFiles = async ({ bucket, content, cloudfrontDistro, cloudfront }) =
 
 /**
  * Doc: https://www.pulumi.com/docs/reference/pkg/aws/s3/bucket/
- * 
+ *
  * Resources:
  * 	1. S3 bucket.
  * 	2. (Optional) CloudFront Distribution
  * 	3. (Optional) Uploads files to S3.
- * 	
- * @param  {Output<String>}				name				
- * @param  {Output<String>}				acl								Valid values: 'private' (default), 'public-read' (for website), 'public-read-write', 'aws-exec-read', 'authenticated-read', and 'log-delivery-write'	
+ *
+ * @param  {Output<String>}				name
+ * @param  {Output<String>}				acl								Valid values: 'private' (default), 'public-read' (for website), 'public-read-write', 'aws-exec-read', 'authenticated-read', and 'log-delivery-write'
  * @param  {Object}						website							If exists, overwrites 'acl' with 'public-read'
- * @param  {Output<String>}					.indexDocument				e.g., 'index.html'	
+ * @param  {Output<String>}					.indexDocument				e.g., 'index.html'
  * @param  {Output<String>}					.errorDocument				e.g., 'error.html'
  * @param  {Output<String>}					.redirectAllRequestsTo		e.g., 'https://neap.co'
- * @param  {Output<[Object]>}				.routingRules				https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-s3-websiteconfiguration-routingrules.html	
- * @param  {Output<[Object]>}				.cors						https://www.pulumi.com/docs/reference/pkg/aws/s3/bucket/#using-cors	
+ * @param  {Output<[Object]>}				.routingRules				https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-s3-websiteconfiguration-routingrules.html
+ * @param  {Output<[Object]>}				.cors						https://www.pulumi.com/docs/reference/pkg/aws/s3/bucket/#using-cors
  * @param  {Output<Object>}					.content
  * @param  {Output<String>}						.dir					Local path to the content that should be moved to the bucket.
- * @param  {Output<String|[String]>}			.ignore					(1) Ignore patterns for files under 'dir' 
+ * @param  {Output<String|[String]>}			.ignore					(1) Ignore patterns for files under 'dir'
+ * @param  {Output<String|Object>}				.cacheControl			(5) Cache-Control configuration for S3 object metadata.
+ * @param  {Output<String>}							.default			Default Cache-Control value for all files.
+ * @param  {Output<[Object]>}						.rules[]			Rules to match specific files.
+ * @param  {Output<String>}								.match			Glob pattern to match file keys
+ * @param  {Output<String>}								.value			Cache-Control value for matched files.
  * @param  {Output<[Object]>}					.existingContent[]		Skip uploading files that match both the key AND the hash
  * @param  {Output<String>}							.key				Bucket object key
  * @param  {Output<String>}							.hash				Bucket object hash
@@ -159,14 +181,22 @@ const _uploadFiles = async ({ bucket, content, cloudfrontDistro, cloudfront }) =
  * 
  */
 // (1)	For example, to ignore the content under the node_modules folder: '**/node_modules/**'
-// (2)	'auto' means a new AWS ACM certificate is automatically profisionned using the values from the 
+// (2)	'auto' means a new AWS ACM certificate is automatically profisionned using the values from the
 // 		'website.cloudfront.customDomains' properties. It uses the 'DNS' challenge.
-// (3)	When 'website.cloudfront.dns.validateChallenge' is true and 'website.cloudfront.acmCertificateArn' is set to 'auto', a new 
+// (3)	When 'website.cloudfront.dns.validateChallenge' is true and 'website.cloudfront.acmCertificateArn' is set to 'auto', a new
 // 		Route 53 record is added to the 'website.cloudfront.dns.domainZoneId' to validate the DNS challenge (WARNING:
 // 		this assumes that the Route 53 Zone ID is also managed in the same AWS account).
 // (4)	Zone ID in Route 53 which is required to validate DNS challenge.
-// 		
-// 
+// (5)	Cache-Control can be a simple string (applied to all files) or an object with default and rules:
+//		cacheControl: {
+//			default: 'max-age=3600',
+//			rules: [
+//				{ match: '**/*.html', value: 'no-cache, no-store, must-revalidate' },
+//				{ match: '**/*.{js,css}', value: 'max-age=31536000, immutable' }
+//			]
+//		}
+//
+
 const Website = function (input) {
 	const output = unwrap(input).apply(({ name, website:__website, versioning, tags, parent, dependsOn, protect }) => {
 		if (!name)
