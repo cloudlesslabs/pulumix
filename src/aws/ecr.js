@@ -130,7 +130,7 @@ const Image = function ({ name, tag, publicConfig, dir, args, scanOnPush, imageT
 				password: pulumi.secret(token.password),
 			}))
 		: repository.registryId.apply(async (registryId) => {
-			const credentials = await aws.ecr.getCredentials({ registryId }, { async: true })
+			const credentials = await aws.ecr.getAuthorizationToken({ registryId }, { async: true })
 			const decodedCredentials = Buffer.from(credentials.authorizationToken, 'base64').toString()
 			const [username, password] = decodedCredentials.split(':')
 			if (!password || !username)
