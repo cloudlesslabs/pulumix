@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.29.1](https://github.com/cloudlesslabs/pulumix/compare/v0.29.0...v0.29.1) (2025-12-07)
+
+
+### Bug Fixes
+
+* **ecr:** Replace deprecated getCredentials with getAuthorizationToken for @pulumi/aws v6+ compatibility ([658349c](https://github.com/cloudlesslabs/pulumix/commit/658349ccd578513efc90884899e46f00b439c313))
+
 ## [0.29.0](https://github.com/cloudlesslabs/pulumix/compare/v0.28.0...v0.29.0) (2025-12-04)
 
 
