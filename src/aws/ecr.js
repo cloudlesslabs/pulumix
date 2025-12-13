@@ -118,7 +118,7 @@ const Image = function ({ name, tag, publicConfig, dir, args, scanOnPush, imageT
 		args, 
 		// If you relied on specific CLI flags, you can pass them through here.
 		// (Supported by the classic docker provider.)
-		extraOptions
+		...(extraOptions||{})
 	}
 
 	// Resolve auth for Docker registry (private ECR vs public ECR)
