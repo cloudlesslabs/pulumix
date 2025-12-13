@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.31.0](https://github.com/cloudlesslabs/pulumix/compare/v0.30.1...v0.31.0) (2025-12-13)
+
+
+### Features
+
+* Automate the platform decision based on the lambda architecture ([f611f87](https://github.com/cloudlesslabs/pulumix/commit/f611f877390901cff8a8af4c0651e366e7751261))
+
 ### [0.30.1](https://github.com/cloudlesslabs/pulumix/compare/v0.30.0...v0.30.1) (2025-12-13)
 
 
