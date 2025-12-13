@@ -246,6 +246,11 @@ class Lambda extends aws.lambda.Function {
 			// 		Name: canonicalName
 			// 	}
 			// })
+			if (!imageOpts)
+				imageOpts = {}
+			if (!imageOpts.platform)
+				imageOpts.platform = architecture == 'x86_64' ? 'linux/amd64' : 'linux/arm64'
+
 			const image = type == 'image' || dockerFileFound 
 				? new Image({ 
 					name: canonicalName,
