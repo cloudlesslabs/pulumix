@@ -150,7 +150,7 @@ class Lambda extends aws.lambda.Function {
 	 * 			// deliveryPolicy: ... // Optional Object. Refer to doc: https://docs.aws.amazon.com/sns/latest/dg/sns-message-delivery-retries.html
 	 * 		}
 	 */
-	constructor({ name, description, environment, architecture, fn, layers, timeout=3, memorySize=128, handler, policies:_policies, vpcConfig:_vpcConfig, fileSystemConfig, schedule, eventSources, publish, cloudWatch, cloudwatch, logsRetentionInDays, tags, parent, dependsOn:_dependsOn, protect, ...rest }) {
+	constructor({ name, description, environment, architecture, fn, layers, timeout=3, memorySize=128, handler, policies:_policies, vpcConfig:_vpcConfig, fileSystemConfig, schedule, eventSources, publish, cloudWatch, cloudwatch, logsRetentionInDays, tags, parent, dependsOn:_dependsOn, protect, imageOpts, ...rest }) {
 		tags = tags || {}
 		if (cloudWatch !== undefined && cloudwatch === undefined)
 			cloudwatch = cloudWatch
@@ -251,7 +251,8 @@ class Lambda extends aws.lambda.Function {
 					name: canonicalName,
 					dir: dir,
 					args: args || env ? { ...(args||{}), ...(env||{}) } : undefined,
-					tags
+					tags,
+					extraOptions: imageOpts
 				})
 				: null
 
