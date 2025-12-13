@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.30.1](https://github.com/cloudlesslabs/pulumix/compare/v0.30.0...v0.30.1) (2025-12-13)
+
+
+### Bug Fixes
+
+* Docker image issue ([15bbde5](https://github.com/cloudlesslabs/pulumix/commit/15bbde53bb6769e6cf8d878068202aa1ed4ce689))
+
 ## [0.30.0](https://github.com/cloudlesslabs/pulumix/compare/v0.29.1...v0.30.0) (2025-12-13)
 
 
