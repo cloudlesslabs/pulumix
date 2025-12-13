@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.30.0](https://github.com/cloudlesslabs/pulumix/compare/v0.29.1...v0.30.0) (2025-12-13)
+
+
+### Features
+
+* Add support for fully configuring the docker image via the Lambda constructor ([b6b2716](https://github.com/cloudlesslabs/pulumix/commit/b6b2716ccd83f82ee953799708841a9f351d02f7))
+
 ### [0.29.1](https://github.com/cloudlesslabs/pulumix/compare/v0.29.0...v0.29.1) (2025-12-07)
 
 
